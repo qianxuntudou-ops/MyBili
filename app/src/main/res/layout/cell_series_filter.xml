@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:id="@+id/click_view"
+    android:background="?attr/selectableItemBackground"
+    android:paddingTop="@dimen/px20"
+    android:paddingBottom="@dimen/px20"
+    android:focusable="true"
+    android:clickable="true"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/px20"
+    android:paddingEnd="@dimen/px20">
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/image_icon"
+        android:layout_width="@dimen/px50"
+        android:layout_height="@dimen/px50"
+        app:srcCompat="@drawable/tab_recommend"
+        app:tint="?android:attr/textColorPrimary"/>
+    <androidx.appcompat.widget.AppCompatTextView
+        android:textSize="@dimen/px28"
+        android:textColor="?android:attr/textColorPrimary"
+        android:id="@+id/text_filter"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/filter_type"
+        android:layout_weight="1"
+        android:layout_marginStart="@dimen/px15"/>
+</androidx.appcompat.widget.LinearLayoutCompat>

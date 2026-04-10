@@ -1,0 +1,182 @@
+package com.tutu.myblbl.ui.fragment.main.category
+
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
+import com.tutu.myblbl.R
+import com.tutu.myblbl.databinding.FragmentCategoryBinding
+import com.tutu.myblbl.model.CategoryModel
+import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
+import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.enableTouchNavigation
+import com.tutu.myblbl.utils.focusNearestTabTo
+import com.tutu.myblbl.utils.focusSelectedTab
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
+
+class CategoryFragment : BaseFragment<FragmentCategoryBinding>(), MainTabFocusTarget {
+
+    companion object {
+        private const val TAG = "MainEntryFocus"
+        fun newInstance(): CategoryFragment = CategoryFragment()
+    }
+
+    private lateinit var tabLayout: TabLayout
+    private lateinit var viewPager: ViewPager2
+    private lateinit var adapter: CategoryFragmentAdapter
+    private val categories = mutableListOf<CategoryModel>()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        EventBus.getDefault().register(this)
+    }
+
+    override fun getViewBinding(
+        inflater: LayoutInflater,
+        container: ViewGroup?
+    ): FragmentCategoryBinding {
+        return FragmentCategoryBinding.inflate(inflater, container, false)
+    }
+
+    override fun initView() {
+        tabLayout = binding.tabLayout
+        viewPager = binding.viewPager
+
+        adapter = CategoryFragmentAdapter(
+            childFragmentManager,
+            lifecycle
+        )
+        viewPager.adapter = adapter
+        viewPager.offscreenPageLimit = 1
+        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
+            tab.text = adapter.getPageTitle(position)
+        }.attach()
+        tabLayout.enableTouchNavigation(
+            viewPager = viewPager,
+            matchLegacyViewPagerAnimation = true,
+            onNavigateDown = ::focusCurrentPagePrimaryContent
+        )
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                adapter.getCurrentFragment(tab.position)?.onTabSelected()
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+
+            override fun onTabReselected(tab: TabLayout.Tab) = Unit
+        })
+
+        initCategories()
+    }
+
+    private fun initCategories() {
+        categories.clear()
+        val resources = requireContext().resources
+
+        categories.add(CategoryModel(0, resources.getString(R.string.allWeb)))
+        categories.add(CategoryModel(1, resources.getString(R.string.cartoon)))
+        categories.add(CategoryModel(3, resources.getString(R.string.music)))
+        categories.add(CategoryModel(129, resources.getString(R.string.dance)))
+        categories.add(CategoryModel(4, resources.getString(R.string.game)))
+        categories.add(CategoryModel(36, resources.getString(R.string.knowledge)))
+        categories.add(CategoryModel(188, resources.getString(R.string.science)))
+        categories.add(CategoryModel(234, resources.getString(R.string.sport)))
+        categories.add(CategoryModel(223, resources.getString(R.string.auto)))
+        categories.add(CategoryModel(160, resources.getString(R.string.lifestyle)))
+        categories.add(CategoryModel(211, resources.getString(R.string.food)))
+        categories.add(CategoryModel(217, resources.getString(R.string.pet)))
+        categories.add(CategoryModel(119, resources.getString(R.string.kichiku)))
+        categories.add(CategoryModel(155, resources.getString(R.string.fashion)))
+        categories.add(CategoryModel(5, resources.getString(R.string.entainment)))
+        categories.add(CategoryModel(181, resources.getString(R.string.film_and_television)))
+        categories.add(CategoryModel(177, resources.getString(R.string.documentary)))
+        categories.add(CategoryModel(23, resources.getString(R.string.movie)))
+        categories.add(CategoryModel(11, resources.getString(R.string.series)))
+
+        adapter.setCategories(categories)
+        
+        viewPager.currentItem = 0
+    }
+
+    override fun initData() {
+        binding.viewPager.post {
+            adapter.getCurrentFragment(viewPager.currentItem)?.onTabSelected()
+        }
+    }
+
+    override fun initObserver() {
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onMessageEvent(event: String) {
+        if (isHidden) {
+            return
+        }
+        when (event) {
+            "selectTab1" -> {
+                adapter.getCurrentFragment(viewPager.currentItem)?.onTabSelected()
+            }
+            "clickTab1" -> {
+                adapter.getCurrentFragment(viewPager.currentItem)?.refresh()
+            }
+            "keyMenuPress" -> adapter.getCurrentFragment(viewPager.currentItem)?.refresh()
+            "backPressed" -> adapter.getCurrentFragment(viewPager.currentItem)?.scrollToTop()
+        }
+    }
+
+    fun scrollToTop() {
+        adapter.getCurrentFragment(viewPager.currentItem)?.scrollToTop()
+    }
+
+    override fun onDestroyView() {
+        binding.viewPager.adapter = null
+        super.onDestroyView()
+    }
+
+    override fun onDestroy() {
+        EventBus.getDefault().unregister(this)
+        super.onDestroy()
+    }
+
+    fun focusCurrentTab(anchorView: View? = view?.findFocus() ?: activity?.currentFocus): Boolean {
+        return binding.tabLayout.focusNearestTabTo(anchorView)
+    }
+
+    override fun focusEntryFromMainTab(): Boolean {
+        return focusEntryFromMainTab(anchorView = null, preferSpatialEntry = false)
+    }
+
+    override fun focusEntryFromMainTab(anchorView: View?, preferSpatialEntry: Boolean): Boolean {
+        val handled = focusCurrentPagePrimaryContent(anchorView, preferSpatialEntry)
+        AppLog.d(
+            TAG,
+            "CategoryFragment.focusEntryFromMainTab: currentItem=${viewPager.currentItem} handled=$handled preferSpatialEntry=$preferSpatialEntry anchor=${anchorView?.javaClass?.simpleName ?: "null"} focus=${view?.findFocus()?.javaClass?.simpleName ?: "null"}"
+        )
+        return handled
+    }
+
+    private fun focusCurrentPagePrimaryContent(anchorView: View? = null, preferSpatialEntry: Boolean = false): Boolean {
+        return getCurrentListFragment()?.focusPrimaryContent(anchorView, preferSpatialEntry) == true
+    }
+
+    private fun getCurrentListFragment(): CategoryListFragment? {
+        val currentItem = viewPager.currentItem
+        val itemId = adapter.getItemId(currentItem)
+        val fragmentTag = "f$itemId"
+        childFragmentManager.findFragmentByTag(fragmentTag)?.let { return it as? CategoryListFragment }
+        for (fragment in childFragmentManager.fragments) {
+            if (fragment is CategoryListFragment && fragment.isVisible) {
+                return fragment
+            }
+        }
+        return null
+    }
+}

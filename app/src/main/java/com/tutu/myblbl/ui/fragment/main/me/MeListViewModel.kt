@@ -1,0 +1,140 @@
+package com.tutu.myblbl.ui.fragment.main.me
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.tutu.myblbl.repository.UserRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+class MeListViewModel(
+    private val userRepository: UserRepository
+) : ViewModel() {
+    private var lastLoadedAt = 0L
+
+    private val _uiState = MutableStateFlow(MeListUiState())
+    val uiState: StateFlow<MeListUiState> = _uiState.asStateFlow()
+
+    private val _loading = MutableStateFlow(false)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _hasMore = MutableStateFlow(true)
+    val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+
+    private var historyCursorViewAt: Long = 0
+
+    fun loadFavorites(@Suppress("UNUSED_PARAMETER") page: Int, @Suppress("UNUSED_PARAMETER") pageSize: Int) {
+        viewModelScope.launch {
+            _loading.value = true
+            _error.value = null
+            _loading.value = false
+        }
+    }
+
+    fun loadHistory(page: Int, pageSize: Int) {
+        viewModelScope.launch {
+            if (_loading.value) {
+                _loading.value = false
+                return@launch
+            }
+            _loading.value = true
+            _error.value = null
+
+            if (!userRepository.isLoggedIn()) {
+                _uiState.value = _uiState.value.copy(historyVideos = emptyList())
+                _hasMore.value = false
+                _error.value = "该功能需要登录后才可以使用"
+                _loading.value = false
+                return@launch
+            }
+
+            if (page == 1) {
+                historyCursorViewAt = 0
+            }
+
+            userRepository.getHistory(historyCursorViewAt, pageSize)
+                .onSuccess { response ->
+                    if (response.isSuccess && response.data != null) {
+                        val rawList = response.data.list
+                        val pageItems = rawList
+                            .filter { it.covers == null }
+                            .distinctBy(::historyItemKey)
+                        val merged = if (page == 1) {
+                            pageItems
+                        } else {
+                            (_uiState.value.historyVideos + pageItems).distinctBy(::historyItemKey)
+                        }
+                        _uiState.value = _uiState.value.copy(historyVideos = merged)
+                        historyCursorViewAt = response.data.cursor?.viewAt
+                            ?: rawList.lastOrNull()?.viewAt
+                            ?: 0L
+                        _hasMore.value = rawList.size >= pageSize
+                        lastLoadedAt = System.currentTimeMillis()
+                    } else {
+                        _error.value = response.errorMessage
+                    }
+                }
+                .onFailure { exception ->
+                    _error.value = exception.message
+                }
+
+            _loading.value = false
+        }
+    }
+
+    fun loadLaterWatch() {
+        viewModelScope.launch {
+            if (_loading.value) return@launch
+            _loading.value = true
+            _error.value = null
+
+            if (!userRepository.isLoggedIn()) {
+                _uiState.value = _uiState.value.copy(laterVideos = emptyList())
+                _hasMore.value = false
+                _error.value = "该功能需要登录后才可以使用"
+                _loading.value = false
+                return@launch
+            }
+
+            userRepository.getLaterWatch()
+                .onSuccess { response ->
+                    if (response.isSuccess && response.data != null) {
+                        _uiState.value = _uiState.value.copy(laterVideos = response.data.list)
+                        _hasMore.value = false
+                        lastLoadedAt = System.currentTimeMillis()
+                    } else {
+                        _error.value = response.errorMessage
+                    }
+                }
+                .onFailure { exception ->
+                    _error.value = exception.message
+                }
+
+            _loading.value = false
+        }
+    }
+
+    fun loadFollowing(@Suppress("UNUSED_PARAMETER") page: Int, @Suppress("UNUSED_PARAMETER") pageSize: Int) {
+        viewModelScope.launch {
+            _loading.value = true
+            _error.value = null
+            _loading.value = false
+        }
+    }
+
+    fun shouldRefresh(ttlMs: Long): Boolean {
+        return System.currentTimeMillis() - lastLoadedAt >= ttlMs
+    }
+
+    private fun historyItemKey(item: com.tutu.myblbl.model.video.HistoryVideoModel): String {
+        return when {
+            item.bvid.isNotBlank() -> "bvid:${item.bvid}"
+            (item.history?.oid ?: 0L) > 0L -> "aid:${item.history?.oid}"
+            else -> "title:${item.title}|cover:${item.cover}"
+        }
+    }
+}

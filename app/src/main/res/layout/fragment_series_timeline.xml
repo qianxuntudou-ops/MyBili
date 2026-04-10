@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/view_top"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/px100"
+        android:descendantFocusability="afterDescendants"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/button_back_1"
+            android:layout_width="@dimen/px100"
+            android:layout_height="@dimen/px100"
+            android:layout_marginStart="@dimen/px30"
+            android:background="?selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="@dimen/px35"
+            app:srcCompat="@drawable/ic_back"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/text_top_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/new_series_update"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="@dimen/px40"
+            android:textStyle="bold" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <RadioGroup
+        android:id="@+id/radio_group"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/px30"
+        android:layout_marginTop="@dimen/px20"
+        android:background="@drawable/bg_date_chooser"
+        android:orientation="horizontal"
+        android:padding="@dimen/px5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/view_top">
+
+        <RadioButton
+            android:id="@+id/button_radio_0"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:checked="true"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/recent_update"
+            android:textSize="@dimen/px32" />
+
+        <RadioButton
+            android:id="@+id/button_radio_1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/monday"
+            android:textSize="@dimen/px32" />
+
+        <RadioButton
+            android:id="@+id/button_radio_2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/tuesday"
+            android:textSize="@dimen/px32" />
+
+        <RadioButton
+            android:id="@+id/button_radio_3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/wednesday"
+            android:textSize="@dimen/px32" />
+
+        <RadioButton
+            android:id="@+id/button_radio_4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/thursday"
+            android:textSize="@dimen/px32" />
+
+        <RadioButton
+            android:id="@+id/button_radio_5"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/friday"
+            android:textSize="@dimen/px32" />
+
+        <RadioButton
+            android:id="@+id/button_radio_6"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/saturday"
+            android:textSize="@dimen/px32" />
+
+        <RadioButton
+            android:id="@+id/button_radio_7"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_item"
+            android:button="@android:color/transparent"
+            android:paddingStart="@dimen/px30"
+            android:paddingTop="@dimen/px5"
+            android:paddingEnd="@dimen/px30"
+            android:paddingBottom="@dimen/px5"
+            android:text="@string/sunday"
+            android:textSize="@dimen/px32" />
+    </RadioGroup>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:paddingStart="@dimen/px10"
+        android:paddingTop="@dimen/px20"
+        android:paddingEnd="@dimen/px90"
+        android:paddingBottom="@dimen/px20"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/radio_group" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="@+id/recyclerView"
+        app:layout_constraintEnd_toEndOf="@+id/recyclerView"
+        app:layout_constraintStart_toStartOf="@+id/recyclerView"
+        app:layout_constraintTop_toTopOf="@+id/recyclerView" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/image_empty"
+        android:layout_width="@dimen/px560"
+        android:layout_height="@dimen/px316"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@+id/recyclerView"
+        app:layout_constraintEnd_toEndOf="@+id/recyclerView"
+        app:layout_constraintStart_toStartOf="@+id/recyclerView"
+        app:layout_constraintTop_toTopOf="@+id/recyclerView"
+        app:srcCompat="@drawable/empty" />
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/text_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/px20"
+        android:text="@string/empty_data"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="@dimen/px30"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="@+id/recyclerView"
+        app:layout_constraintStart_toStartOf="@+id/recyclerView"
+        app:layout_constraintTop_toBottomOf="@+id/image_empty" />
+</androidx.constraintlayout.widget.ConstraintLayout>

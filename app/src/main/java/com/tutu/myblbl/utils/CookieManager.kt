@@ -1,0 +1,279 @@
+package com.tutu.myblbl.utils
+
+import android.content.Context
+import android.content.SharedPreferences
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
+import java.util.concurrent.ConcurrentHashMap
+
+class CookieManager : CookieJar {
+
+    private val webCookieManager: android.webkit.CookieManager by lazy {
+        android.webkit.CookieManager.getInstance().apply {
+            setAcceptCookie(true)
+        }
+    }
+    
+    private var sharedPreferences: SharedPreferences? = null
+    private val cookieCache = ConcurrentHashMap<String, MutableList<Cookie>>()
+    
+    companion object {
+        private const val PREF_NAME = "CookiePersistence"
+        private const val KEY_COOKIES = "cookies"
+    }
+    
+    fun init(context: Context) {
+        sharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        loadCookiesFromPrefs()
+        syncFromWebView()
+    }
+
+    private fun loadCookiesFromPrefs() {
+        cookieCache.clear()
+        val cookieStrings = sharedPreferences?.getStringSet(KEY_COOKIES, emptySet()) ?: emptySet()
+        cookieStrings.forEach { cookieString ->
+            parseCookie(cookieString)?.let(::upsertCookie)
+        }
+        persistCookieCache()
+    }
+
+    fun saveCookies(cookieStrings: List<String>) {
+        cookieStrings.forEach { cookieString ->
+            parseCookie(cookieString)?.let(::upsertCookie)
+        }
+        persistCookieCache()
+    }
+
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        removeExpiredCookies()
+        val resultCookies = mutableListOf<Cookie>()
+        val domain = url.host
+
+        cookieCache.forEach { (cookieDomain, domainCookies) ->
+            if (domain == cookieDomain || domain.endsWith(".$cookieDomain")) {
+                resultCookies.addAll(domainCookies.filter(::isCookieActive))
+            }
+        }
+        
+        return resultCookies
+            .distinctBy { "${it.name}|${it.domain}|${it.path}" }
+            .sortedWith(compareByDescending { it.name == "SESSDATA" })
+    }
+    
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+        val cookieStrings = cookies.map { encodeCookie(it) }
+        saveCookies(cookieStrings)
+        syncToWebView(url, cookies)
+    }
+    
+    fun getCsrfToken(): String {
+        return findCookie("bili_jct")?.value.orEmpty()
+    }
+
+    fun hasSessionCookie(): Boolean {
+        return findCookie("SESSDATA") != null
+    }
+
+    fun getCookieValue(name: String): String? {
+        return findCookie(name)?.value
+    }
+
+    fun clearCookies() {
+        cookieCache.clear()
+        sharedPreferences?.edit()?.clear()?.apply()
+        runCatching {
+            webCookieManager.removeAllCookies(null)
+            webCookieManager.flush()
+        }
+    }
+
+    fun syncFromWebView() {
+        knownCookieUrls.forEach { targetUrl ->
+            val rawCookies = runCatching {
+                webCookieManager.getCookie(targetUrl)
+            }.getOrNull().orEmpty()
+            if (rawCookies.isBlank()) {
+                return@forEach
+            }
+            val host = targetUrl.toHttpUrlOrNull()?.host ?: return@forEach
+            rawCookies.split(';')
+                .map { it.trim() }
+                .filter { it.isNotBlank() && it.contains('=') }
+                .forEach { cookiePair ->
+                    parseWebViewCookie(host, cookiePair)?.let(::upsertCookie)
+                }
+        }
+        persistCookieCache()
+    }
+    
+    private fun parseCookie(cookieString: String): Cookie? {
+        return try {
+            val parts = cookieString.split(";").map { it.trim() }
+            if (parts.isEmpty()) return null
+            
+            val nameValue = parts[0].split("=", limit = 2)
+            if (nameValue.size != 2) return null
+            
+            val builder = Cookie.Builder()
+                .name(nameValue[0])
+                .value(nameValue[1])
+            
+            parts.drop(1).forEach { part ->
+                when {
+                    part.startsWith("domain=", ignoreCase = true) -> {
+                        builder.domain(normalizeDomain(part.substring(7)))
+                    }
+                    part.startsWith("path=", ignoreCase = true) -> {
+                        builder.path(part.substring(5))
+                    }
+                    part.equals("secure", ignoreCase = true) -> {
+                        builder.secure()
+                    }
+                    part.startsWith("max-age=", ignoreCase = true) -> {
+                        builder.expiresAt(parseMaxAge(part.substring(8)))
+                    }
+                    part.startsWith("expires=", ignoreCase = true) -> {
+                        builder.expiresAt(parseExpires(part.substring(8)))
+                    }
+                }
+            }
+            
+            builder.build()
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    private fun parseExpires(expiresStr: String): Long {
+        return try {
+            if (expiresStr.toLongOrNull() != null) {
+                expiresStr.toLong()
+            } else {
+                System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000
+            }
+        } catch (e: Exception) {
+            System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000
+        }
+    }
+
+    private fun parseMaxAge(maxAgeStr: String): Long {
+        val seconds = maxAgeStr.toLongOrNull()
+            ?: return System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000
+        return if (seconds <= 0L) {
+            0L
+        } else {
+            System.currentTimeMillis() + seconds * 1000L
+        }
+    }
+    
+    private fun encodeCookie(cookie: Cookie): String {
+        val sb = StringBuilder()
+        sb.append(cookie.name).append("=").append(cookie.value)
+        sb.append("; domain=").append(normalizeDomain(cookie.domain))
+        sb.append("; path=").append(cookie.path)
+        if (cookie.secure) sb.append("; secure")
+        if (cookie.expiresAt != Long.MAX_VALUE) {
+            sb.append("; expires=").append(cookie.expiresAt)
+        }
+        return sb.toString()
+    }
+
+    private fun normalizeDomain(domain: String): String {
+        return domain.trim().removePrefix(".")
+    }
+
+    private fun syncToWebView(url: HttpUrl, cookies: List<Cookie>) {
+        cookies.forEach { cookie ->
+            runCatching {
+                webCookieManager.setCookie(url.toString(), encodeCookie(cookie))
+            }
+        }
+        runCatching {
+            webCookieManager.flush()
+        }
+    }
+
+    private fun parseWebViewCookie(host: String, cookiePair: String): Cookie? {
+        val nameValue = cookiePair.split("=", limit = 2)
+        if (nameValue.size != 2) {
+            return null
+        }
+        return runCatching {
+            Cookie.Builder()
+                .name(nameValue[0].trim())
+                .value(nameValue[1].trim())
+                .domain(normalizeDomain(host))
+                .path("/")
+                .expiresAt(Long.MAX_VALUE)
+                .build()
+        }.getOrNull()
+    }
+
+    private fun findCookie(name: String): Cookie? {
+        removeExpiredCookies()
+        return cookieCache.values
+            .asSequence()
+            .flatten()
+            .firstOrNull { it.name == name && isCookieActive(it) }
+    }
+
+    private fun upsertCookie(cookie: Cookie) {
+        val domain = normalizeDomain(cookie.domain)
+        if (domain.isBlank()) {
+            return
+        }
+        val cookies = cookieCache.getOrPut(domain) { mutableListOf() }
+        val existingIndex = cookies.indexOfFirst {
+            it.name == cookie.name && it.path == cookie.path
+        }
+        if (!isCookieActive(cookie)) {
+            if (existingIndex >= 0) {
+                cookies.removeAt(existingIndex)
+            }
+            if (cookies.isEmpty()) {
+                cookieCache.remove(domain)
+            }
+            return
+        }
+        if (existingIndex >= 0) {
+            cookies[existingIndex] = cookie
+        } else {
+            cookies.add(cookie)
+        }
+    }
+
+    private fun persistCookieCache() {
+        removeExpiredCookies()
+        val cookieStrings = cookieCache.values
+            .asSequence()
+            .flatten()
+            .filter(::isCookieActive)
+            .map(::encodeCookie)
+            .toSet()
+        sharedPreferences?.edit()?.putStringSet(KEY_COOKIES, cookieStrings)?.apply()
+    }
+
+    private fun removeExpiredCookies() {
+        val emptyDomains = mutableListOf<String>()
+        cookieCache.forEach { (domain, cookies) ->
+            cookies.removeAll { !isCookieActive(it) }
+            if (cookies.isEmpty()) {
+                emptyDomains += domain
+            }
+        }
+        emptyDomains.forEach(cookieCache::remove)
+    }
+
+    private fun isCookieActive(cookie: Cookie): Boolean {
+        return cookie.value.isNotBlank() && cookie.expiresAt > System.currentTimeMillis()
+    }
+
+    private val knownCookieUrls = listOf(
+        "https://www.bilibili.com/",
+        "https://api.bilibili.com/",
+        "https://passport.bilibili.com/",
+        "https://live.bilibili.com/"
+    )
+}

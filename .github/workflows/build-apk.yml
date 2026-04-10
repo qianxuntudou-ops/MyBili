@@ -1,0 +1,73 @@
+name: Android APK Build
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Get version name
+        id: get_version
+        run: |
+          VERSION=$(grep -A 10 "defaultConfig" app/build.gradle.kts | grep "versionName" | sed 's/.*versionName = "\(.*\)".*/\1/')
+          echo "VERSION_NAME=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Build Release APK (if secrets are configured)
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        if: ${{ env.KEYSTORE_FILE != '' }}
+        run: |
+          printf '%s' "$KEYSTORE_FILE" | base64 -d > app/keystore.jks
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=app/keystore.jks \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyBili-v${{ steps.get_version.outputs.VERSION_NAME }}-debug
+          path: app/build/outputs/apk/debug/MyBili-v${{ steps.get_version.outputs.VERSION_NAME }}-debug.apk
+
+      - name: Upload Release APK
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+        if: ${{ env.KEYSTORE_FILE != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyBili-v${{ steps.get_version.outputs.VERSION_NAME }}-release
+          path: app/build/outputs/apk/release/MyBili-v${{ steps.get_version.outputs.VERSION_NAME }}-release.apk
+
+      - name: Create GitHub Release
+        env:
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        if: startsWith(github.ref, 'refs/tags/') && env.PERSONAL_ACCESS_TOKEN != ''
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            app/build/outputs/apk/debug/MyBili-v${{ steps.get_version.outputs.VERSION_NAME }}-debug.apk
+            app/build/outputs/apk/release/MyBili-v${{ steps.get_version.outputs.VERSION_NAME }}-release.apk
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

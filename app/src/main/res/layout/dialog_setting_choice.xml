@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dialog_root"
+    android:layout_width="@dimen/px760"
+    android:layout_height="wrap_content"
+    android:background="@drawable/dialog_background"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/px18"
+    android:paddingBottom="@dimen/px18">
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/top_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="@dimen/px48"
+        android:paddingTop="@dimen/px18"
+        android:paddingEnd="@dimen/px48"
+        android:paddingBottom="@dimen/px18"
+        android:textColor="@color/textColor"
+        android:textSize="@dimen/px30"
+        android:textStyle="bold" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:descendantFocusability="afterDescendants"
+        android:paddingStart="@dimen/px18"
+        android:paddingTop="@dimen/px8"
+        android:paddingEnd="@dimen/px18"
+        android:paddingBottom="@dimen/px8" />
+
+
+
+</androidx.appcompat.widget.LinearLayoutCompat>

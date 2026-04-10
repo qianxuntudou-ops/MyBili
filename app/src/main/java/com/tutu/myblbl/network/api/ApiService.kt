@@ -1,0 +1,492 @@
+package com.tutu.myblbl.network.api
+
+import com.google.gson.JsonObject
+import com.tutu.myblbl.model.BaseResponse
+import com.tutu.myblbl.model.common.CollectionResultModel
+import com.tutu.myblbl.model.common.GiveCoinResultModel
+import com.tutu.myblbl.model.common.CheckGiveCoinModel
+import com.tutu.myblbl.model.common.TripleActionResultModel
+import com.tutu.myblbl.model.common.ZoneModel
+import com.tutu.myblbl.model.user.UserInfoModel
+import com.tutu.myblbl.model.user.UserStatModel
+import com.tutu.myblbl.model.user.UserSpaceInfo
+import com.tutu.myblbl.model.user.UserDetailInfoModel
+import com.tutu.myblbl.model.user.CheckRelationModel
+import com.tutu.myblbl.model.user.GetFollowUserWrapper
+import com.tutu.myblbl.model.user.ScanQrModel
+import com.tutu.myblbl.model.user.SignInResultModel
+import com.tutu.myblbl.model.video.VideoModel
+import com.tutu.myblbl.model.video.detail.VideoDetailModel
+import com.tutu.myblbl.model.video.VideoPvModel
+import com.tutu.myblbl.model.video.HistoryListResponse
+import com.tutu.myblbl.model.video.LaterWatchWrapper
+import com.tutu.myblbl.model.video.RegionVideoListWrapper
+import com.tutu.myblbl.model.video.UserDynamicResponse
+import com.tutu.myblbl.model.video.AllDynamicResponse
+import com.tutu.myblbl.model.video.GetVideoByChannelWrapper
+import com.tutu.myblbl.model.player.PlayInfoModel
+import com.tutu.myblbl.model.recommend.RecommendListDataModel
+import com.tutu.myblbl.model.favorite.FavoriteFolderModel
+import com.tutu.myblbl.model.favorite.CheckFavoriteModel
+import com.tutu.myblbl.model.favorite.FavoriteFolderDetailWrapper
+import com.tutu.myblbl.model.favorite.FavoriteFoldersWrapper
+import com.tutu.myblbl.model.favorite.FolderDetailModel
+import com.tutu.myblbl.model.live.*
+import com.tutu.myblbl.model.interaction.InteractionInfo
+import com.tutu.myblbl.model.interaction.InteractionModel
+import com.tutu.myblbl.model.search.SearchAllResponseData
+import com.tutu.myblbl.model.series.CheckUserSeriesResult
+import com.tutu.myblbl.model.series.EpisodesDetailModel
+import com.tutu.myblbl.model.series.FollowSeriesResult
+import com.tutu.myblbl.model.series.MyFollowingResponseWrapper
+import com.tutu.myblbl.model.series.SeasonSectionResult
+import com.tutu.myblbl.model.series.timeline.GetTimeLineWrapper
+import com.tutu.myblbl.network.response.Base2Response
+import com.tutu.myblbl.network.response.BaseBaseResponse
+import com.tutu.myblbl.network.response.GetAllSeriesWrapper
+import com.tutu.myblbl.network.response.GetLaneWrapper
+import com.tutu.myblbl.network.response.ListDataModel
+import com.tutu.myblbl.network.response.PlayerInfoDataWrapper
+import okhttp3.ResponseBody
+import retrofit2.http.*
+
+interface ApiService {
+
+    @GET("https://www.bilibili.com/")
+    suspend fun getMainPage(): ResponseBody
+
+    @GET("x/web-interface/nav")
+    suspend fun getUserDetailInfo(): BaseResponse<UserDetailInfoModel>
+
+    @GET("x/web-interface/nav/stat")
+    suspend fun getUserStat(): BaseResponse<UserStatModel>
+
+    @GET("x/relation/stat")
+    suspend fun getRelationStat(
+        @Query("vmid") vmid: Long
+    ): BaseResponse<UserStatModel>
+
+    @GET("x/member/web/account")
+    suspend fun getUserInfo(): BaseResponse<UserInfoModel>
+
+    @GET("x/relation/followings")
+    suspend fun getFollowing(
+        @Query("vmid") vmid: Long,
+        @Query("pn") page: Int,
+        @Query("ps") pageSize: Int
+    ): BaseResponse<GetFollowUserWrapper>
+
+    @GET("x/relation/followers")
+    suspend fun getFollower(
+        @Query("vmid") vmid: Long,
+        @Query("pn") page: Int,
+        @Query("ps") pageSize: Int
+    ): BaseResponse<GetFollowUserWrapper>
+
+    @GET("x/space/arc/list")
+    suspend fun getUserDynamic(
+        @Query("mid") mid: Long,
+        @Query("pn") page: Int,
+        @Query("ps") pageSize: Int
+    ): BaseResponse<UserDynamicResponse>
+
+    @GET("x/polymer/web-dynamic/desktop/v1/feed/video")
+    suspend fun getAllDynamic(
+        @Query("page") page: Int,
+        @Query("offset") offset: Long? = null
+    ): BaseResponse<AllDynamicResponse>
+
+    @GET("x/space/wbi/acc/info")
+    suspend fun getUserSpace(@QueryMap params: Map<String, String>): BaseResponse<UserSpaceInfo>
+
+    @GET("x/web-interface/index/top/feed/rcmd")
+    suspend fun getRecommendList(
+        @Query("fresh_idx") freshIdx: Int,
+        @Query("ps") ps: Int,
+        @Query("feed_version") feedVersion: String = "V1",
+        @Query("fresh_type") freshType: Int = 3,
+        @Query("plat") plat: Int = 1
+    ): BaseResponse<RecommendListDataModel<VideoModel>>
+
+    @GET("x/web-interface/popular")
+    suspend fun getHotList(
+        @Query("pn") page: Int,
+        @Query("ps") pageSize: Int
+    ): BaseResponse<ListDataModel<VideoModel>>
+
+    @GET("x/web-interface/ranking/v2")
+    suspend fun getRanking(
+        @Query("rid") rid: Int,
+        @Query("type") type: String = "all"
+    ): BaseResponse<ListDataModel<VideoModel>>
+
+    @GET("x/web-interface/dynamic/region")
+    suspend fun getRegionLatestVideos(
+        @Query("rid") rid: Int,
+        @Query("pn") page: Int,
+        @Query("ps") pageSize: Int
+    ): BaseResponse<RegionVideoListWrapper>
+
+    @GET("x/web-interface/view/detail")
+    suspend fun getVideoDetail(
+        @Query("avid") avid: Long?,
+        @Query("bvid") bvid: String?
+    ): BaseResponse<VideoDetailModel>
+
+    @GET("x/player/pagelist")
+    suspend fun getVideoPv(
+        @Query("avid") avid: Long?,
+        @Query("bvid") bvid: String?
+    ): BaseResponse<List<VideoPvModel>>
+
+    @GET("x/player/playurl")
+    suspend fun getVideoPlayInfo(
+        @Query("avid") avid: Long?,
+        @Query("bvid") bvid: String?,
+        @Query("cid") cid: Long,
+        @Query("qn") qn: Int = 80,
+        @Query("fnval") fnval: Int = 4048,
+        @Query("fourk") fourk: Int = 1,
+        @Query("fnver") fnver: Int = 0
+    ): BaseResponse<PlayInfoModel>
+
+    @GET("x/player/wbi/playurl?voice_balance=1&gaia_source=pre-load&isGaiaAvoided=true")
+    suspend fun getVideoPlayInfoWbi(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<PlayInfoModel>
+
+    @GET("x/player/v2")
+    suspend fun getPlayerInfo(
+        @Query("aid") aid: Long?,
+        @Query("bvid") bvid: String?,
+        @Query("cid") cid: Long
+    ): BaseResponse<PlayerInfoDataWrapper>
+
+    @GET("x/player/wbi/v2")
+    suspend fun getPlayerInfoWbi(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<PlayerInfoDataWrapper>
+
+    @GET("x/web-interface/archive/related")
+    suspend fun getRelated(
+        @Query("avid") avid: Long?,
+        @Query("bvid") bvid: String?
+    ): BaseResponse<List<VideoModel>>
+
+    @POST("x/click-interface/web/heartbeat")
+    @FormUrlEncoded
+    suspend fun playVideoHeartbeat(
+        @FieldMap params: Map<String, String>
+    ): BaseResponse<String>
+
+    @POST("x/web-interface/archive/like")
+    @FormUrlEncoded
+    suspend fun like(
+        @Field("avid") avid: Long?,
+        @Field("bvid") bvid: String?,
+        @Field("like") like: Int,
+        @Field("csrf") csrf: String
+    ): BaseResponse<Int>
+
+    @GET("x/web-interface/archive/has/like")
+    suspend fun hasLike(
+        @Query("avid") avid: Long?,
+        @Query("bvid") bvid: String?
+    ): BaseResponse<Int>
+
+    @POST("x/web-interface/coin/add")
+    @FormUrlEncoded
+    suspend fun giveCoin(
+        @Field("avid") avid: Long?,
+        @Field("bvid") bvid: String?,
+        @Field("multiply") multiply: Int,
+        @Field("select_like") selectLike: Int,
+        @Field("csrf") csrf: String
+    ): BaseResponse<GiveCoinResultModel>
+
+    @GET("x/web-interface/archive/coins")
+    suspend fun hasGiveCoin(
+        @Query("avid") avid: Long?,
+        @Query("bvid") bvid: String?
+    ): BaseResponse<CheckGiveCoinModel>
+
+    @POST("x/web-interface/archive/like/triple")
+    @FormUrlEncoded
+    suspend fun tripleAction(
+        @Field("avid") avid: Long?,
+        @Field("bvid") bvid: String?,
+        @Field("csrf") csrf: String
+    ): BaseResponse<TripleActionResultModel>
+
+    @GET("x/web-interface/search/all/v2")
+    suspend fun searchAll(
+        @Query("keyword") keyword: String,
+        @Query("platform") platform: String = "pc",
+        @Query("highlight") highlight: Int = 1,
+        @Query("page_size") pageSize: Int = 20,
+        @Query("page") page: Int = 1
+    ): BaseResponse<SearchAllResponseData>
+
+    @GET("x/web-interface/wbi/search/all/v2")
+    suspend fun searchAllWbi(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<SearchAllResponseData>
+
+    @GET("x/web-interface/history/cursor")
+    suspend fun getHistory(
+        @Query("view_at") viewAt: Long,
+        @Query("ps") ps: Int = 20
+    ): BaseResponse<HistoryListResponse>
+
+    @GET("x/v2/history/toview")
+    suspend fun getLaterWatch(): BaseResponse<LaterWatchWrapper>
+
+    @GET("x/web-interface/zone")
+    suspend fun getZoneInfo(): BaseResponse<ZoneModel>
+
+    @POST("x/relation/modify")
+    @FormUrlEncoded
+    suspend fun userRelationModify(
+        @FieldMap params: Map<String, String>
+    ): BaseBaseResponse
+
+    @GET("x/relation")
+    suspend fun checkUserRelation(
+        @Query("fid") fid: String
+    ): BaseResponse<CheckRelationModel>
+
+    @GET("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
+    suspend fun getSignInQrCode(
+        @Query("source") source: String = "main-fe-header"
+    ): BaseResponse<ScanQrModel>
+
+    @GET("https://passport.bilibili.com/x/passport-login/web/qrcode/poll")
+    suspend fun checkSignInResult(
+        @Query("qrcode_key") qrcodeKey: String,
+        @Query("source") source: String = "main-fe-header"
+    ): BaseResponse<SignInResultModel>
+
+    @POST("x/v3/fav/resource/deal")
+    @FormUrlEncoded
+    suspend fun dealFavorite(
+        @Field("rid") rid: Long,
+        @Field("type") type: Int = 2,
+        @Field("add_media_ids") addMediaIds: String?,
+        @Field("del_media_ids") delMediaIds: String?,
+        @Field("csrf") csrf: String
+    ): BaseResponse<CollectionResultModel>
+
+    @GET("x/v2/fav/video/favoured")
+    suspend fun checkFavorite(
+        @Query("aid") aid: Long?
+    ): BaseResponse<CheckFavoriteModel>
+
+    @GET("x/v3/fav/folder/created/list-all")
+    suspend fun getFavoriteFolders(
+        @Query("up_mid") upMid: Long,
+        @Query("type") type: Int = 2
+    ): BaseResponse<FavoriteFoldersWrapper>
+
+    @GET("x/v3/fav/folder/info")
+    suspend fun getFavoriteFolderInfo(
+        @Query("media_id") mediaId: Long
+    ): BaseResponse<FolderDetailModel>
+
+    @GET("x/v3/fav/resource/list")
+    suspend fun getFavoriteFolderDetail(
+        @Query("media_id") mediaId: Long,
+        @Query("pn") page: Int,
+        @Query("ps") pageSize: Int,
+        @Query("order") order: String = "mtime",
+        @Query("type") type: Int = 0,
+        @Query("platform") platform: String = "web",
+        @Query("jsonp") jsonp: String = "jsonp"
+    ): BaseResponse<FavoriteFolderDetailWrapper>
+
+    // ==================== 直播模块 API ====================
+    
+    @GET("x/live/web-interface/v1/second/getList")
+    suspend fun getLiveList(
+        @Query("platform") platform: String = "web",
+        @Query("parent_area_id") parentAreaId: Int = 0,
+        @Query("area_id") areaId: Int = 0,
+        @Query("page") page: Int = 1
+    ): BaseResponse<LiveListWrapper>
+
+    @GET("https://api.live.bilibili.com/room/v1/Area/getList")
+    suspend fun getLiveArea(): BaseResponse<List<LiveAreaCategoryParent>>
+
+    @GET("https://api.live.bilibili.com/room/v1/Area/getRoomList")
+    suspend fun getAreaRoomList(
+        @Query("parent_area_id") parentAreaId: Long,
+        @Query("area_id") areaId: Long,
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 30,
+        @Query("sort_type") sortType: String = "online"
+    ): BaseResponse<List<LiveRoomItem>>
+
+    @GET("https://api.live.bilibili.com/xlive/web-interface/v1/second/getList")
+    suspend fun getLiveCategoryDetailList(
+        @Query("platform") platform: String = "web",
+        @Query("parent_area_id") parentAreaId: Long,
+        @Query("area_id") areaId: Long,
+        @Query("page") page: Int = 1
+    ): BaseResponse<LiveCategoryDetailListWrapper>
+
+    @GET("https://api.live.bilibili.com/xlive/web-interface/v1/second/getList")
+    suspend fun getLiveCategoryDetailListSigned(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<LiveCategoryDetailListWrapper>
+    
+    @GET("x/live/web-interface/v1/second/recommend")
+    suspend fun getRecommendLive(
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int
+    ): BaseResponse<LiveListWrapper>
+
+    @GET("https://api.live.bilibili.com/xlive/web-interface/v1/index/getList")
+    suspend fun getLiveHomeList(
+        @Query("platform") platform: String = "web"
+    ): BaseResponse<LiveListWrapper>
+    
+    @GET("https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomPlayInfo")
+    suspend fun getLiveRoomPlayInfo(
+        @Query("room_id") roomId: Long
+    ): BaseResponse<JsonObject>
+
+    @GET("https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo")
+    suspend fun getLiveRoomPlayInfoV2(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<JsonObject>
+
+    @GET("https://api.live.bilibili.com/xlive/web-room/v1/playUrl/playUrl")
+    suspend fun getLivePlayInfo(
+        @Query("cid") cid: Long,
+        @Query("qn") qn: Int = 10000,
+        @Query("platform") platform: String = "web",
+        @Query("https_url_req") httpsUrlReq: Int = 1,
+        @Query("ptype") ptype: Int = 16
+    ): BaseResponse<LivePlayUrlDataModel>
+
+    @GET("x/live/web-room/v1/index/getDanmuInfo")
+    suspend fun getLiveChatRoomUrl(
+        @Query("id") id: Long
+    ): BaseResponse<ChatRoomWrapper>
+
+    @GET("x/live/web-room/v1/index/getConf")
+    suspend fun getLiveChatRoomUrlWithWbi(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<ChatRoomWrapper>
+
+    // ==================== 互动视频 API ====================
+    
+    @GET("x/stein/edgeinfo_v2")
+    suspend fun getInteractionVideoInfo(
+        @Query("bvid") bvid: String,
+        @Query("aid") aid: Long,
+        @Query("graph_version") graphVersion: Long,
+        @Query("edge_id") edgeId: Long = 0
+    ): BaseResponse<InteractionModel>
+
+    // ==================== 番剧模块 API ====================
+    
+    @GET("pgc/view/web/season")
+    suspend fun getVideoEpisodes(
+        @Query("season_id") seasonId: Long?,
+        @Query("ep_id") epId: Long?
+    ): Base2Response<EpisodesDetailModel>
+
+    @GET("pgc/web/season/section")
+    suspend fun getVideoEpisodeSections(
+        @Query("season_id") seasonId: Long
+    ): Base2Response<SeasonSectionResult>
+
+    @GET("pgc/player/web/playurl")
+    suspend fun getVideoPlayPgcInfo(
+        @QueryMap params: Map<String, String>
+    ): Base2Response<PlayInfoModel>
+
+    @GET("pgc/page/pc/bangumi/tab")
+    suspend fun getAnimations(
+        @Query("is_refresh") isRefresh: Int = 0,
+        @Query("cursor") cursor: Long = 0
+    ): BaseResponse<GetLaneWrapper>
+
+    @GET("pgc/page/pc/cinema/tab")
+    suspend fun getCinema(
+        @Query("is_refresh") isRefresh: Int = 0,
+        @Query("cursor") cursor: Long = 0
+    ): BaseResponse<GetLaneWrapper>
+
+    @GET("pgc/season/index/result")
+    suspend fun getAllSeries(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<GetAllSeriesWrapper>
+
+    @GET("x/v2/dm/web/seg.so")
+    suspend fun getVideoComment(
+        @Query("type") type: Int = 1,
+        @Query("oid") oid: Long,
+        @Query("pid") pid: Long,
+        @Query("segment_index") segmentIndex: Int
+    ): ResponseBody
+
+    @GET("x/v2/dm/web/view")
+    suspend fun getVideoCommentView(
+        @Query("type") type: Int = 1,
+        @Query("oid") oid: Long,
+        @Query("pid") pid: Long
+    ): ResponseBody
+
+    @GET("x/v2/dm/wbi/web/seg.so")
+    suspend fun getVideoCommentWbi(
+        @QueryMap params: Map<String, String>
+    ): ResponseBody
+
+    @GET("pgc/web/timeline")
+    suspend fun getSeriesTimeLine(
+        @Query("types") type: Int = 1,
+        @Query("before") before: Int = 6,
+        @Query("after") after: Int = 6
+    ): GetTimeLineWrapper
+
+    @GET("x/space/bangumi/follow/list")
+    suspend fun getMyFollowingSeries(
+        @Query("type") type: Int,
+        @Query("follow_status") followStatus: Int = 0,
+        @Query("pn") page: Int,
+        @Query("ps") pageSize: Int,
+        @Query("vmid") vmid: Long,
+        @Query("ts") ts: Long
+    ): BaseResponse<MyFollowingResponseWrapper>
+
+    @POST("pgc/web/follow/add")
+    @FormUrlEncoded
+    suspend fun followSeries(
+        @Field("season_id") seasonId: Long,
+        @Field("csrf") csrf: String
+    ): BaseBaseResponse
+
+    @POST("pgc/web/follow/del")
+    @FormUrlEncoded
+    suspend fun cancelFollowSeries(
+        @Field("season_id") seasonId: Long,
+        @Field("csrf") csrf: String
+    ): BaseBaseResponse
+
+    @POST("pgc/web/follow/status/update")
+    @FormUrlEncoded
+    suspend fun checkSeriesUserStat(
+        @Field("season_id") seasonId: Long,
+        @Field("status") status: Int,
+        @Field("csrf") csrf: String
+    ): BaseBaseResponse
+
+    @GET("x/web-interface/web/channel/featured/list")
+    suspend fun getVideoByChannel(
+        @Query("channel_id") channelId: Long,
+        @Query("filter_type") filterType: Int = 0,
+        @Query("offset") offset: String = "",
+        @Query("page_size") pageSize: Int = 30
+    ): BaseResponse<GetVideoByChannelWrapper>
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:textSize="@dimen/px38"
+    android:textStyle="bold"
+    android:textColor="?android:attr/textColorSecondary"
+    android:gravity="center"
+    android:id="@+id/button_key_qwe"
+    android:background="@drawable/kb_keyboard_selector"
+    android:focusable="true"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:text="A"/>

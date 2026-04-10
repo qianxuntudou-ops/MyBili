@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="?attr/backgroundColor"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/mainBackgroundImage"
+        android:background="@drawable/background_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+    <com.tutu.myblbl.ui.view.TabBarView
+        android:id="@+id/myTabView"
+        android:layout_width="@dimen/px100"
+        android:layout_height="match_parent"
+        app:layout_constraintStart_toStartOf="parent"/>
+    <View
+        android:id="@+id/divide"
+        android:background="?attr/dividerColor"
+        android:layout_width="@dimen/px1"
+        android:layout_height="match_parent"
+        android:layout_marginTop="@dimen/px120"
+        android:layout_marginBottom="@dimen/px120"
+        app:layout_constraintStart_toEndOf="@+id/myTabView"/>
+    <FrameLayout
+        android:id="@+id/container"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/divide"/>
+    <TextView
+        android:textColor="?android:attr/textColorPrimary"
+        android:id="@+id/textViewDebug"
+        android:visibility="gone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

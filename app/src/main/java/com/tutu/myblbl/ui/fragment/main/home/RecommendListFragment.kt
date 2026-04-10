@@ -1,0 +1,249 @@
+package com.tutu.myblbl.ui.fragment.main.home
+
+import android.os.Bundle
+import android.view.View
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.tutu.myblbl.R
+import com.tutu.myblbl.model.video.VideoModel
+import com.tutu.myblbl.repository.cache.HomeCacheStore
+import com.tutu.myblbl.ui.adapter.VideoAdapter
+import com.tutu.myblbl.ui.base.BaseListFragment
+import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.ContentFilter
+import com.tutu.myblbl.utils.VideoRouteNavigator
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
+
+class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
+
+    companion object {
+        private const val TAG = "RecommendListFragment"
+        private const val CACHE_KEY = "recommendCacheList"
+
+        fun newInstance(): RecommendListFragment {
+            return RecommendListFragment()
+        }
+    }
+
+    private val viewModel: RecommendViewModel by viewModel()
+    private var loadingPage = 1
+    private var waitingForFirstLoad = true
+    private var cacheRestoreJob: Job? = null
+
+    override val autoLoad: Boolean = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        EventBus.getDefault().register(this)
+    }
+
+    override fun createAdapter(): VideoAdapter {
+        return VideoAdapter(
+            onItemClick = ::onVideoClick,
+            onTopEdgeUp = ::focusTopTab
+        )
+    }
+
+    override fun getSpanCount(): Int = 4
+
+    private fun focusTopTab(): Boolean {
+        return (parentFragment as? HomeFragment)?.focusCurrentTab() == true
+    }
+
+    private fun onVideoClick(video: VideoModel) {
+        AppLog.d(TAG, "onVideoClick: title=${video.title}, bvid=${video.bvid}, aid=${video.aid}, cid=${video.cid}")
+        VideoRouteNavigator.openVideo(
+            context = requireContext(),
+            video = video,
+            playQueue = com.tutu.myblbl.ui.activity.PlayerActivity.buildPlayQueue(
+                (adapter as? VideoAdapter)?.getItemsSnapshot().orEmpty(),
+                video
+            )
+        )
+    }
+
+    override fun loadData(page: Int) {
+        isLoading = true
+        loadingPage = page
+        viewModel.loadRecommendList(page, 24)
+    }
+
+    override fun refresh() {
+        cacheRestoreJob?.cancel()
+        currentPage = 1
+        hasMore = true
+        waitingForFirstLoad = true
+        loadData(1)
+    }
+
+    override fun initView() {
+        super.initView()
+        adapter?.setShowLoadMore(true)
+    }
+
+    override fun initData() {
+        showLoading(true)
+        restoreCacheThenLoad()
+    }
+
+    private fun restoreCacheThenLoad() {
+        cacheRestoreJob?.cancel()
+        cacheRestoreJob = viewLifecycleOwner.lifecycleScope.launch {
+            val hasCache = restoreCachedVideos()
+            if (!hasCache) {
+                showLoading(true)
+            }
+            loadData(1)
+        }
+    }
+
+    override fun initObserver() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.videos.collectLatest { rawVideos ->
+                    val videos = ContentFilter.filterVideos(requireContext(), rawVideos)
+                    AppLog.d(TAG, "videos observer update: count=${videos.size}, loadingPage=$loadingPage")
+                    if (waitingForFirstLoad && videos.isEmpty()) {
+                        return@collectLatest
+                    }
+                    waitingForFirstLoad = false
+                    isLoading = false
+                    setRefreshing(false)
+                    if (loadingPage == 1 || (adapter as? VideoAdapter)?.items.isNullOrEmpty()) {
+                        adapter?.setData(videos)
+                    } else {
+                        (adapter as? VideoAdapter)?.addData(videos)
+                    }
+                    if (videos.isNotEmpty()) {
+                        showContent()
+                        showLoading(false)
+                        EventBus.getDefault().post("homeContentReady")
+                        if (loadingPage == 1) {
+                            cacheVideos(videos)
+                            scrollToTop()
+                        }
+                    } else if (loadingPage == 1) {
+                        showEmpty()
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.hasMore.collectLatest { canLoadMore ->
+                    hasMore = canLoadMore
+                    adapter?.setShowLoadMore(canLoadMore)
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.loading.collectLatest { loading ->
+                    AppLog.d(TAG, "loading observer update: loading=$loading")
+                    if (loading && adapter?.contentCount() == 0) {
+                        showLoading(true)
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.error.collectLatest { error ->
+                    error?.let {
+                        AppLog.e(TAG, "error observer update: $it")
+                        waitingForFirstLoad = false
+                        isLoading = false
+                        setRefreshing(false)
+                        if (adapter?.contentCount() == 0) {
+                            restoreCachedVideos(
+                                onMiss = {
+                                    showError(it.ifBlank { getString(R.string.net_error) })
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onRetryClick() {
+        refresh()
+    }
+
+    override fun focusPrimaryContent(): Boolean {
+        if (!isAdded || view == null) {
+            return false
+        }
+        if (viewError?.visibility == View.VISIBLE && buttonRetry?.isShown == true) {
+            return buttonRetry?.requestFocus() == true
+        }
+        return super<BaseListFragment>.focusPrimaryContent()
+    }
+
+    override fun focusPrimaryContent(anchorView: View?, preferSpatialEntry: Boolean): Boolean {
+        return super<BaseListFragment>.focusPrimaryContent(anchorView, preferSpatialEntry)
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onMessageEvent(event: String) {
+        if (!isResumed || view == null) {
+            return
+        }
+        when (event) {
+            "signIn", "updateUserInfo", "clickTab0", "clickTopTab0", "keyMenuPress" -> {
+                if (!isLoading) {
+                    refresh()
+                }
+            }
+            "backPressed" -> scrollToTop()
+        }
+    }
+
+    override fun onDestroy() {
+        EventBus.getDefault().unregister(this)
+        super.onDestroy()
+    }
+
+    private fun cacheVideos(videos: List<VideoModel>) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatching {
+                HomeCacheStore.writeVideos(CACHE_KEY, videos)
+                AppLog.d(TAG, "cacheVideos success: count=${videos.size}")
+            }.onFailure { throwable ->
+                AppLog.e(TAG, "cacheVideos failure: ${throwable.message}", throwable)
+            }
+        }
+    }
+
+    private suspend fun restoreCachedVideos(onMiss: (() -> Unit)? = null): Boolean {
+        val cachedVideos = runCatching {
+            HomeCacheStore.readVideos(CACHE_KEY)
+        }.getOrElse { throwable ->
+            AppLog.e(TAG, "restoreCachedVideos failure: ${throwable.message}", throwable)
+            emptyList()
+        }
+        if (cachedVideos.isEmpty()) {
+            onMiss?.invoke()
+            return false
+        }
+        AppLog.d(TAG, "restoreCachedVideos success: count=${cachedVideos.size}")
+        adapter?.setData(ContentFilter.filterVideos(requireContext(), cachedVideos))
+        adapter?.setShowLoadMore(true)
+        showContent()
+        showLoading(false)
+        EventBus.getDefault().post("homeContentReady")
+        return true
+    }
+
+}

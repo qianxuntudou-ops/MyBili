@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <drawable name="exo_styled_controls_audiotrack">@drawable/exo_ic_audiotrack</drawable>
+    <drawable name="exo_styled_controls_speed">@drawable/exo_ic_speed</drawable>
+</resources>

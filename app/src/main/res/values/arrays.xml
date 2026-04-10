@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="exo_controls_playback_speeds">
+        <item>0.5x</item>
+        <item>0.75x</item>
+        <item>1.0x</item>
+        <item>1.25x</item>
+        <item>1.5x</item>
+        <item>2.0x</item>
+    </array>
+
+    <array name="screen_ratios">
+        <item>自适应</item>
+        <item>宽度适应</item>
+        <item>高度适应</item>
+        <item>拉伸</item>
+        <item>放大</item>
+    </array>
+
+    <string-array name="give_coin_number">
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <string-array name="themes">
+        <item>自动</item>
+        <item>黑色</item>
+        <item>白色</item>
+        <item>经典主题</item>
+        <item>粉色</item>
+        <item>蓝色</item>
+        <item>紫色</item>
+        <item>红色</item>
+    </string-array>
+</resources>

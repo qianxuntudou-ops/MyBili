@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:id="@+id/click_view"
+    android:background="@drawable/button_common"
+    android:paddingTop="@dimen/px10"
+    android:paddingBottom="@dimen/px10"
+    android:focusable="true"
+    android:clickable="true"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="@dimen/px5"
+    android:layout_marginBottom="@dimen/px20"
+    android:paddingStart="@dimen/px30"
+    android:paddingEnd="@dimen/px30"
+    android:layout_marginStart="@dimen/px5"
+    android:layout_marginEnd="@dimen/px5">
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/image_icon"
+        android:layout_width="@dimen/px35"
+        android:layout_height="@dimen/px35"
+        android:layout_marginEnd="@dimen/px10"
+        app:srcCompat="@drawable/ic_hot"
+        app:tint="?android:attr/textColorPrimary"/>
+    <androidx.appcompat.widget.AppCompatTextView
+        android:textSize="@dimen/px35"
+        android:textColor="?android:attr/textColorPrimary"
+        android:id="@+id/text_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:maxLines="1"/>
+</androidx.appcompat.widget.LinearLayoutCompat>

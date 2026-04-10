@@ -1,0 +1,556 @@
+package com.tutu.myblbl.ui.fragment.main.dynamic
+
+import android.os.Bundle
+import android.view.Gravity
+import android.view.KeyEvent
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.tutu.myblbl.R
+import com.tutu.myblbl.databinding.FragmentDynamicBinding
+import com.tutu.myblbl.model.user.FollowingModel
+import com.tutu.myblbl.model.video.VideoModel
+import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
+import com.tutu.myblbl.ui.fragment.main.settings.SignInFragment
+import com.tutu.myblbl.ui.activity.MainActivity
+import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
+import com.tutu.myblbl.ui.base.RecyclerViewFocusRestoreHelper
+import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.ContentFilter
+import com.tutu.myblbl.utils.SpatialFocusNavigator
+import com.tutu.myblbl.utils.SwipeRefreshHelper
+import com.tutu.myblbl.utils.VideoRouteNavigator
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
+import org.koin.androidx.viewmodel.ext.android.viewModel
+
+class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarget {
+    companion object {
+        private const val TAG = "MainEntryFocus"
+        private const val FOCUS_TAG = "DynamicFocus"
+        private const val CACHE_TTL_MS = 5 * 60 * 1000L
+
+        fun newInstance(): DynamicFragment = DynamicFragment()
+    }
+
+    private val viewModel: DynamicViewModel by viewModel()
+    private lateinit var upAdapter: DynamicUpAdapter
+    private lateinit var videoAdapter: DynamicVideoAdapter
+    private var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout? = null
+    private var currentUpId: Long = 0L
+    private val pageSize = 20
+    private val loadMoreThreshold = 12
+    private var latestStatus: DynamicViewModel.DynamicStatus = DynamicViewModel.DynamicStatus.Idle
+    private var latestScreenState: DynamicViewModel.ScreenState = DynamicViewModel.ScreenState.Content
+    private var latestLoading = false
+    private var lastToastMessage: String? = null
+    private var lastFocusedVideoPosition = 0
+    private var pendingScrollToTop = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        EventBus.getDefault().register(this)
+    }
+
+    override fun getViewBinding(
+        inflater: LayoutInflater,
+        container: ViewGroup?
+    ): FragmentDynamicBinding {
+        return FragmentDynamicBinding.inflate(inflater, container, false)
+    }
+
+    override fun initView() {
+        setupUpList()
+        setupVideoList()
+    }
+
+    override fun onRetryClick() {
+        if (!NetworkManager.isLoggedIn()) {
+            (activity as? MainActivity)?.openOverlayFragment(SignInFragment.newInstance(), "sign_in")
+        } else {
+            currentUpId = 0L
+            loadData()
+        }
+    }
+
+    private fun setupUpList() {
+        upAdapter = DynamicUpAdapter(
+            onItemClick = { up -> onUpClick(up) },
+            onLeftEdge = { (activity as? MainActivity)?.focusLeftFunctionArea() == true },
+            onRightEdge = { focusRightContent() },
+            debugTag = FOCUS_TAG
+        )
+        binding.recyclerViewLeft.layoutManager = LinearLayoutManager(requireContext())
+        binding.recyclerViewLeft.adapter = upAdapter
+        binding.recyclerViewLeft.setOnFocusChangeListener { _, hasFocus ->
+            AppLog.d(FOCUS_TAG, "left recycler focus: hasFocus=$hasFocus childCount=${binding.recyclerViewLeft.childCount}")
+        }
+        binding.recyclerViewLeft.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy > 0) checkLoadMoreFollowing()
+            }
+        })
+    }
+
+    private fun setupVideoList() {
+        videoAdapter = DynamicVideoAdapter(
+            onItemClick = { video -> onVideoClick(video) },
+            onItemFocused = { position -> lastFocusedVideoPosition = position },
+            onLeftEdge = { focusSelectedUpItem() },
+            debugTag = FOCUS_TAG
+        )
+        binding.recyclerViewRight.layoutManager = object : WrapContentGridLayoutManager(requireContext(), 3) {
+            override fun onFocusSearchFailed(
+                focused: View,
+                direction: Int,
+                recycler: RecyclerView.Recycler,
+                state: RecyclerView.State
+            ): View? {
+                val result = super.onFocusSearchFailed(focused, direction, recycler, state)
+                AppLog.d(
+                    FOCUS_TAG,
+                    "right onFocusSearchFailed: focusedPos=${binding.recyclerViewRight.getChildAdapterPosition(focused)} direction=${directionName(direction)} resultPos=${result?.let { binding.recyclerViewRight.getChildAdapterPosition(it) } ?: RecyclerView.NO_POSITION} childCount=${binding.recyclerViewRight.childCount}"
+                )
+                return result
+            }
+        }
+        binding.recyclerViewRight.adapter = videoAdapter
+        binding.recyclerViewRight.setOnFocusChangeListener { _, hasFocus ->
+            AppLog.d(FOCUS_TAG, "right recycler focus: hasFocus=$hasFocus childCount=${binding.recyclerViewRight.childCount}")
+        }
+        binding.recyclerViewRight.setOnKeyListener { _, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                AppLog.d(
+                    FOCUS_TAG,
+                    "right recycler key: key=${directionName(keyCode)} currentFocus=${view?.findFocus()?.javaClass?.simpleName ?: "null"}"
+                )
+            }
+            false
+        }
+        binding.recyclerViewRight.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy > 0) checkLoadMore()
+            }
+        })
+        swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(binding.recyclerViewRight) {
+            currentUpId = 0L
+            loadData()
+        }
+    }
+
+    private fun onUpClick(up: FollowingModel) {
+        val clickedPosition = upAdapter.getData().indexOfFirst { it.mid == up.mid }
+        if (clickedPosition >= 0) {
+            upAdapter.setSelectedPosition(clickedPosition)
+        }
+        currentUpId = up.mid
+        lastFocusedVideoPosition = 0
+        pendingScrollToTop = true
+        viewModel.selectUp(currentUpId.toString(), pageSize)
+    }
+
+    private fun onVideoClick(video: VideoModel) {
+        VideoRouteNavigator.openVideo(
+            context = requireContext(),
+            video = video,
+            playQueue = com.tutu.myblbl.ui.activity.PlayerActivity.buildPlayQueue(
+                videoAdapter.getItemsSnapshot(),
+                video
+            )
+        )
+    }
+
+    override fun initData() {
+        loadData()
+        latestScreenState = viewModel.screenState.value
+        latestLoading = viewModel.loading.value
+        renderUiState()
+    }
+
+    private fun loadData() {
+        pendingScrollToTop = true
+        lastRefreshTime = System.currentTimeMillis()
+        if (!NetworkManager.isLoggedIn()) {
+            currentUpId = 0L
+            viewModel.loadFollowingList()
+            latestScreenState = viewModel.screenState.value
+            latestLoading = viewModel.loading.value
+            renderUiState()
+            return
+        }
+        viewModel.loadFollowingList()
+        viewModel.selectUp(currentUpId.toString(), pageSize)
+    }
+
+    override fun initObserver() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.followingList.collectLatest { list ->
+                    upAdapter.setData(list)
+                    if (list.isNotEmpty() && currentUpId == 0L) {
+                        currentUpId = list[0].mid
+                        upAdapter.setSelectedPosition(0)
+                        viewModel.selectUp(currentUpId.toString(), pageSize)
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.videos.collectLatest { rawVideos ->
+                    val videos = ContentFilter.filterVideos(requireContext(), rawVideos)
+                    val page = viewModel.loadedPage.value
+                    swipeRefreshLayout?.isRefreshing = false
+                    if (page <= 1 || videoAdapter.itemCount == 0) {
+                        videoAdapter.setData(videos)
+                    } else if (videos.isNotEmpty()) {
+                        videoAdapter.addData(videos)
+                    }
+                    if (videos.isNotEmpty()) {
+                        showContent()
+                        if (pendingScrollToTop) {
+                            pendingScrollToTop = false
+                            scrollVideoListToTop()
+                        }
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.screenState.collectLatest { state ->
+                    latestScreenState = state
+                    renderUiState()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.loading.collectLatest { loading ->
+                    latestLoading = loading
+                    if (!loading) swipeRefreshLayout?.isRefreshing = false
+                    renderUiState()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.status.collectLatest { status ->
+                    latestStatus = status
+                    renderUiState()
+                }
+            }
+        }
+    }
+
+    private fun checkLoadMore() {
+        val layoutManager = binding.recyclerViewRight.layoutManager as? LinearLayoutManager ?: return
+        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+        if (lastVisiblePosition >= videoAdapter.itemCount - loadMoreThreshold) {
+            viewModel.loadNextPage(pageSize)
+        }
+    }
+
+    private fun checkLoadMoreFollowing() {
+        val layoutManager = binding.recyclerViewLeft.layoutManager as? LinearLayoutManager ?: return
+        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+        if (lastVisiblePosition >= upAdapter.itemCount - loadMoreThreshold) {
+            viewModel.loadMoreFollowingIfNeeded()
+        }
+    }
+
+    private fun renderUiState() {
+        val showOverlay = latestScreenState != DynamicViewModel.ScreenState.Content
+        val showContent = !showOverlay
+
+        binding.recyclerViewLeft.visibility = if (showContent) View.VISIBLE else View.GONE
+        binding.recyclerViewRight.visibility = if (showContent) View.VISIBLE else View.GONE
+        showLoading(latestLoading && showOverlay)
+
+        if (showOverlay) {
+            when (latestScreenState) {
+                DynamicViewModel.ScreenState.NotLoggedIn -> {
+                    showStateOverlay(
+                        imageResId = R.drawable.empty,
+                        message = getString(R.string.feature_wait_tip),
+                        retryVisible = false
+                    )
+                }
+                DynamicViewModel.ScreenState.Error -> {
+                    showStateOverlay(
+                        imageResId = R.drawable.net_error,
+                        message = viewModel.error.value ?: getString(R.string.net_error),
+                        retryVisible = true
+                    )
+                }
+                DynamicViewModel.ScreenState.Content -> Unit
+            }
+            return
+        }
+
+        val shouldToastError = latestStatus == DynamicViewModel.DynamicStatus.Error && !viewModel.error.value.isNullOrBlank()
+        if (shouldToastError) {
+            val message = viewModel.error.value
+            if (message != null && message != lastToastMessage) {
+                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).apply {
+                    setGravity(Gravity.CENTER, 0, 0)
+                }.show()
+                lastToastMessage = message
+            }
+        } else if (!latestLoading) {
+            lastToastMessage = null
+        }
+    }
+
+    private fun showStateOverlay(imageResId: Int, message: String, retryVisible: Boolean) {
+        viewError?.visibility = View.VISIBLE
+        imageError?.setImageResource(imageResId)
+        textError?.text = message
+        buttonRetry?.visibility = if (retryVisible) View.VISIBLE else View.GONE
+        if (retryVisible) {
+            buttonRetry?.requestFocus()
+        } else {
+            viewError?.requestFocus()
+        }
+        contentContainer?.visibility = View.GONE
+    }
+
+    private fun restoreVideoFocus() {
+        if (viewError?.visibility == View.VISIBLE || videoAdapter.itemCount == 0) {
+            return
+        }
+        val fv = videoAdapter.focusedView
+        if (fv != null && fv.isAttachedToWindow && fv.visibility == View.VISIBLE) {
+            fv.requestFocus()
+            return
+        }
+        val targetPosition = lastFocusedVideoPosition.coerceIn(0, videoAdapter.itemCount - 1)
+        val result = RecyclerViewFocusRestoreHelper.requestFocusAtPosition(
+            recyclerView = binding.recyclerViewRight,
+            position = targetPosition
+        )
+        AppLog.d(
+            TAG,
+            "restoreVideoFocus deferred: targetPosition=$targetPosition handled=${result.handled} deferred=${result.deferred}"
+        )
+    }
+
+    private fun focusSelectedUpItem(): Boolean {
+        if (!isAdded || view == null || upAdapter.itemCount == 0) {
+            return false
+        }
+        val targetPosition = upAdapter.getSelectedPosition().takeIf { it >= 0 } ?: 0
+        binding.recyclerViewLeft.findViewHolderForAdapterPosition(targetPosition)?.itemView?.let { itemView ->
+            val handled = itemView.requestFocus()
+            AppLog.d(FOCUS_TAG, "focusSelectedUpItem visible: targetPosition=$targetPosition handled=$handled")
+            return handled
+        }
+        val result = RecyclerViewFocusRestoreHelper.requestFocusAtPosition(
+            recyclerView = binding.recyclerViewLeft,
+            position = targetPosition
+        )
+        AppLog.d(
+            FOCUS_TAG,
+            "focusSelectedUpItem deferred: targetPosition=$targetPosition handled=${result.handled} deferred=${result.deferred}"
+        )
+        AppLog.d(FOCUS_TAG, "focusSelectedUpItem deferred: targetPosition=$targetPosition")
+        return true
+    }
+
+    private fun focusRightContent(): Boolean {
+        if (viewError?.visibility == View.VISIBLE) {
+            val handled = if (buttonRetry?.isShown == true) {
+                buttonRetry?.requestFocus() == true
+            } else {
+                viewError?.requestFocus() == true
+            }
+            AppLog.d(TAG, "DynamicFragment.focusRightContent stateOverlay: handled=$handled")
+            return handled
+        }
+        if (videoAdapter.itemCount == 0) {
+            AppLog.d(TAG, "DynamicFragment.focusRightContent failed: itemCount=0")
+            return false
+        }
+        val fv = videoAdapter.focusedView
+        if (fv != null && fv.isAttachedToWindow && fv.visibility == View.VISIBLE) {
+            val handled = fv.requestFocus()
+            AppLog.d(
+                TAG,
+                "DynamicFragment.focusRightContent restoreFocusedView: handled=$handled pos=${binding.recyclerViewRight.getChildAdapterPosition(fv)} lastFocusedVideoPosition=$lastFocusedVideoPosition"
+            )
+            return handled
+        }
+        val targetPosition = lastFocusedVideoPosition.coerceIn(0, videoAdapter.itemCount - 1)
+        binding.recyclerViewRight.findViewHolderForAdapterPosition(targetPosition)?.itemView?.let { itemView ->
+            val handled = itemView.requestFocus()
+            AppLog.d(
+                TAG,
+                "DynamicFragment.focusRightContent targetPosition=$targetPosition handled=$handled source=visibleHolder"
+            )
+            return handled
+        }
+        val result = RecyclerViewFocusRestoreHelper.requestFocusAtPosition(
+            recyclerView = binding.recyclerViewRight,
+            position = targetPosition
+        )
+        AppLog.d(
+            TAG,
+            "DynamicFragment.focusRightContent deferred: targetPosition=$targetPosition handled=${result.handled} deferred=${result.deferred} lastFocused=$lastFocusedVideoPosition"
+        )
+        AppLog.d(
+            TAG,
+            "DynamicFragment.focusRightContent deferred: targetPosition=$targetPosition lastFocusedVideoPosition=$lastFocusedVideoPosition"
+        )
+        return true
+    }
+
+    private fun focusPrimaryContent(): Boolean {
+        if (!isAdded || view == null) {
+            return false
+        }
+        if (viewError?.visibility == View.VISIBLE) {
+            return if (buttonRetry?.isShown == true) {
+                buttonRetry?.requestFocus() == true
+            } else {
+                viewError?.requestFocus() == true
+            }
+        }
+        if (focusSelectedUpItem()) {
+            return true
+        }
+        return focusRightContent()
+    }
+
+    private fun focusPrimaryContent(anchorView: View?, preferSpatialEntry: Boolean): Boolean {
+        if (preferSpatialEntry) {
+            val handled = SpatialFocusNavigator.requestBestDescendant(
+                anchorView = anchorView,
+                root = binding.recyclerViewLeft,
+                direction = View.FOCUS_RIGHT,
+                fallback = null
+            )
+            AppLog.d(TAG, "DynamicFragment.focusPrimaryContent spatialEntryLeft: handled=$handled")
+            if (handled) {
+                return true
+            }
+        }
+        return focusPrimaryContent()
+    }
+
+    private fun scrollVideoListToTop() {
+        binding.recyclerViewRight.scrollToPosition(0)
+    }
+
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (!hidden) {
+            val currentFocusedView = activity?.currentFocus
+            if (currentFocusedView != null &&
+                currentFocusedView !== binding.recyclerViewRight &&
+                currentFocusedView !== binding.recyclerViewLeft &&
+                !currentFocusedView.isDescendantOf(binding.recyclerViewRight) &&
+                !currentFocusedView.isDescendantOf(binding.recyclerViewLeft)
+            ) {
+                AppLog.d(TAG, "DynamicFragment.onHiddenChanged skipRestore: currentFocus=${currentFocusedView.javaClass.simpleName}")
+                return
+            }
+            restoreVideoFocus()
+        }
+    }
+
+    override fun focusEntryFromMainTab(): Boolean {
+        return focusEntryFromMainTab(anchorView = null, preferSpatialEntry = false)
+    }
+
+    override fun focusEntryFromMainTab(anchorView: View?, preferSpatialEntry: Boolean): Boolean {
+        val handled = focusPrimaryContent(anchorView, preferSpatialEntry)
+        AppLog.d(
+            TAG,
+            "DynamicFragment.focusEntryFromMainTab: handled=$handled preferSpatialEntry=$preferSpatialEntry currentUpId=$currentUpId lastFocusedVideoPosition=$lastFocusedVideoPosition focus=${view?.findFocus()?.javaClass?.simpleName ?: "null"}"
+        )
+        return handled
+    }
+
+    private var lastRefreshTime = 0L
+
+    private fun shouldRefresh(): Boolean {
+        return videoAdapter.itemCount == 0 || upAdapter.itemCount == 0 ||
+                System.currentTimeMillis() - lastRefreshTime >= CACHE_TTL_MS
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onMessageEvent(event: String) {
+        when (event) {
+            "signIn", "updateUserInfo" -> {
+                if (!isHidden) {
+                    currentUpId = 0L
+                    loadData()
+                }
+            }
+            "selectTab2" -> {
+                if (!isHidden && shouldRefresh()) {
+                    currentUpId = 0L
+                    loadData()
+                }
+            }
+            "clickTab2" -> {
+                if (!isHidden) {
+                    currentUpId = 0L
+                    loadData()
+                }
+            }
+            "keyMenuPress" -> {
+                if (!isHidden) {
+                    currentUpId = 0L
+                    loadData()
+                }
+            }
+            "backPressed" -> {
+                if (!isHidden) {
+                    scrollVideoListToTop()
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        EventBus.getDefault().unregister(this)
+        super.onDestroy()
+    }
+
+    private fun View.isDescendantOf(ancestor: View): Boolean {
+        var current: View? = this
+        while (current != null) {
+            if (current === ancestor) {
+                return true
+            }
+            current = current.parent as? View
+        }
+        return false
+    }
+
+    private fun directionName(direction: Int): String {
+        return when (direction) {
+            View.FOCUS_UP, KeyEvent.KEYCODE_DPAD_UP -> "UP"
+            View.FOCUS_DOWN, KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
+            View.FOCUS_LEFT, KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
+            View.FOCUS_RIGHT, KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
+            else -> direction.toString()
+        }
+    }
+}

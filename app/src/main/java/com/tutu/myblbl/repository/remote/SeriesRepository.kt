@@ -1,0 +1,158 @@
+package com.tutu.myblbl.repository.remote
+
+import com.tutu.myblbl.model.series.EpisodesDetailModel
+import com.tutu.myblbl.model.series.FollowSeriesResult
+import com.tutu.myblbl.model.series.MyFollowingResponseWrapper
+import com.tutu.myblbl.model.series.timeline.TimeLineADayModel
+import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.api.ApiService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+class SeriesRepository {
+    
+    private val apiService: ApiService = NetworkManager.apiService
+
+    suspend fun getSeriesDetail(seasonId: Long, epId: Long = 0): Result<EpisodesDetailModel> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.getVideoEpisodes(
+                    if (seasonId > 0) seasonId else null,
+                    if (epId > 0) epId else null
+                ).let {
+                    NetworkManager.syncAuthState(it, source = "series.getSeriesDetail")
+                }
+                val detail = response.result
+                if (response.isSuccess && detail != null) {
+                    val resolvedSeasonId = detail.seasonId.takeIf { it > 0 } ?: seasonId
+                    val sectionResult = if (resolvedSeasonId > 0) {
+                        apiService.getVideoEpisodeSections(resolvedSeasonId)
+                            .let { NetworkManager.syncAuthState(it, source = "series.getVideoEpisodeSections") }
+                            .result
+                    } else {
+                        null
+                    }
+                    val mergedDetail = detail.copy(
+                        episodes = sectionResult?.mainSection?.episodes.orEmpty(),
+                        section = sectionResult?.section.orEmpty(),
+                        mainSectionTitle = sectionResult?.mainSection?.title.orEmpty()
+                    )
+                    Result.success(mergedDetail)
+                } else {
+                    Result.failure(Exception(response.errorMessage))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun followSeries(seasonId: Long): Result<FollowSeriesResult> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val csrf = NetworkManager.getCsrfToken()
+                val response = NetworkManager.syncAuthState(
+                    apiService.followSeries(seasonId, csrf),
+                    source = "series.followSeries"
+                )
+                if (response.isSuccess) {
+                    Result.success(
+                        FollowSeriesResult(
+                            relation = true,
+                            status = 1,
+                            toast = response.errorMessage.ifBlank { "追番成功" }
+                        )
+                    )
+                } else {
+                    Result.failure(Exception(response.errorMessage.ifBlank { "追番失败" }))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun cancelFollowSeries(seasonId: Long): Result<FollowSeriesResult> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val csrf = NetworkManager.getCsrfToken()
+                val response = NetworkManager.syncAuthState(
+                    apiService.cancelFollowSeries(seasonId, csrf),
+                    source = "series.cancelFollowSeries"
+                )
+                if (response.isSuccess) {
+                    Result.success(
+                        FollowSeriesResult(
+                            relation = false,
+                            status = 0,
+                            toast = response.errorMessage.ifBlank { "已取消追番" }
+                        )
+                    )
+                } else {
+                    Result.failure(Exception(response.errorMessage.ifBlank { "取消追番失败" }))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun getMyFollowingSeries(
+        type: Int,
+        page: Int,
+        pageSize: Int,
+        vmid: Long
+    ): Result<MyFollowingResponseWrapper> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.getMyFollowingSeries(
+                    type = type,
+                    page = page,
+                    pageSize = pageSize,
+                    vmid = vmid,
+                    ts = System.currentTimeMillis()
+                ).let {
+                    NetworkManager.syncAuthState(it, source = "series.getMyFollowingSeries")
+                }
+                if (response.code == 0 && response.data != null) {
+                    Result.success(response.data)
+                } else {
+                    Result.failure(Exception(response.message.ifEmpty { response.msg }))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun getSeriesTimeline(
+        type: Int,
+        before: Int = 6,
+        after: Int = 6
+    ): Result<List<TimeLineADayModel>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.getSeriesTimeLine(
+                    type = type,
+                    before = before,
+                    after = after
+                )
+                if (response.code == 0) {
+                    Result.success(
+                        response.result.map { day ->
+                            day.copy(
+                                episodes = day.episodes.map { episode ->
+                                    episode.copy(dayOfWeek = day.dayOfWeek)
+                                }
+                            )
+                        }
+                    )
+                } else {
+                    Result.failure(Exception(response.message.ifEmpty { "时间线加载失败" }))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+}

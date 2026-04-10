@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <include
+        android:id="@+id/user_space_top"
+        layout="@layout/cell_user_space_top"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/header_bottom_barrier"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierAllowsGoneWidgets="true"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="user_space_top,layout_stat_actions" />
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/layout_stat_actions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/px12"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/user_space_top"
+        app:layout_constraintTop_toBottomOf="@id/user_space_top">
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvFollowing"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="@dimen/px120"
+            android:paddingStart="@dimen/px8"
+            android:paddingTop="@dimen/px6"
+            android:paddingEnd="@dimen/px8"
+            android:paddingBottom="@dimen/px6"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="@dimen/px22"
+            tools:text="12 关注" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvFollower"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/px28"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="@dimen/px120"
+            android:paddingStart="@dimen/px8"
+            android:paddingTop="@dimen/px6"
+            android:paddingEnd="@dimen/px8"
+            android:paddingBottom="@dimen/px6"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="@dimen/px22"
+            tools:text="34 粉丝" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/tvVideoCount"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/px40"
+        android:layout_marginTop="@dimen/px20"
+        android:layout_marginEnd="@dimen/px40"
+        android:layout_marginBottom="@dimen/px8"
+        android:textColor="?attr/tabBarNormal"
+        android:textSize="@dimen/px28"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/header_bottom_barrier"
+        tools:text="投稿视频 0" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

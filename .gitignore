@@ -1,0 +1,102 @@
+# ========== IDE 配置 ==========
+/.trae/
+/.vscode/
+/.idea/
+*.iml
+*.iws
+*.ipr
+
+# ========== 编译输出 ==========
+build/
+app/build/
+*/build/
+app/release/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.so
+*.jar
+*.aar
+!gradle/wrapper/gradle-wrapper.jar
+!app/src/main/jniLibs/**/*.so
+
+# ========== Gradle 相关 ==========
+.gradle/
+.gradle-app.setting
+gradle-app.setting
+local.properties
+
+# ========== 缓存 & 日志 ==========
+*.log
+*.hprof
+.cxx/
+captures/
+.externalNativeBuild/
+*.swp
+*.swo
+*~
+
+# ========== 密钥 & 签名 ==========
+*.jks
+*.keystore
+key.properties
+google-services.json
+
+# ========== 文档 ==========
+/docs/
+
+# ========== 调试文件 ==========
+debug.txt
+error.txt
+
+# ========== 第三方库资源（构建时由 AAR 依赖自动合并） ==========
+# AndroidX AppCompat / Material Design
+app/src/main/res/**/abc_*
+app/src/main/res/**/mtrl_*
+app/src/main/res/**/design_*
+app/src/main/res/**/material_*
+app/src/main/res/**/btn_checkbox_to_*
+app/src/main/res/**/btn_radio_to_*
+app/src/main/res/**/nav_default_*
+app/src/main/res/**/fragment_close_*
+app/src/main/res/**/fragment_fade_*
+app/src/main/res/**/fragment_open_*
+app/src/main/res/**/fragment_fast_out_*
+app/src/main/res/**/m3_*
+app/src/main/res/**/fast_out_*
+app/src/main/res/**/common_full_*
+app/src/main/res/**/notification_*
+app/src/main/res/**/notify_panel_*
+# ExoPlayer
+app/src/main/res/**/exo_*
+app/src/main/res/**/my_exo_*
+app/src/main/res/**/yt_*
+# 例外：项目代码直接引用的 ExoPlayer/YouTube 布局和动画
+!app/src/main/res/layout/exo_styled_settings_list.xml
+!app/src/main/res/layout/exo_styled_sub_settings_list_item.xml
+!app/src/main/res/layout/my_exo_styled_player_view.xml
+!app/src/main/res/layout/yt_seconds_view.xml
+!app/src/main/res/layout/yt_overlay.xml
+!app/src/main/res/drawable-anydpi/exo_ic_speed.xml
+!app/src/main/res/drawable-anydpi/exo_ic_audiotrack.xml
+!app/src/main/res/drawable/exo_ic_speed.xml
+!app/src/main/res/drawable/exo_ic_audiotrack.xml
+!app/src/main/res/anim/m3_side_sheet_enter_from_right.xml
+!app/src/main/res/anim/m3_side_sheet_exit_to_right.xml
+# 特定 values 文件（被 AAR 覆盖）
+app/src/main/res/values-v23/colors.xml
+app/src/main/res/values-v23/drawables.xml
+app/src/main/res/values-v23/styles.xml
+app/src/main/res/values-v24/styles.xml
+app/src/main/res/values-v26/styles.xml
+app/src/main/res/values-v28/dimens.xml
+app/src/main/res/values-v28/styles.xml
+app/src/main/res/values-watch/drawables.xml
+app/src/main/res/values-watch/styles.xml
+
+# ========== 其他 ==========
+.DS_Store
+.claude/
+*.pid
+*.seed

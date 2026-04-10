@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewLeft"
+        android:background="?attr/subBackgroundColor"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/recyclerViewRight"
+        app:layout_constraintWidth_percent="0.18"/>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewRight"
+        android:background="?attr/thirdBackgroundColor"
+        android:paddingLeft="@dimen/px20"
+        android:paddingTop="@dimen/px20"
+        android:paddingRight="@dimen/px20"
+        android:paddingBottom="@dimen/px50"
+        android:clipToPadding="false"
+        android:descendantFocusability="afterDescendants"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:paddingStart="@dimen/px20"
+        android:paddingEnd="@dimen/px20"
+        app:layout_constraintStart_toEndOf="@+id/recyclerViewLeft"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintWidth_percent="0.82"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

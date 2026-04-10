@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App theme attrs used by layouts, drawables, and theme variants. -->
+    <attr name="backgroundColor" format="color|reference" />
+    <attr name="alignItems">
+        <enum name="flex_start" value="0" />
+        <enum name="flex_end" value="1" />
+        <enum name="center" value="2" />
+        <enum name="baseline" value="3" />
+        <enum name="stretch" value="4" />
+    </attr>
+    <attr name="buttonBackgroundColor" format="color|reference" />
+    <attr name="flexWrap">
+        <enum name="nowrap" value="0" />
+        <enum name="wrap" value="1" />
+        <enum name="wrap_reverse" value="2" />
+    </attr>
+    <attr name="layout_alignSelf">
+        <enum name="auto" value="-1" />
+        <enum name="flex_start" value="0" />
+        <enum name="flex_end" value="1" />
+        <enum name="center" value="2" />
+        <enum name="baseline" value="3" />
+        <enum name="stretch" value="4" />
+    </attr>
+    <attr name="layout_order" format="integer" />
+    <attr name="fourthBackgroundColor" format="color|reference" />
+    <attr name="subBackgroundColor" format="color|reference" />
+    <attr name="tabBarHighlight" format="color|reference" />
+    <attr name="tabBarNormal" format="color|reference" />
+    <attr name="tabBarSelected" format="color|reference" />
+    <attr name="dividerColor" format="color|reference" />
+    <attr name="thirdBackgroundColor" format="color|reference" />
+
+    <declare-styleable name="FlexboxLayout">
+        <attr name="alignItems" />
+        <attr name="flexWrap" />
+    </declare-styleable>
+
+    <declare-styleable name="FlexboxLayout_Layout">
+        <attr name="layout_alignSelf" />
+        <attr name="layout_order" />
+    </declare-styleable>
+
+    <!-- Custom overlay attrs kept from the reference project. -->
+    <attr name="yt_animationDuration" format="integer" />
+    <attr name="yt_arcSize" format="dimension" />
+    <attr name="yt_backgroundCircleColor" format="color" />
+    <attr name="yt_icon" format="reference" />
+    <attr name="yt_iconAnimationDuration" format="integer" />
+    <attr name="yt_playerView" format="reference" />
+    <attr name="yt_seekSeconds" format="integer" />
+    <attr name="yt_tapCircleColor" format="color" />
+    <attr name="yt_textAppearance" format="reference" />
+
+    <declare-styleable name="YouTubeOverlay">
+        <attr name="yt_animationDuration" />
+        <attr name="yt_arcSize" />
+        <attr name="yt_backgroundCircleColor" />
+        <attr name="yt_icon" />
+        <attr name="yt_iconAnimationDuration" />
+        <attr name="yt_playerView" />
+        <attr name="yt_seekSeconds" />
+        <attr name="yt_tapCircleColor" />
+        <attr name="yt_textAppearance" />
+    </declare-styleable>
+
+    <!-- DefaultTimeBar attrs -->
+    <declare-styleable name="DefaultTimeBar">
+        <attr name="bar_height" format="dimension" />
+        <attr name="touch_target_height" format="dimension" />
+        <attr name="bar_gravity" format="integer" />
+        <attr name="scrubber_enabled_size" format="dimension" />
+        <attr name="scrubber_disabled_size" format="dimension" />
+        <attr name="scrubber_dragged_size" format="dimension" />
+        <attr name="scrubber_drawable" format="reference" />
+        <attr name="played_color" format="color" />
+        <attr name="scrubber_color" format="color" />
+        <attr name="buffered_color" format="color" />
+        <attr name="unplayed_color" format="color" />
+        <attr name="ad_marker_color" format="color" />
+        <attr name="played_ad_marker_color" format="color" />
+    </declare-styleable>
+</resources>

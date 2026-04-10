@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/click_view"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/list_background"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <View
+        android:id="@+id/indicator"
+        android:layout_width="@dimen/px7"
+        android:layout_height="@dimen/px80"
+        android:background="?attr/colorAccent" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/image_avatar"
+        android:layout_width="@dimen/px50"
+        android:layout_height="@dimen/px50"
+        android:layout_marginStart="@dimen/px13"
+        android:layout_marginTop="@dimen/px15"
+        android:layout_marginBottom="@dimen/px15"
+        app:srcCompat="@drawable/default_avatar" />
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/text_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/px15"
+        android:layout_marginEnd="@dimen/px20"
+        android:layout_weight="1"
+        android:ellipsize="marquee"
+        android:singleLine="true"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="@dimen/px29"
+        android:textStyle="bold"
+        tools:text="用户昵称" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

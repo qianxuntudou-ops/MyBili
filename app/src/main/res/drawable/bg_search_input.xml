@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/buttonBackgroundColor" />
+            <stroke
+                android:width="@dimen/px2"
+                android:color="?attr/colorAccent" />
+            <corners android:radius="@dimen/px22" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/buttonBackgroundColor" />
+            <stroke
+                android:width="@dimen/px2"
+                android:color="?attr/dividerColor" />
+            <corners android:radius="@dimen/px22" />
+        </shape>
+    </item>
+</selector>

@@ -1,0 +1,243 @@
+package com.tutu.myblbl.ui.view
+
+import android.content.Context
+import android.graphics.PorterDuff
+import android.util.AttributeSet
+import android.util.TypedValue
+import android.view.KeyEvent
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.FrameLayout
+import androidx.appcompat.widget.AppCompatImageView
+import com.tutu.myblbl.R
+import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.ImageLoader
+import com.tutu.myblbl.utils.SpatialFocusNavigator
+
+class TabBarView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : FrameLayout(context, attrs, defStyleAttr) {
+
+    companion object {
+        private const val TAG = "MainEntryFocus"
+    }
+
+    private val buttonSearch: AppCompatImageView
+    private val buttonHome: AppCompatImageView
+    private val buttonCategory: AppCompatImageView
+    private val buttonDynamic: AppCompatImageView
+    private val buttonLive: AppCompatImageView
+    private val buttonMe: AppCompatImageView
+    private val buttonSetting: AppCompatImageView
+    private val imageAvatar: AppCompatImageView
+
+    private val tabButtons = mutableListOf<AppCompatImageView>()
+    private var currentSelectedIndex = -1
+    private var onTabClickListener: OnTabClickListener? = null
+
+    private val selectedColor: Int
+    private val normalColor: Int
+
+    init {
+        val view = LayoutInflater.from(context).inflate(R.layout.view_tab_bar, this, true)
+        buttonSearch = view.findViewById(R.id.button_search)
+        buttonHome = view.findViewById(R.id.button_home)
+        buttonCategory = view.findViewById(R.id.button_category)
+        buttonDynamic = view.findViewById(R.id.button_dynamic)
+        buttonLive = view.findViewById(R.id.button_live)
+        buttonMe = view.findViewById(R.id.button_me)
+        buttonSetting = view.findViewById(R.id.button_setting)
+        imageAvatar = view.findViewById(R.id.image_avatar)
+
+        val typedValueSelected = TypedValue()
+        context.theme.resolveAttribute(R.attr.tabBarSelected, typedValueSelected, true)
+        selectedColor = typedValueSelected.data
+
+        val typedValueNormal = TypedValue()
+        context.theme.resolveAttribute(R.attr.tabBarNormal, typedValueNormal, true)
+        normalColor = typedValueNormal.data
+
+        tabButtons.addAll(listOf(
+            buttonHome,
+            buttonCategory,
+            buttonDynamic,
+            buttonLive,
+            buttonMe,
+            buttonSearch
+        ))
+
+        tabButtons.forEach { button ->
+            applyTabColor(button, false)
+        }
+
+        setupClickListeners()
+    }
+
+    private fun applyTabColor(view: View, isSelected: Boolean) {
+        if (view is AppCompatImageView) {
+            view.setColorFilter(
+                if (isSelected) selectedColor else normalColor,
+                PorterDuff.Mode.SRC_IN
+            )
+            view.isSelected = isSelected
+        }
+    }
+
+    private fun setupClickListeners() {
+        tabButtons.forEachIndexed { index, button ->
+            button.setOnClickListener {
+                selectTab(index)
+            }
+            button.setOnKeyListener { _, keyCode, event ->
+                if (event.action != KeyEvent.ACTION_DOWN) {
+                    return@setOnKeyListener false
+                }
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        AppLog.d(
+                            TAG,
+                            "leftNav key RIGHT: index=$index button=${resources.getResourceEntryName(button.id)} selected=$currentSelectedIndex hasFocus=${button.hasFocus()}"
+                        )
+                        onTabClickListener?.onTabNavigateRight(index) == true
+                    }
+                    KeyEvent.KEYCODE_DPAD_LEFT -> true
+                    KeyEvent.KEYCODE_DPAD_UP -> {
+                        if (button === buttonSearch) true else false
+                    }
+                    else -> false
+                }
+            }
+        }
+
+        buttonSetting.setOnClickListener {
+            onTabClickListener?.onSettingClick()
+        }
+        buttonSetting.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) {
+                return@setOnKeyListener false
+            }
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> true
+                KeyEvent.KEYCODE_DPAD_UP -> false
+                KeyEvent.KEYCODE_DPAD_DOWN -> true
+                else -> false
+            }
+        }
+
+        imageAvatar.setOnClickListener {
+            onTabClickListener?.onAvatarClick()
+        }
+        imageAvatar.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) {
+                return@setOnKeyListener false
+            }
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> true
+                KeyEvent.KEYCODE_DPAD_UP -> false
+                KeyEvent.KEYCODE_DPAD_DOWN -> false
+                else -> false
+            }
+        }
+    }
+
+    fun selectTab(index: Int) {
+        if (index < 0 || index >= tabButtons.size) return
+        if (index == 3 && buttonLive.visibility == GONE) return
+        if (currentSelectedIndex == index) {
+            if (index == 5) {
+                onTabClickListener?.onSearchClick()
+            } else {
+                onTabClickListener?.onTabReselected(index)
+            }
+            return
+        }
+
+        tabButtons.getOrNull(currentSelectedIndex)?.let { applyTabColor(it, false) }
+        currentSelectedIndex = index
+        applyTabColor(tabButtons[currentSelectedIndex], true)
+
+        if (index == 5) {
+            onTabClickListener?.onSearchClick()
+        } else {
+            onTabClickListener?.onTabSelected(index)
+        }
+    }
+
+    fun setOnTabClickListener(listener: OnTabClickListener) {
+        this.onTabClickListener = listener
+    }
+
+    fun setLiveButtonVisible(visible: Boolean) {
+        buttonLive.visibility = if (visible) VISIBLE else GONE
+    }
+
+    fun isLiveButtonVisible(): Boolean {
+        return buttonLive.visibility == VISIBLE
+    }
+
+    fun showAvatar(show: Boolean) {
+        imageAvatar.visibility = if (show) VISIBLE else GONE
+    }
+
+    fun setAvatarUrl(avatarUrl: String?) {
+        if (avatarUrl.isNullOrBlank()) {
+            imageAvatar.setImageResource(R.drawable.default_avatar)
+            return
+        }
+
+        ImageLoader.loadCircle(
+            imageView = imageAvatar,
+            url = avatarUrl,
+            placeholder = R.drawable.default_avatar,
+            error = R.drawable.default_avatar
+        )
+    }
+
+    fun getCurrentSelectedIndex(): Int = currentSelectedIndex
+
+    fun restoreTabHighlight(index: Int) {
+        if (index < 0 || index >= tabButtons.size) return
+        tabButtons.getOrNull(currentSelectedIndex)?.let { applyTabColor(it, false) }
+        currentSelectedIndex = index
+        applyTabColor(tabButtons[currentSelectedIndex], true)
+    }
+
+    fun focusCurrentTab(): Boolean {
+        return tabButtons.getOrNull(currentSelectedIndex)?.requestFocus() == true
+    }
+
+    fun focusNearestButtonTo(anchorView: View?): Boolean {
+        val candidates = buildList {
+            add(buttonSearch)
+            add(buttonHome)
+            add(buttonCategory)
+            add(buttonDynamic)
+            add(buttonLive)
+            add(buttonMe)
+            add(imageAvatar)
+            add(buttonSetting)
+        }.filter { it.visibility == VISIBLE && it.isFocusable }
+        if (candidates.isEmpty()) {
+            return false
+        }
+        return SpatialFocusNavigator.requestBestCandidate(
+            anchorView = anchorView,
+            candidates = candidates,
+            direction = View.FOCUS_LEFT,
+            fallback = {
+                focusCurrentTab() || candidates.firstOrNull()?.requestFocus() == true
+            }
+        )
+    }
+
+    interface OnTabClickListener {
+        fun onTabSelected(index: Int)
+        fun onTabReselected(index: Int)
+        fun onTabNavigateRight(index: Int): Boolean
+        fun onSearchClick()
+        fun onSettingClick()
+        fun onAvatarClick()
+    }
+}
