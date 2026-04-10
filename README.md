@@ -1,6 +1,6 @@
-# MyBLBL
+# MyBili
 
-📺 一个专为 Android TV 设计的第三方 Bilibili 客户端应用
+📺 一个专为 Android TV 设计的第三方 Bilibili 客户端应用,像素级对齐BLBL。
 
 ## ✨ 主要功能
 
@@ -22,6 +22,11 @@
 - **弹幕**: 快手 AkDanmaku 引擎 
 - **最低版本**: Android 5.0 (API 21)
 - **目标版本**: Android 15 (API 35)
+## APP 截图
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b746a1dd-8243-4378-a1ea-c023460323b7" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/4a0199e0-64a0-4762-9d45-8ec2ff58524a" />
+
 
 ## 🙏 感谢
 
