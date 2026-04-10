@@ -37,6 +37,7 @@ import com.tutu.myblbl.model.video.quality.AudioQuality
 import com.tutu.myblbl.model.video.quality.VideoCodecEnum
 import com.tutu.myblbl.model.video.quality.VideoQuality
 import com.tutu.myblbl.utils.isAdvancedDanmakuEnabled
+import com.tutu.myblbl.utils.getDanmakuSmartFilterLevel
 import com.tutu.myblbl.ui.fragment.player.LiveQualityInfo
 
 @OptIn(UnstableApi::class)
@@ -119,6 +120,7 @@ class MyPlayerView @JvmOverloads constructor(
     private var downTouchX = 0f
     private var downTouchY = 0f
     private var isSwipeSeeking = false
+    private var swipeSeekUsesControllerPreview = false
     private var swipeSeekStartPositionMs = 0L
     private var swipeSeekTargetPositionMs = 0L
     private var hasRenderedFirstFrame = false
@@ -323,14 +325,16 @@ class MyPlayerView @JvmOverloads constructor(
         tapOverlayView = findViewById(R.id.view_youtube_overlay)
         tapOverlayView?.setPlayerView(this)
         tapOverlayView?.setCallback(object : YouTubeOverlay.Callback {
-            override fun onAnimationStart() {
-                setUseController(false)
-                tapOverlayView?.visibility = VISIBLE
+            override fun onAnimationStart(displayMode: YouTubeOverlay.DisplayMode) {
+                if (displayMode == YouTubeOverlay.DisplayMode.EXCLUSIVE) {
+                    setUseController(false)
+                }
             }
 
-            override fun onAnimationEnd() {
-                setUseController(true)
-                tapOverlayView?.visibility = GONE
+            override fun onAnimationEnd(displayMode: YouTubeOverlay.DisplayMode) {
+                if (displayMode == YouTubeOverlay.DisplayMode.EXCLUSIVE) {
+                    setUseController(true)
+                }
             }
 
             override fun shouldForward(player: Player, playerView: MyPlayerView, x: Float): Boolean? {
@@ -778,6 +782,11 @@ class MyPlayerView @JvmOverloads constructor(
             controller?.rememberCurrentFocusTarget()
         }
         settingView?.showHide(show)
+        if (!show) {
+            val currentPositionMs = player?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            syncDanmakuPosition(currentPositionMs, forceSeek = true)
+            restoreControllerAfterGesture(showIndefinitely = true)
+        }
     }
 
     fun showHideDmSwitchButton(show: Boolean) {
@@ -1015,6 +1024,7 @@ class MyPlayerView @JvmOverloads constructor(
             screenArea = settingView?.getScreenPartParam() ?: 3,
             allowTop = settingView?.getDmAllowTop() ?: true,
             allowBottom = settingView?.getDmAllowBottom() ?: true,
+            smartFilterLevel = context.getDanmakuSmartFilterLevel(),
             mergeDuplicate = settingView?.getDmMergeDuplicate() ?: true
         )
     }
@@ -1029,6 +1039,7 @@ class MyPlayerView @JvmOverloads constructor(
                 downTouchX = event.x
                 downTouchY = event.y
                 isSwipeSeeking = false
+                swipeSeekUsesControllerPreview = false
                 swipeSeekStartPositionMs = currentPlayer.currentPosition.coerceAtLeast(0L)
                 swipeSeekTargetPositionMs = swipeSeekStartPositionMs
             }
@@ -1044,13 +1055,20 @@ class MyPlayerView @JvmOverloads constructor(
                         return false
                     }
                     isSwipeSeeking = true
+                    swipeSeekUsesControllerPreview = controller?.isVisible() == true
                     parent?.requestDisallowInterceptTouchEvent(true)
                     val deltaMs = (deltaX / width.coerceAtLeast(1)) * currentPlayer.duration
+                    if (swipeSeekUsesControllerPreview) {
+                        controller?.beginSeekPreview(
+                            swipeSeekStartPositionMs + deltaMs.toLong().coerceIn(0L, currentPlayer.duration)
+                        )
+                    }
                     tapOverlayView?.showSwipeSeek(
                         swipeSeekStartPositionMs + deltaMs.toLong()
                             .coerceIn(0L, currentPlayer.duration),
                         currentPlayer.duration,
-                        deltaMs.toLong()
+                        deltaMs.toLong(),
+                        showBottomProgress = !swipeSeekUsesControllerPreview
                     )
                 }
                 val durationMs = currentPlayer.duration.coerceAtLeast(0L)
@@ -1061,7 +1079,15 @@ class MyPlayerView @JvmOverloads constructor(
                         .coerceIn(0L, durationMs)
                 swipeSeekTargetPositionMs = targetPositionMs
                 val deltaMs = swipeSeekTargetPositionMs - swipeSeekStartPositionMs
-                tapOverlayView?.showSwipeSeek(targetPositionMs, durationMs, deltaMs)
+                if (swipeSeekUsesControllerPreview) {
+                    controller?.beginSeekPreview(targetPositionMs)
+                }
+                tapOverlayView?.showSwipeSeek(
+                    targetPositionMs,
+                    durationMs,
+                    deltaMs,
+                    showBottomProgress = !swipeSeekUsesControllerPreview
+                )
                 return true
             }
 
@@ -1071,8 +1097,12 @@ class MyPlayerView @JvmOverloads constructor(
                 }
                 currentPlayer.seekTo(swipeSeekTargetPositionMs)
                 syncDanmakuPosition(swipeSeekTargetPositionMs, forceSeek = true)
+                if (swipeSeekUsesControllerPreview) {
+                    controller?.endSeekPreview(swipeSeekTargetPositionMs, 180L)
+                }
                 tapOverlayView?.finishSwipeSeek()
                 isSwipeSeeking = false
+                swipeSeekUsesControllerPreview = false
                 parent?.requestDisallowInterceptTouchEvent(false)
                 return true
             }
@@ -1081,13 +1111,27 @@ class MyPlayerView @JvmOverloads constructor(
                 if (!isSwipeSeeking) {
                     return false
                 }
+                if (swipeSeekUsesControllerPreview) {
+                    controller?.cancelSeekPreview()
+                }
                 tapOverlayView?.cancelSwipeSeek()
                 isSwipeSeeking = false
+                swipeSeekUsesControllerPreview = false
                 parent?.requestDisallowInterceptTouchEvent(false)
                 return true
             }
         }
         return false
+    }
+
+    private fun restoreControllerAfterGesture(showIndefinitely: Boolean = false) {
+        setUseController(true)
+        if (showIndefinitely) {
+            showController(true)
+        } else {
+            maybeShowController(true)
+        }
+        controller?.resetHideCallbacks()
     }
 
     private inner class ProgressiveSeekHelper {
@@ -1201,6 +1245,7 @@ class MyPlayerView @JvmOverloads constructor(
             } else if (isForward) {
                 doSingleSeek()
             }
+            restoreControllerAfterGesture()
         }
 
         private fun doSingleSeek() {
@@ -1229,6 +1274,7 @@ class MyPlayerView @JvmOverloads constructor(
                 currentPlayer.playbackParameters = PlaybackParameters(originalSpeed)
             }
             tapOverlayView?.cancelSwipeSeek()
+            restoreControllerAfterGesture()
         }
 
         private fun cancelPendingRunnable() {
@@ -1252,6 +1298,7 @@ class MyPlayerView @JvmOverloads constructor(
                 currentPlayer.playbackParameters = PlaybackParameters(originalSpeed)
             }
             tapOverlayView?.cancelSwipeSeek()
+            restoreControllerAfterGesture()
         }
 
         fun isActive(): Boolean = isSeeking

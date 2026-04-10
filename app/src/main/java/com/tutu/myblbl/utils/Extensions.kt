@@ -17,6 +17,9 @@ import java.io.Serializable
 private const val PREFS_APP_SETTINGS = "app_settings"
 private const val VALUE_ON = "开"
 private const val VALUE_OFF = "关"
+private const val VALUE_LOW = "低"
+private const val VALUE_MEDIUM = "中"
+private const val VALUE_HIGH = "高"
 private val DEFAULT_START_PAGE_OPTIONS = arrayOf("推荐", "热门", "番剧", "影视")
 
 fun Context.toast(message: String, duration: Int = Toast.LENGTH_SHORT) {
@@ -65,11 +68,28 @@ fun Context.isSimpleOperationKeyEnabled(): Boolean {
     )
 }
 
+fun Context.getDanmakuSmartFilterLevel(): Int {
+    return when (getSettingString("dm_filter_weight")?.trim()) {
+        VALUE_LOW -> 1
+        VALUE_MEDIUM -> 2
+        VALUE_HIGH -> 3
+        VALUE_ON -> 1
+        else -> 0
+    }
+}
+
 fun Context.isDanmakuSmartFilterEnabled(): Boolean {
-    return getToggleSetting(
-        key = "dm_filter_weight",
-        defaultValue = false
-    )
+    return getDanmakuSmartFilterLevel() > 0
+}
+
+fun normalizeDanmakuSmartFilterValue(value: String?): String {
+    return when (value?.trim()) {
+        VALUE_LOW -> VALUE_LOW
+        VALUE_MEDIUM -> VALUE_MEDIUM
+        VALUE_HIGH -> VALUE_HIGH
+        VALUE_ON -> VALUE_LOW
+        else -> VALUE_OFF
+    }
 }
 
 fun Context.isVipColorfulDanmakuAllowed(): Boolean {

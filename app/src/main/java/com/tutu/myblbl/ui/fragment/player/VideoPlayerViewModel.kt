@@ -1554,12 +1554,16 @@ class VideoPlayerViewModel(
             val segment = runCatching {
                 DmProtoParser.parseSegment(bytes)
             }.getOrNull() ?: return@forEach
+            val regularStartIndex = regularItems.size
+            val specialStartIndex = specialItems.size
+            var advancedCount = 0
             val aiFlagsById = segment.aiFlag.dmFlags.associate { it.dmid to it.flag }
             val colorfulSrcByType = segment.colorfulSrc
                 .filter { it.type != 0 && it.src.isNotBlank() }
                 .associate { it.type to it.src }
             segment.elems.forEach { elem ->
                 if (elem.mode == 7) {
+                    advancedCount += 1
                     AdvancedDanmakuParser.parse(
                         id = elem.id.takeIf { it > 0L } ?: elem.progress.toLong(),
                         progressMs = elem.progress,
@@ -1591,6 +1595,10 @@ class VideoPlayerViewModel(
                     )
                 }
             }
+            AppLog.d(
+                TAG,
+                "loadDanmaku segment[$segmentIndex]: bytes=${bytes.size}, state=${segment.state}, elems=${segment.elems.size}, regularAdded=${regularItems.size - regularStartIndex}, specialAdded=${specialItems.size - specialStartIndex}, advancedRaw=$advancedCount, colorfulSrc=${segment.colorfulSrc.size}"
+            )
         }
         SpecialDanmakuPayload(
             regularItems = regularItems,

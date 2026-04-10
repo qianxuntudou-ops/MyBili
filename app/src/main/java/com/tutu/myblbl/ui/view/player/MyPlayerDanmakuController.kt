@@ -11,6 +11,7 @@ import com.kuaishou.akdanmaku.render.SimpleRenderer
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import com.kuaishou.akdanmaku.ui.DanmakuView
 import com.tutu.myblbl.model.dm.DmModel
+import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.isVipColorfulDanmakuAllowed
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,10 +32,15 @@ class MyPlayerDanmakuController(
 ) {
 
     companion object {
+        private const val TAG = "MyPlayerDanmaku"
         private const val MERGE_DUPLICATE_WINDOW_MS = 15_000
         private const val MERGE_DUPLICATE_MIN_COUNT = 2
         private const val MAX_SYNC_DRIFT_MS = 1200L
         private const val COLORFUL_VIP_GRADIENT = 0xEA61
+        private const val SMART_FILTER_LEVEL_OFF = 0
+        private const val SMART_FILTER_LEVEL_LOW = 1
+        private const val SMART_FILTER_LEVEL_MEDIUM = 2
+        private const val SMART_FILTER_LEVEL_HIGH = 3
     }
 
     data class SettingsSnapshot(
@@ -46,6 +52,7 @@ class MyPlayerDanmakuController(
         val screenArea: Int,
         val allowTop: Boolean,
         val allowBottom: Boolean,
+        val smartFilterLevel: Int,
         val mergeDuplicate: Boolean
     )
 
@@ -57,6 +64,7 @@ class MyPlayerDanmakuController(
     private var isDanmakuStarted = false
     private var isDanmakuPaused = false
     private var mergeDuplicate = true
+    private var smartFilterLevel = SMART_FILTER_LEVEL_OFF
     private var lastSettingsSnapshot: SettingsSnapshot? = null
     private var rawDanmakuSignature: Long = 0L
     private var rawDanmakuCount: Int = 0
@@ -107,6 +115,7 @@ class MyPlayerDanmakuController(
             return
         }
         lastSettingsSnapshot = snapshot
+        val normalizedSmartFilterLevel = snapshot.smartFilterLevel.normalizeSmartFilterLevel()
         val durationMs = snapshot.speed.toDanmakuDurationMs()
         val newConfig = danmakuConfig.copy(
             visibility = snapshot.enabled,
@@ -129,7 +138,10 @@ class MyPlayerDanmakuController(
             newConfig.updateFilter()
         }
         updateConfig(newConfig)
-        setMergeDuplicate(snapshot.mergeDuplicate)
+        updatePreparationOptions(
+            mergeDuplicateEnabled = snapshot.mergeDuplicate,
+            smartFilterLevel = normalizedSmartFilterLevel
+        )
     }
 
     fun updatePlaybackSpeed(speed: Float) {
@@ -202,7 +214,9 @@ class MyPlayerDanmakuController(
         val generation = ++prepareGeneration
         prepareJob = controllerScope.launch {
             val allowVipColorful = isVipColorfulDanmakuAllowed()
-            val preparedData = rawDanmakuData
+            val filteredData = rawDanmakuData
+                .applySmartFilter(level = smartFilterLevel, stage = "full")
+            val preparedData = filteredData
                 .mergeDuplicateDanmaku(mergeDuplicate)
                 .mapIndexedNotNull { index, item ->
                     item.toDanmakuItemData(index.toLong(), allowVipColorful)
@@ -271,7 +285,9 @@ class MyPlayerDanmakuController(
         prepareJob = controllerScope.launch {
             val allowVipColorful = isVipColorfulDanmakuAllowed()
             val startIndex = danmakuData.size.toLong()
-            val preparedData = data
+            val filteredData = data
+                .applySmartFilter(level = smartFilterLevel, stage = "append")
+            val preparedData = filteredData
                 .mapIndexedNotNull { index, item ->
                     item.toDanmakuItemData(startIndex + index, allowVipColorful)
                 }
@@ -326,10 +342,12 @@ class MyPlayerDanmakuController(
         }
     }
 
-    private fun setMergeDuplicate(enabled: Boolean) {
-        val changed = mergeDuplicate != enabled
-        mergeDuplicate = enabled
-        if (changed && rawDanmakuData.isNotEmpty()) {
+    private fun updatePreparationOptions(mergeDuplicateEnabled: Boolean, smartFilterLevel: Int) {
+        val mergeChanged = mergeDuplicate != mergeDuplicateEnabled
+        val smartFilterChanged = this.smartFilterLevel != smartFilterLevel
+        mergeDuplicate = mergeDuplicateEnabled
+        this.smartFilterLevel = smartFilterLevel
+        if ((mergeChanged || smartFilterChanged) && rawDanmakuData.isNotEmpty()) {
             rebuildAndApplyData()
         }
     }
@@ -457,6 +475,50 @@ class MyPlayerDanmakuController(
         }
     }
 
+    private fun List<DmModel>.applySmartFilter(level: Int, stage: String): List<DmModel> {
+        val normalizedLevel = level.normalizeSmartFilterLevel()
+        if (normalizedLevel == SMART_FILTER_LEVEL_OFF || isEmpty()) {
+            return this
+        }
+        val maxPositiveScore = asSequence()
+            .map { it.aiFlagScore }
+            .filter { it > 0 }
+            .maxOrNull()
+            ?: return this
+        val threshold = resolveSmartFilterThreshold(normalizedLevel, maxPositiveScore)
+        val filtered = filter { item ->
+            val score = item.aiFlagScore
+            score <= 0 || score < threshold
+        }
+        AppLog.d(
+            TAG,
+            "smartFilter[$stage]: level=$normalizedLevel, threshold=$threshold, maxScore=$maxPositiveScore, before=${size}, after=${filtered.size}, filtered=${size - filtered.size}"
+        )
+        return filtered
+    }
+
+    private fun resolveSmartFilterThreshold(level: Int, maxPositiveScore: Int): Int {
+        return when {
+            maxPositiveScore <= 3 -> when (level) {
+                SMART_FILTER_LEVEL_LOW -> 3
+                SMART_FILTER_LEVEL_MEDIUM -> 2
+                else -> 1
+            }
+
+            maxPositiveScore <= 10 -> when (level) {
+                SMART_FILTER_LEVEL_LOW -> 7
+                SMART_FILTER_LEVEL_MEDIUM -> 4
+                else -> 2
+            }
+
+            else -> when (level) {
+                SMART_FILTER_LEVEL_LOW -> max(1, (maxPositiveScore * 3) / 4)
+                SMART_FILTER_LEVEL_MEDIUM -> max(1, maxPositiveScore / 2)
+                else -> max(1, maxPositiveScore / 4)
+            }
+        }
+    }
+
     private data class MergeDuplicateKey(
         val content: String,
         val mode: Int,
@@ -528,6 +590,10 @@ class MyPlayerDanmakuController(
             return Color.WHITE
         }
         return resolvedColor
+    }
+
+    private fun Int.normalizeSmartFilterLevel(): Int {
+        return coerceIn(SMART_FILTER_LEVEL_OFF, SMART_FILTER_LEVEL_HIGH)
     }
 
     private fun Int.toDanmakuTextScale(): Float {

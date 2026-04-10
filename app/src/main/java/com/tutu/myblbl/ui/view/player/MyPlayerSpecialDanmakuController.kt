@@ -16,6 +16,7 @@ class MyPlayerSpecialDanmakuController(
         screenArea = 3,
         allowTop = true,
         allowBottom = true,
+        smartFilterLevel = 0,
         mergeDuplicate = true
     )
     private var playbackPositionMs = 0L

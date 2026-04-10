@@ -9,11 +9,11 @@ data class PlayerSettings(
     val defaultVideoQualityId: Int? = VideoQualityDefaults.DEFAULT_VIDEO_QUALITY_ID,
     val defaultAudioQualityId: Int? = VideoQualityDefaults.DEFAULT_AUDIO_QUALITY_ID,
     val defaultPlaybackSpeed: Float = 1.0f,
-    val defaultVideoCodec: VideoCodecEnum? = VideoCodecEnum.AVC,
+    val defaultVideoCodec: VideoCodecEnum? = VideoCodecEnum.HEVC,
     val continuePlaybackAfterFinish: Boolean = true,
     val exitPlayerWhenPlaybackFinished: Boolean = true,
     val showSubtitleByDefault: Boolean = false,
-    val subtitleTextSizePx: Int = 40,
+    val subtitleTextSizePx: Int = 45,
     val showBottomProgressBar: Boolean = false,
     val showDebugInfo: Boolean = false,
     val simpleKeyPress: Boolean = false,
@@ -67,10 +67,11 @@ object PlayerSettingsStore {
             defaultVideoCodec = parseVideoCodec(
                 readSetting(KEY_VIDEO_CODEC)
             ),
-            continuePlaybackAfterFinish = parseToggle(
-                readSetting(KEY_AFTER_PLAY),
-                defaultValue = true
-            ),
+            continuePlaybackAfterFinish = when (readSetting(KEY_AFTER_PLAY)) {
+                "什么都不做" -> false
+                null, "" -> true
+                else -> true
+            },
             exitPlayerWhenPlaybackFinished = parseToggle(
                 readSetting(KEY_PLAY_FINISH_EXIT_PLAYER),
                 defaultValue = true
@@ -82,7 +83,7 @@ object PlayerSettingsStore {
             subtitleTextSizePx = readSetting(KEY_SUBTITLE_TEXT_SIZE)
                 ?.toIntOrNull()
                 ?.coerceIn(30, 60)
-                ?: 40,
+                ?: 45,
             showBottomProgressBar = parseToggle(
                 readSetting(KEY_SHOW_BOTTOM_PROGRESS_BAR),
                 defaultValue = false
@@ -144,17 +145,19 @@ object PlayerSettingsStore {
             "192KBPS", "192K", AudioQuality.AUDIO_192K.name.uppercase() -> AudioQuality.AUDIO_192K.id
             "132KBPS", "132K", AudioQuality.AUDIO_132K.name.uppercase() -> AudioQuality.AUDIO_132K.id
             "64KBPS", "64K", AudioQuality.AUDIO_64K.name.uppercase() -> AudioQuality.AUDIO_64K.id
+            "DOLBYATMOS", "杜比全景声" -> AudioQuality.AUDIO_DOLBY.id
+            "HI-RES无损", "HI-RES", "HIRES" -> AudioQuality.AUDIO_HIRES.id
             else -> value.toIntOrNull()
         }
     }
 
     private fun parseVideoCodec(value: String?): VideoCodecEnum? {
         return when (value?.trim()?.uppercase()) {
-            null, "" -> VideoCodecEnum.AVC
+            null, "" -> VideoCodecEnum.HEVC
             "AVC", "H.264", "H264" -> VideoCodecEnum.AVC
             "HEVC", "H.265", "H265" -> VideoCodecEnum.HEVC
             "AV1" -> VideoCodecEnum.AV1
-            else -> VideoCodecEnum.AVC
+            else -> VideoCodecEnum.HEVC
         }
     }
 

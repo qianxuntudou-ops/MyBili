@@ -1,6 +1,7 @@
 package com.tutu.myblbl.ui.fragment.player
 
 import com.tutu.myblbl.model.player.PlayInfoModel
+import com.tutu.myblbl.model.proto.DmProtoParser
 import com.tutu.myblbl.model.player.VideoSnapshotData
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.WbiGenerator
@@ -17,6 +18,12 @@ class VideoPlayerPlayInfoGateway(
     private val apiService: ApiService,
     private val logTag: String
 ) {
+
+    private data class DanmakuSegmentProbe(
+        val bytes: ByteArray,
+        val elemCount: Int,
+        val state: Int
+    )
 
     data class PlayInfoResult(
         val code: Int,
@@ -201,12 +208,30 @@ class VideoPlayerPlayInfoGateway(
                 responseBody.bytes()
             }
         }.getOrNull()
-        if (normalBytes != null) {
-            return normalBytes
+        val normalProbe = probeDanmakuSegment(normalBytes)
+        logDanmakuSegmentProbe(
+            source = "normal",
+            cid = cid,
+            aid = aid,
+            segmentIndex = segmentIndex,
+            probe = normalProbe
+        )
+        if (normalProbe != null && !isSuspiciousDanmakuSegment(normalProbe)) {
+            return normalProbe.bytes
         }
 
+        if (normalProbe != null) {
+            AppLog.w(
+                logTag,
+                "requestDanmakuSegment suspicious normal payload: cid=$cid, aid=$aid, segment=$segmentIndex, bytes=${normalProbe.bytes.size}, elems=${normalProbe.elemCount}, state=${normalProbe.state}"
+            )
+        }
+
+        NetworkManager.prewarmWebSession(forceUaRefresh = normalProbe != null)
+        ensureWbiKeys()
+
         if (!hasWbiKeys()) {
-            return null
+            return normalProbe?.bytes
         }
 
         val params = buildWbiParams(
@@ -217,11 +242,57 @@ class VideoPlayerPlayInfoGateway(
                 "segment_index" to segmentIndex.toString()
             )
         )
-        return runCatching {
+        val wbiBytes = runCatching {
             apiService.getVideoCommentWbi(params).use { responseBody ->
                 responseBody.bytes()
             }
         }.getOrNull()
+        val wbiProbe = probeDanmakuSegment(wbiBytes)
+        logDanmakuSegmentProbe(
+            source = "wbi",
+            cid = cid,
+            aid = aid,
+            segmentIndex = segmentIndex,
+            probe = wbiProbe
+        )
+        if (wbiProbe != null) {
+            if (!isSuspiciousDanmakuSegment(wbiProbe)) {
+                return wbiProbe.bytes
+            }
+            if (normalProbe == null || wbiProbe.elemCount > normalProbe.elemCount || wbiProbe.bytes.size > normalProbe.bytes.size) {
+                return wbiProbe.bytes
+            }
+        }
+        return normalProbe?.bytes
+    }
+
+    private fun probeDanmakuSegment(bytes: ByteArray?): DanmakuSegmentProbe? {
+        if (bytes == null) {
+            return null
+        }
+        val segment = runCatching { DmProtoParser.parseSegment(bytes) }.getOrNull()
+        return DanmakuSegmentProbe(
+            bytes = bytes,
+            elemCount = segment?.elems?.size ?: -1,
+            state = segment?.state ?: -1
+        )
+    }
+
+    private fun isSuspiciousDanmakuSegment(probe: DanmakuSegmentProbe): Boolean {
+        return probe.bytes.size in 1..64 && probe.elemCount == 0
+    }
+
+    private fun logDanmakuSegmentProbe(
+        source: String,
+        cid: Long,
+        aid: Long,
+        segmentIndex: Int,
+        probe: DanmakuSegmentProbe?
+    ) {
+        AppLog.d(
+            logTag,
+            "requestDanmakuSegment[$source]: cid=$cid, aid=$aid, segment=$segmentIndex, bytes=${probe?.bytes?.size ?: 0}, elems=${probe?.elemCount ?: -1}, state=${probe?.state ?: -1}"
+        )
     }
 
     suspend fun requestDanmakuViewBytes(

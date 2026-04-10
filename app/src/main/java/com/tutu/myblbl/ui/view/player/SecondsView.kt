@@ -2,6 +2,7 @@ package com.tutu.myblbl.ui.view.player
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Color
 import android.graphics.Bitmap
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -40,10 +41,12 @@ class SecondsView @JvmOverloads constructor(
 
     private var cycleDuration: Long = 750L
     private var seconds: Int = 0
+    private var indicatorLoopActive = false
+    private var hasPreviewBitmap = false
     var isForward: Boolean = true
         private set
     private var iconRes: Int = R.drawable.ic_play_triangle
-    private val secondaryTextColor by lazy { ContextCompat.getColor(context, R.color.white_70) }
+    private val secondaryTextColor by lazy { Color.argb(196, 255, 255, 255) }
 
     init {
         val view = LayoutInflater.from(context).inflate(R.layout.yt_seconds_view, this, true)
@@ -76,7 +79,9 @@ class SecondsView @JvmOverloads constructor(
                     icon3.alpha = 0f
                 }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    animator2?.start()
+                    if (indicatorLoopActive) {
+                        animator2?.start()
+                    }
                 }
             })
         }
@@ -94,7 +99,9 @@ class SecondsView @JvmOverloads constructor(
                     icon3.alpha = 0f
                 }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    animator3?.start()
+                    if (indicatorLoopActive) {
+                        animator3?.start()
+                    }
                 }
             })
         }
@@ -113,7 +120,9 @@ class SecondsView @JvmOverloads constructor(
                     icon3.alpha = 0f
                 }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    animator4?.start()
+                    if (indicatorLoopActive) {
+                        animator4?.start()
+                    }
                 }
             })
         }
@@ -131,7 +140,9 @@ class SecondsView @JvmOverloads constructor(
                     icon3.alpha = 1f
                 }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    animator5?.start()
+                    if (indicatorLoopActive) {
+                        animator5?.start()
+                    }
                 }
             })
         }
@@ -149,47 +160,43 @@ class SecondsView @JvmOverloads constructor(
                     icon3.alpha = 1f
                 }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    animator1?.start()
+                    if (indicatorLoopActive) {
+                        animator1?.start()
+                    }
                 }
             })
         }
     }
 
     fun cancel() {
-        animator1?.cancel()
-        animator2?.cancel()
-        animator3?.cancel()
-        animator4?.cancel()
-        animator5?.cancel()
-        icon1.alpha = 0f
-        icon2.alpha = 0f
-        icon3.alpha = 0f
+        indicatorLoopActive = false
+        cancelAnimators()
+        resetIndicators()
     }
 
     fun m() {
-        animator1?.cancel()
-        animator2?.cancel()
-        animator3?.cancel()
-        animator4?.cancel()
-        animator5?.cancel()
-        icon1.alpha = 0f
-        icon2.alpha = 0f
-        icon3.alpha = 0f
+        indicatorLoopActive = false
+        cancelAnimators()
+        resetIndicators()
     }
 
     fun start() {
-        cancel()
-        animator1?.start()
+        restartIndicatorLoop()
     }
 
     fun showPreviewLoading() {
-        previewContainer.visibility = View.VISIBLE
+        if (hasPreviewBitmap) {
+            return
+        }
+        hasPreviewBitmap = false
+        previewContainer.visibility = View.GONE
         previewImage.setImageDrawable(null)
         previewImage.visibility = View.GONE
         triangleContainer.visibility = View.VISIBLE
     }
 
     fun showPreviewBitmap(bitmap: Bitmap) {
+        hasPreviewBitmap = true
         previewContainer.visibility = View.VISIBLE
         previewImage.setImageBitmap(bitmap)
         previewImage.visibility = View.VISIBLE
@@ -197,9 +204,36 @@ class SecondsView @JvmOverloads constructor(
     }
 
     fun hidePreview() {
+        hasPreviewBitmap = false
+        previewContainer.visibility = View.GONE
         previewImage.setImageDrawable(null)
         previewImage.visibility = View.GONE
         triangleContainer.visibility = View.VISIBLE
+    }
+
+    fun ensureIndicatorLoop() {
+        if (indicatorLoopActive) {
+            return
+        }
+        indicatorLoopActive = true
+        cancelAnimators()
+        resetIndicators()
+        animator1?.start()
+    }
+
+    fun restartIndicatorLoop() {
+        indicatorLoopActive = true
+        cancelAnimators()
+        resetIndicators()
+        animator1?.start()
+    }
+
+    fun isIndicatorLoopRunning(): Boolean {
+        return indicatorLoopActive
+    }
+
+    fun hasPreviewBitmap(): Boolean {
+        return hasPreviewBitmap
     }
 
     fun getCycleDuration(): Long {
@@ -276,5 +310,19 @@ class SecondsView @JvmOverloads constructor(
         }
         tvSeconds.text = speedStr
         seconds = 0
+    }
+
+    private fun cancelAnimators() {
+        animator1?.cancel()
+        animator2?.cancel()
+        animator3?.cancel()
+        animator4?.cancel()
+        animator5?.cancel()
+    }
+
+    private fun resetIndicators() {
+        icon1.alpha = 0f
+        icon2.alpha = 0f
+        icon3.alpha = 0f
     }
 }

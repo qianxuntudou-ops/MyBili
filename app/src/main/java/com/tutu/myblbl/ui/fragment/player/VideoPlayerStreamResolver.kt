@@ -59,9 +59,7 @@ internal class VideoPlayerStreamResolver(
         val routes: List<CodecRoute>
     )
 
-    fun buildFnval(qualityId: Int): Int {
-        return if (qualityId >= 120 || qualityId == 125 || qualityId == 126) 4048 else 16
-    }
+    fun buildFnval(qualityId: Int): Int = 4048
 
     fun buildFourk(qualityId: Int): Int {
         return if (qualityId >= 120) 1 else 0

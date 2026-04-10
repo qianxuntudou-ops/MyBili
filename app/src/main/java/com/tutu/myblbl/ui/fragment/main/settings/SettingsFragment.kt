@@ -21,6 +21,7 @@ import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.FileCacheManager
 import com.tutu.myblbl.utils.ImageLoader
 import com.tutu.myblbl.utils.PlayerMediaCache
+import com.tutu.myblbl.utils.normalizeDanmakuSmartFilterValue
 import java.util.Locale
 
 class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
@@ -68,6 +69,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         private const val KEY_DM_ALLOW_VIP_COLORFUL_DM = "dm_allow_vip_colorful_dm"
         private const val KEY_DM_SHOW_ADVANCED = "dm_show_advanced"
         private const val KEY_DM_MERGE_DUPLICATE = "dm_merge_duplicate"
+        private val DM_SMART_FILTER_OPTIONS = arrayOf("关", "低", "中", "高")
 
         private val HOME_START_PAGE_OPTIONS = arrayOf("推荐", "热门", "番剧", "影视")
     }
@@ -126,12 +128,12 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             SettingModel(getString(R.string.default_video_quality), "1080P"),
             SettingModel(getString(R.string.default_audio_track), "192kbps"),
             SettingModel(getString(R.string.default_play_speed), "1.0"),
-            SettingModel(getString(R.string.after_play), "开"),
+            SettingModel(getString(R.string.after_play), "播推荐视频"),
             SettingModel(getString(R.string.play_finish_exit_player), "开"),
             SettingModel(getString(R.string.show_re_ff), "关"),
-            SettingModel(getString(R.string.video_codec), "AVC"),
+            SettingModel(getString(R.string.video_codec), "HEVC"),
             SettingModel(getString(R.string.show_subtitle_default), "关"),
-            SettingModel(getString(R.string.subtitle_text_size), "40"),
+            SettingModel(getString(R.string.subtitle_text_size), "45"),
             SettingModel(getString(R.string.show_debug), "关"),
             SettingModel(getString(R.string.show_video_detail), "关"),
             SettingModel(getString(R.string.show_bottom_progress_bar), "关"),
@@ -264,14 +266,14 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
     private fun handlePlayerSettingClick(position: Int, @Suppress("UNUSED_PARAMETER") item: SettingModel) {
         when (position) {
             0 -> showPlayerChoiceDialog(position, KEY_DEFAULT_VIDEO_QUALITY, arrayOf("自动", "8K", "杜比视界", "HDR Vivid", "HDR", "4K", "1080P60", "1080P+", "智能修复", "1080P", "720P60", "720P", "480P", "360P", "240P"))
-            1 -> showPlayerChoiceDialog(position, KEY_DEFAULT_AUDIO_TRACK, arrayOf("192kbps", "132kbps", "64kbps"))
+            1 -> showPlayerChoiceDialog(position, KEY_DEFAULT_AUDIO_TRACK, arrayOf("192kbps", "132kbps", "64kbps", "杜比全景声", "Hi-Res无损"))
             2 -> showPlayerChoiceDialog(position, KEY_DEFAULT_PLAY_SPEED, arrayOf("0.25", "0.5", "0.75", "1.0", "1.25", "1.5", "2.0"))
-            3 -> showPlayerChoiceDialog(position, KEY_AFTER_PLAY, toggleOptions())
+            3 -> showPlayerChoiceDialog(position, KEY_AFTER_PLAY, arrayOf("什么都不做", "播推荐视频", "播列表中的下一个", "播剧集和PV中的下一个"))
             4 -> showPlayerChoiceDialog(position, KEY_PLAY_FINISH_EXIT_PLAYER, toggleOptions())
             5 -> showPlayerChoiceDialog(position, KEY_SHOW_RE_FF, toggleOptions())
             6 -> showPlayerChoiceDialog(position, KEY_VIDEO_CODEC, arrayOf("AVC", "HEVC", "AV1"))
             7 -> showPlayerChoiceDialog(position, KEY_SHOW_SUBTITLE_DEFAULT, toggleOptions())
-            8 -> showPlayerChoiceDialog(position, KEY_SUBTITLE_TEXT_SIZE, arrayOf("30", "35", "40", "45", "50"))
+            8 -> showPlayerChoiceDialog(position, KEY_SUBTITLE_TEXT_SIZE, arrayOf("35", "40", "45", "50", "55", "60"))
             9 -> showPlayerChoiceDialog(position, KEY_SHOW_DEBUG, toggleOptions())
             10 -> showPlayerChoiceDialog(position, KEY_SHOW_VIDEO_DETAIL, toggleOptions())
             11 -> showPlayerChoiceDialog(position, KEY_SHOW_BOTTOM_PROGRESS_BAR, toggleOptions())
@@ -279,7 +281,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             13 -> showPlayerChoiceDialog(position, KEY_GIVE_COIN_NUMBER, arrayOf("1", "2"))
             14 -> showPlayerChoiceDialog(position, KEY_SHOW_NEXT_PREVIOUS, toggleOptions())
             15 -> showPlayerChoiceDialog(position, KEY_SHOW_DM_SWITCH, toggleOptions())
-            16 -> showPlayerChoiceDialog(position, KEY_FF_SEEK_SECOND, arrayOf("5s", "10s", "15s", "20s"))
+            16 -> showPlayerChoiceDialog(position, KEY_FF_SEEK_SECOND, arrayOf("10s", "15s", "20s", "25s", "30s", "35s", "40s", "45s", "50s", "55s", "60s"))
         }
     }
 
@@ -292,7 +294,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             4 -> showDmChoiceDialog(position, KEY_DM_SPEED, arrayOf("1", "2", "3", "4", "5", "6", "7", "8", "9"))
             5 -> showDmChoiceDialog(position, KEY_DM_ALLOW_TOP, toggleOptions())
             6 -> showDmChoiceDialog(position, KEY_DM_ALLOW_BOTTOM, toggleOptions())
-            7 -> showDmChoiceDialog(position, KEY_DM_FILTER_WEIGHT, toggleOptions())
+            7 -> showDmChoiceDialog(position, KEY_DM_FILTER_WEIGHT, DM_SMART_FILTER_OPTIONS)
             8 -> showDmChoiceDialog(position, KEY_DM_ALLOW_VIP_COLORFUL_DM, toggleOptions())
             9 -> showDmChoiceDialog(position, KEY_DM_SHOW_ADVANCED, toggleOptions())
             10 -> showDmChoiceDialog(position, KEY_DM_MERGE_DUPLICATE, toggleOptions())
@@ -416,7 +418,9 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         applySavedValue(dmSettings, 4, KEY_DM_SPEED)
         applySavedValue(dmSettings, 5, KEY_DM_ALLOW_TOP)
         applySavedValue(dmSettings, 6, KEY_DM_ALLOW_BOTTOM)
-        applySavedValue(dmSettings, 7, KEY_DM_FILTER_WEIGHT)
+        dmSettings[7].info = normalizeDanmakuSmartFilterValue(
+            prefs.getString(KEY_DM_FILTER_WEIGHT, dmSettings[7].info)
+        )
         applySavedValue(dmSettings, 8, KEY_DM_ALLOW_VIP_COLORFUL_DM)
         applySavedValue(dmSettings, 9, KEY_DM_SHOW_ADVANCED)
         applySavedValue(dmSettings, 10, KEY_DM_MERGE_DUPLICATE)
@@ -640,7 +644,12 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
     }
 
     private fun persistDmSetting(key: String, value: String) {
-        prefs.edit().putString(key, value).apply()
+        val persistedValue = if (key == KEY_DM_FILTER_WEIGHT) {
+            normalizeDanmakuSmartFilterValue(value)
+        } else {
+            value
+        }
+        prefs.edit().putString(key, persistedValue).apply()
     }
 
     private fun requestInitialCategoryFocus() {

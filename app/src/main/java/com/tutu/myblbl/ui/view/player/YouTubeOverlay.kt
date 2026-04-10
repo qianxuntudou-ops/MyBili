@@ -30,6 +30,11 @@ class YouTubeOverlay @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : ConstraintLayout(context, attrs, defStyleAttr) {
 
+    enum class DisplayMode {
+        EXCLUSIVE,
+        COEXISTING
+    }
+
     private enum class IndicatorLayoutMode {
         START,
         END,
@@ -45,9 +50,11 @@ class YouTubeOverlay @JvmOverloads constructor(
     private var playerView: MyPlayerView? = null
     private var callback: Callback? = null
     private var overlayShowing = false
+    private var activeDisplayMode = DisplayMode.EXCLUSIVE
     private var layoutMode = IndicatorLayoutMode.CENTER
     private var previewSnapshot: VideoSnapshotData? = null
     private var swipePreviewActive = false
+    private var showBottomProgress = true
     private var lastSwipeTargetPositionMs = 0L
     private var currentPreviewFrameKey: String? = null
     private var previewRequestToken = 0
@@ -67,8 +74,8 @@ class YouTubeOverlay @JvmOverloads constructor(
         }
 
     interface Callback {
-        fun onAnimationStart()
-        fun onAnimationEnd()
+        fun onAnimationStart(displayMode: DisplayMode)
+        fun onAnimationEnd(displayMode: DisplayMode)
         fun shouldForward(player: Player, playerView: MyPlayerView, x: Float): Boolean?
     }
 
@@ -128,6 +135,7 @@ class YouTubeOverlay @JvmOverloads constructor(
         secondsView.setForward(true)
         applyLayoutMode(IndicatorLayoutMode.CENTER)
         circleClipTapView.setPerformAtEnd(null)
+        circleClipTapView.visibility = View.INVISIBLE
     }
 
     fun setPlayer(player: Player?) {
@@ -161,7 +169,7 @@ class YouTubeOverlay @JvmOverloads constructor(
         swipePreviewActive = false
         cancelPreviewRequest(resetFrameKey = true)
         removeCallbacks(hideOverlayRunnable)
-        ensureOverlayVisible()
+        ensureOverlayVisible(displayMode = DisplayMode.EXCLUSIVE, showBottomProgress = true)
         secondsView.hidePreview()
         secondsView.cancel()
         secondsView.setForward(forward)
@@ -192,7 +200,7 @@ class YouTubeOverlay @JvmOverloads constructor(
         val wasShowing = overlayShowing
         swipePreviewActive = false
         cancelPreviewRequest(resetFrameKey = true)
-        ensureOverlayVisible()
+        ensureOverlayVisible(displayMode = DisplayMode.EXCLUSIVE, showBottomProgress = true)
 
         val isRewind = !shouldForward
         val directionChanged = secondsView.isForward != shouldForward
@@ -231,7 +239,7 @@ class YouTubeOverlay @JvmOverloads constructor(
         playerView?.syncDanmakuPosition(boundedPositionMs, forceSeek = true)
     }
 
-    fun showSwipeSeek(targetPositionMs: Long, durationMs: Long, deltaMs: Long) {
+    fun showSwipeSeek(targetPositionMs: Long, durationMs: Long, deltaMs: Long, showBottomProgress: Boolean) {
         val forward = deltaMs >= 0L
         val directionChanged = secondsView.isForward != forward
         val wasShowing = overlayShowing
@@ -239,7 +247,11 @@ class YouTubeOverlay @JvmOverloads constructor(
         swipePreviewActive = true
         lastSwipeTargetPositionMs = targetPositionMs
         removeCallbacks(hideOverlayRunnable)
-        ensureOverlayVisible()
+        ensureOverlayVisible(
+            displayMode = DisplayMode.COEXISTING,
+            showBottomProgress = showBottomProgress
+        )
+        circleClipTapView.cancelAndHide()
         resetSecondsViewPosition()
 
         if (!wasShowing || directionChanged || secondsView.visibility != View.VISIBLE) {
@@ -266,7 +278,7 @@ class YouTubeOverlay @JvmOverloads constructor(
         swipePreviewActive = false
         cancelPreviewRequest(resetFrameKey = true)
         removeCallbacks(hideOverlayRunnable)
-        ensureOverlayVisible()
+        ensureOverlayVisible(displayMode = DisplayMode.EXCLUSIVE, showBottomProgress = true)
         resetSecondsViewPosition()
 
         if (!wasShowing || directionChanged || secondsView.visibility != View.VISIBLE) {
@@ -298,6 +310,7 @@ class YouTubeOverlay @JvmOverloads constructor(
     }
 
     fun finishSwipeSeek() {
+        circleClipTapView.cancelAndHide()
         scheduleHide(180L)
     }
 
@@ -312,7 +325,7 @@ class YouTubeOverlay @JvmOverloads constructor(
         swipePreviewActive = false
         cancelPreviewRequest(resetFrameKey = true)
         removeCallbacks(hideOverlayRunnable)
-        ensureOverlayVisible()
+        ensureOverlayVisible(displayMode = DisplayMode.EXCLUSIVE, showBottomProgress = true)
         resetSecondsViewPosition()
 
         if (!wasShowing || directionChanged || secondsView.visibility != View.VISIBLE) {
@@ -339,6 +352,7 @@ class YouTubeOverlay @JvmOverloads constructor(
     }
 
     fun cancelSwipeSeek() {
+        circleClipTapView.cancelAndHide()
         hideOverlayImmediately()
     }
 
@@ -368,7 +382,9 @@ class YouTubeOverlay @JvmOverloads constructor(
             return
         }
 
-        showPreviewLoadingIndicator()
+        if (!secondsView.hasPreviewBitmap()) {
+            showPreviewLoadingIndicator()
+        }
         val requestToken = ++previewRequestToken
         currentPreviewTarget?.let { Glide.with(this).clear(it) }
         currentPreviewTarget = object : CustomTarget<Bitmap>() {
@@ -384,7 +400,7 @@ class YouTubeOverlay @JvmOverloads constructor(
             override fun onLoadCleared(placeholder: Drawable?) = Unit
 
             override fun onLoadFailed(errorDrawable: Drawable?) {
-                if (requestToken == previewRequestToken && swipePreviewActive) {
+                if (requestToken == previewRequestToken && swipePreviewActive && !secondsView.hasPreviewBitmap()) {
                     showPreviewLoadingIndicator()
                 }
             }
@@ -406,10 +422,7 @@ class YouTubeOverlay @JvmOverloads constructor(
 
     private fun showPreviewLoadingIndicator() {
         secondsView.showPreviewLoading()
-        if (secondsView.animator1?.isRunning != true) {
-            secondsView.m()
-            secondsView.animator1?.start()
-        }
+        secondsView.ensureIndicatorLoop()
     }
 
     private fun cancelPreviewRequest(resetFrameKey: Boolean) {
@@ -422,27 +435,40 @@ class YouTubeOverlay @JvmOverloads constructor(
         secondsView.hidePreview()
     }
 
-    private fun ensureOverlayVisible() {
+    private fun ensureOverlayVisible(displayMode: DisplayMode, showBottomProgress: Boolean) {
+        this.showBottomProgress = showBottomProgress
+        updateProgressBarVisibility()
         if (overlayShowing) {
+            if (activeDisplayMode != displayMode) {
+                callback?.onAnimationEnd(activeDisplayMode)
+                activeDisplayMode = displayMode
+                callback?.onAnimationStart(activeDisplayMode)
+            }
+            visibility = View.VISIBLE
             return
         }
         overlayShowing = true
+        activeDisplayMode = displayMode
         visibility = View.VISIBLE
-        callback?.onAnimationStart()
+        callback?.onAnimationStart(activeDisplayMode)
     }
 
     private fun hideOverlayImmediately() {
         if (!overlayShowing) {
             return
         }
+        val previousDisplayMode = activeDisplayMode
         swipePreviewActive = false
         overlayShowing = false
+        showBottomProgress = true
         cancelPreviewRequest(resetFrameKey = true)
+        circleClipTapView.cancelAndHide()
         secondsView.cancel()
         secondsView.setSeekText(0)
         secondsView.visibility = View.INVISIBLE
+        updateProgressBarVisibility()
         visibility = View.GONE
-        callback?.onAnimationEnd()
+        callback?.onAnimationEnd(previousDisplayMode)
     }
 
     private fun scheduleHide(delayMs: Long = 650L) {
@@ -461,6 +487,10 @@ class YouTubeOverlay @JvmOverloads constructor(
         progressBar.progress = safePosition
     }
 
+    private fun updateProgressBarVisibility() {
+        progressBar.visibility = if (showBottomProgress) View.VISIBLE else View.GONE
+    }
+
     private fun resetSecondsViewPosition() {
         secondsView.translationX = 0f
         secondsView.translationY = 0f
@@ -471,8 +501,7 @@ class YouTubeOverlay @JvmOverloads constructor(
         secondsView.hidePreview()
         secondsView.setForward(forward)
         secondsView.visibility = View.VISIBLE
-        secondsView.m()
-        secondsView.animator1?.start()
+        secondsView.restartIndicatorLoop()
     }
 
     private fun applyLayoutMode(mode: IndicatorLayoutMode) {

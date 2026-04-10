@@ -86,6 +86,14 @@ class CircleClipTapView @JvmOverloads constructor(
         circleAnimator?.start()
     }
 
+    fun cancelAndHide() {
+        isAnimating = false
+        circleAnimator?.cancel()
+        circleRadius = 0f
+        visibility = INVISIBLE
+        invalidate()
+    }
+
     private fun updateClipPath() {
         val halfWidth = displayWidth * 0.5f
         clipPath.reset()

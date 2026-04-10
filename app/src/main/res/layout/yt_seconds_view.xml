@@ -8,62 +8,69 @@
 
     <FrameLayout
         android:id="@+id/preview_container"
-        android:layout_width="228dp"
-        android:layout_height="128dp"
+        android:layout_width="248dp"
+        android:layout_height="140dp"
         android:background="@drawable/seek_preview_card"
-        android:clipToOutline="true"
-        android:elevation="10dp"
-        android:padding="2dp">
+        android:elevation="12dp"
+        android:padding="1dp"
+        android:visibility="gone">
 
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/image_preview"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:adjustViewBounds="true"
-            android:background="#1A000000"
-            android:scaleType="centerCrop"
-            android:visibility="gone" />
+            android:background="@drawable/seek_preview_surface"
+            android:clipToOutline="true">
 
-        <LinearLayout
-            android:id="@+id/triangle_container"
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/image_preview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:adjustViewBounds="true"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+        </FrameLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/triangle_container"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/icon_1"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:orientation="horizontal">
+            app:srcCompat="@drawable/ic_play_triangle" />
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/icon_1"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:srcCompat="@drawable/ic_play_triangle" />
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/icon_2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:srcCompat="@drawable/ic_play_triangle" />
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/icon_2"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:srcCompat="@drawable/ic_play_triangle" />
-
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/icon_3"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:srcCompat="@drawable/ic_play_triangle" />
-        </LinearLayout>
-    </FrameLayout>
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/icon_3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:srcCompat="@drawable/ic_play_triangle" />
+    </LinearLayout>
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tv_seconds"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="10dp"
         android:fontFamily="sans-serif-medium"
         android:gravity="center"
+        android:includeFontPadding="false"
+        android:letterSpacing="0.01"
         android:padding="4dp"
         android:shadowColor="@color/black"
-        android:shadowDx="1.5"
-        android:shadowDy="1.3"
-        android:shadowRadius="1.6"
+        android:shadowDx="1.2"
+        android:shadowDy="1.0"
+        android:shadowRadius="2.2"
         android:textColor="@android:color/white"
-        android:textSize="21sp" />
+        android:textSize="23sp" />
 </LinearLayout>
