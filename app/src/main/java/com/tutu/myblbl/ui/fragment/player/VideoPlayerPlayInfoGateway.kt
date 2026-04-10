@@ -11,9 +11,6 @@ import com.tutu.myblbl.network.response.PlayerInfoDataWrapper
 import com.tutu.myblbl.utils.AppLog
 import okhttp3.Request
 
-/**
- * Centralizes play-info request fallbacks so the ViewModel only decides when to request playback.
- */
 class VideoPlayerPlayInfoGateway(
     private val apiService: ApiService,
     private val logTag: String
@@ -28,7 +25,8 @@ class VideoPlayerPlayInfoGateway(
     data class PlayInfoResult(
         val code: Int,
         val message: String,
-        val data: PlayInfoModel?
+        val data: PlayInfoModel?,
+        val isTryLookBypass: Boolean = false
     ) {
         val isSuccess: Boolean
             get() = code == 0 && data != null
@@ -41,7 +39,8 @@ class VideoPlayerPlayInfoGateway(
         epId: Long?,
         qualityId: Int,
         fnval: Int,
-        fourk: Int
+        fourk: Int,
+        allowWbi: Boolean = true
     ): PlayInfoResult? {
         if (epId != null && epId > 0L) {
             return requestPgcPlayInfo(
@@ -56,46 +55,131 @@ class VideoPlayerPlayInfoGateway(
         }
 
         val resolvedBvid = bvid?.takeIf { it.isNotBlank() } ?: return null
-        ensureWbiKeys()
 
-        if (hasWbiKeys()) {
-            val params = mutableMapOf(
-                "bvid" to resolvedBvid,
-                "cid" to cid.toString(),
-                "qn" to qualityId.toString(),
-                "fnver" to "0",
-                "fnval" to fnval.toString(),
-                "fourk" to fourk.toString()
-            )
-            aid?.takeIf { it > 0L }?.let { params["avid"] = it.toString() }
-            NetworkManager.getCookieManager().getCookieValue("SESSDATA")
-                ?.takeIf { it.isNotBlank() }
-                ?.let { params[""] = it }
+        NetworkManager.ensureHealthyForPlay()
 
-            val wbiResponse = runCatching {
-                apiService.getVideoPlayInfoWbi(buildWbiParams(params))
-            }.onFailure { throwable ->
-                AppLog.e(logTag, "requestPlayInfo wbi exception: ${throwable.message}", throwable)
-            }.getOrNull()
-            if (wbiResponse != null) {
-                AppLog.d(
-                    logTag,
-                    "requestPlayInfo wbi response: code=${wbiResponse.code}, success=${wbiResponse.isSuccess}"
-                )
-                if (wbiResponse.isSuccess && wbiResponse.data != null) {
-                    return PlayInfoResult(
-                        code = wbiResponse.code,
-                        message = wbiResponse.message,
-                        data = wbiResponse.data
-                    )
-                }
-            }
+        val primaryResult = requestPrimaryPlayInfo(
+            aid = aid,
+            bvid = resolvedBvid,
+            cid = cid,
+            qualityId = qualityId,
+            fnval = fnval,
+            fourk = fourk,
+            allowWbi = allowWbi
+        )
+
+        if (primaryResult != null && hasPlayableMedia(primaryResult.data)) {
+            return primaryResult
         }
 
+        val primaryCode = primaryResult?.code ?: 0
+        val primaryMessage = primaryResult?.message.orEmpty()
+        if (isRiskControlSignal(primaryCode, primaryResult?.data, primaryMessage)) {
+            AppLog.w(logTag, "requestPlayInfo risk-control detected: code=$primaryCode, falling back to try_look, cid=$cid, qn=$qualityId")
+            val tryLookResult = requestTryLookPlayInfo(
+                aid = aid,
+                bvid = resolvedBvid,
+                cid = cid,
+                qualityId = qualityId,
+                fnval = fnval,
+                fourk = fourk,
+                allowWbi = allowWbi
+            )
+            if (tryLookResult != null && hasPlayableMedia(tryLookResult.data)) {
+                return tryLookResult.copy(isTryLookBypass = true)
+            }
+            return tryLookResult ?: primaryResult
+        }
+
+        return primaryResult
+    }
+
+    private suspend fun requestPrimaryPlayInfo(
+        aid: Long?,
+        bvid: String,
+        cid: Long,
+        qualityId: Int,
+        fnval: Int,
+        fourk: Int,
+        allowWbi: Boolean
+    ): PlayInfoResult? {
+        val wbiResult = if (allowWbi) {
+            requestWbiPlayInfo(aid, bvid, cid, qualityId, fnval, fourk)
+        } else null
+
+        if (wbiResult != null && hasPlayableMedia(wbiResult.data)) {
+            return wbiResult
+        }
+
+        val normalResult = requestNormalPlayInfo(aid, bvid, cid, qualityId, fnval, fourk)
+
+        if (normalResult != null && hasPlayableMedia(normalResult.data)) {
+            return normalResult
+        }
+
+        if (wbiResult != null && wbiResult.code == 0 && wbiResult.data != null) {
+            return wbiResult
+        }
+
+        return normalResult ?: wbiResult
+    }
+
+    private suspend fun requestWbiPlayInfo(
+        aid: Long?,
+        bvid: String,
+        cid: Long,
+        qualityId: Int,
+        fnval: Int,
+        fourk: Int
+    ): PlayInfoResult? {
+        ensureWbiKeys()
+        if (!hasWbiKeys()) return null
+
+        val params = mutableMapOf(
+            "bvid" to bvid,
+            "cid" to cid.toString(),
+            "qn" to qualityId.toString(),
+            "fnver" to "0",
+            "fnval" to fnval.toString(),
+            "fourk" to fourk.toString(),
+            "voice_balance" to "1",
+            "gaia_source" to "pre-load",
+            "isGaiaAvoided" to "true"
+        )
+        aid?.takeIf { it > 0L }?.let { params["avid"] = it.toString() }
+
+        val wbiResponse = runCatching {
+            apiService.getVideoPlayInfoWbi(buildWbiParams(params))
+        }.onFailure { throwable ->
+            AppLog.e(logTag, "requestPlayInfo wbi exception: ${throwable.message}", throwable)
+        }.getOrNull()
+
+        if (wbiResponse != null) {
+            AppLog.d(
+                logTag,
+                "requestPlayInfo wbi response: code=${wbiResponse.code}, success=${wbiResponse.isSuccess}"
+            )
+            return PlayInfoResult(
+                code = wbiResponse.code,
+                message = wbiResponse.message,
+                data = wbiResponse.data
+            )
+        }
+        return null
+    }
+
+    private suspend fun requestNormalPlayInfo(
+        aid: Long?,
+        bvid: String,
+        cid: Long,
+        qualityId: Int,
+        fnval: Int,
+        fourk: Int
+    ): PlayInfoResult? {
         val normalResponse = runCatching {
             apiService.getVideoPlayInfo(
                 avid = aid,
-                bvid = resolvedBvid,
+                bvid = bvid,
                 cid = cid,
                 qn = qualityId,
                 fnval = fnval,
@@ -105,19 +189,133 @@ class VideoPlayerPlayInfoGateway(
         }.onFailure { throwable ->
             AppLog.e(logTag, "requestPlayInfo normal exception: ${throwable.message}", throwable)
         }.getOrNull()
+
         if (normalResponse != null) {
             AppLog.d(
                 logTag,
                 "requestPlayInfo normal response: code=${normalResponse.code}, success=${normalResponse.isSuccess}"
             )
-        }
-        return normalResponse?.let {
-            PlayInfoResult(
-                code = it.code,
-                message = it.message,
-                data = it.data
+            return PlayInfoResult(
+                code = normalResponse.code,
+                message = normalResponse.message,
+                data = normalResponse.data
             )
         }
+        return null
+    }
+
+    private suspend fun requestTryLookPlayInfo(
+        aid: Long?,
+        bvid: String,
+        cid: Long,
+        qualityId: Int,
+        fnval: Int,
+        fourk: Int,
+        allowWbi: Boolean
+    ): PlayInfoResult? {
+        val wbiTryLook = if (allowWbi) {
+            requestWbiTryLookPlayInfo(aid, bvid, cid, qualityId, fnval, fourk)
+        } else null
+
+        if (wbiTryLook != null && hasPlayableMedia(wbiTryLook.data)) {
+            return wbiTryLook
+        }
+
+        val normalTryLook = requestNormalTryLookPlayInfo(aid, bvid, cid, qualityId, fnval, fourk)
+
+        if (normalTryLook != null && hasPlayableMedia(normalTryLook.data)) {
+            return normalTryLook
+        }
+
+        return wbiTryLook ?: normalTryLook
+    }
+
+    private suspend fun requestWbiTryLookPlayInfo(
+        aid: Long?,
+        bvid: String,
+        cid: Long,
+        qualityId: Int,
+        fnval: Int,
+        fourk: Int
+    ): PlayInfoResult? {
+        ensureWbiKeys()
+        if (!hasWbiKeys()) return null
+
+        val params = mutableMapOf(
+            "bvid" to bvid,
+            "cid" to cid.toString(),
+            "qn" to qualityId.toString(),
+            "fnver" to "0",
+            "fnval" to fnval.toString(),
+            "fourk" to fourk.toString(),
+            "try_look" to "1",
+            "voice_balance" to "1",
+            "gaia_source" to "pre-load",
+            "isGaiaAvoided" to "true"
+        )
+        aid?.takeIf { it > 0L }?.let { params["avid"] = it.toString() }
+
+        val wbiResponse = runCatching {
+            apiService.getVideoPlayInfoWbiTryLook(buildWbiParams(params))
+        }.onFailure { throwable ->
+            AppLog.e(logTag, "requestPlayInfo wbi try_look exception: ${throwable.message}", throwable)
+        }.getOrNull()
+
+        if (wbiResponse != null) {
+            AppLog.d(
+                logTag,
+                "requestPlayInfo wbi try_look response: code=${wbiResponse.code}, success=${wbiResponse.isSuccess}"
+            )
+            return PlayInfoResult(
+                code = wbiResponse.code,
+                message = wbiResponse.message,
+                data = wbiResponse.data
+            )
+        }
+        return null
+    }
+
+    private suspend fun requestNormalTryLookPlayInfo(
+        aid: Long?,
+        bvid: String,
+        cid: Long,
+        qualityId: Int,
+        fnval: Int,
+        fourk: Int
+    ): PlayInfoResult? {
+        val response = runCatching {
+            apiService.getVideoPlayInfoTryLook(
+                avid = aid,
+                bvid = bvid,
+                cid = cid,
+                qn = qualityId,
+                fnval = fnval,
+                fourk = fourk,
+                fnver = 0
+            )
+        }.onFailure { throwable ->
+            AppLog.e(logTag, "requestPlayInfo normal try_look exception: ${throwable.message}", throwable)
+        }.getOrNull()
+
+        if (response != null) {
+            AppLog.d(
+                logTag,
+                "requestPlayInfo normal try_look response: code=${response.code}, success=${response.isSuccess}"
+            )
+            return PlayInfoResult(
+                code = response.code,
+                message = response.message,
+                data = response.data
+            )
+        }
+        return null
+    }
+
+    private fun isRiskControlSignal(code: Int, data: PlayInfoModel?, message: String): Boolean {
+        if (code == -351 || code == -412 || code == -352) return true
+        if (code == 0 && data != null && !hasPlayableMedia(data)) return true
+        val riskKeywords = listOf("风控", "风险", "拦截", "神秘力量", "risk", "blocked")
+        return riskKeywords.any { message.contains(it, ignoreCase = true) }
     }
 
     suspend fun requestPlayerInfoData(
@@ -125,25 +323,6 @@ class VideoPlayerPlayInfoGateway(
         bvid: String?,
         cid: Long
     ): PlayerInfoDataWrapper? {
-        ensureWbiKeys()
-        if (hasWbiKeys()) {
-            val params = mutableMapOf("cid" to cid.toString())
-            aid?.let { params["avid"] = it.toString() }
-            bvid?.takeIf { it.isNotBlank() }?.let { params["bvid"] = it }
-            val wbiResponse = runCatching {
-                apiService.getPlayerInfoWbi(buildWbiParams(params))
-            }.onFailure { throwable ->
-                AppLog.e(logTag, "loadPlayerInfoData wbi exception: ${throwable.message}", throwable)
-            }.getOrNull()
-            if (wbiResponse != null) {
-                AppLog.d(
-                    logTag,
-                    "loadPlayerInfoData wbi response: code=${wbiResponse.code}, success=${wbiResponse.isSuccess}"
-                )
-                wbiResponse.data?.takeIf { wbiResponse.isSuccess }?.let { return it }
-            }
-        }
-
         val normalResponse = runCatching {
             apiService.getPlayerInfo(
                 aid = aid,
@@ -159,7 +338,27 @@ class VideoPlayerPlayInfoGateway(
                 "loadPlayerInfoData normal response: code=${normalResponse.code}, success=${normalResponse.isSuccess}"
             )
         }
-        return normalResponse?.data?.takeIf { normalResponse.isSuccess }
+        normalResponse?.data?.takeIf { normalResponse.isSuccess }?.let { return it }
+
+        ensureWbiKeys()
+        if (!hasWbiKeys()) {
+            return null
+        }
+        val params = mutableMapOf("cid" to cid.toString())
+        aid?.let { params["avid"] = it.toString() }
+        bvid?.takeIf { it.isNotBlank() }?.let { params["bvid"] = it }
+        val wbiResponse = runCatching {
+            apiService.getPlayerInfoWbi(buildWbiParams(params))
+        }.onFailure { throwable ->
+            AppLog.e(logTag, "loadPlayerInfoData wbi exception: ${throwable.message}", throwable)
+        }.getOrNull()
+        if (wbiResponse != null) {
+            AppLog.d(
+                logTag,
+                "loadPlayerInfoData wbi response: code=${wbiResponse.code}, success=${wbiResponse.isSuccess}"
+            )
+        }
+        return wbiResponse?.takeIf { it.isSuccess }?.data
     }
 
     suspend fun requestVideoSnapshot(
@@ -510,5 +709,14 @@ class VideoPlayerPlayInfoGateway(
             message = message,
             data = result
         )
+    }
+
+    private fun hasPlayableMedia(playInfo: PlayInfoModel?): Boolean {
+        if (playInfo == null) {
+            return false
+        }
+        val hasDashVideo = playInfo.dash?.video.orEmpty().isNotEmpty()
+        val hasDurl = playInfo.durl.orEmpty().any { it.url.isNotBlank() }
+        return hasDashVideo || hasDurl
     }
 }

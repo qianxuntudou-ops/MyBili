@@ -114,9 +114,15 @@ class VideoPlayerViewModel(
         val selectionSnapshot: VideoPlayerStreamResolver.SelectionSnapshot,
         val mediaSource: MediaSource,
         val seekToStart: Long,
+        val playWhenReady: Boolean,
         val resumeHintPositionMs: Long?,
         val replaceInPlace: Boolean,
         val requestDurationMs: Long
+    )
+
+    private data class PlayInfoFetchResult(
+        val requestedQualityId: Int,
+        val response: VideoPlayerPlayInfoGateway.PlayInfoResult
     )
 
     private val _resumeHint = MutableLiveData<ResumeProgressHint?>()
@@ -156,6 +162,7 @@ class VideoPlayerViewModel(
         dataSourceFactory = dataSourceFactory,
         urlNormalizer = ::normalizeUrl
     )
+    private val qualityPolicy = VideoPlayerQualityPolicy()
     // Keeps episode-list construction and PGC header mapping out of playback request flow.
     private val episodeCatalogBuilder = VideoPlayerEpisodeCatalogBuilder(apiService)
     // Encapsulates PGC/UGC play-info retries and WBI-dependent requests away from UI state changes.
@@ -816,37 +823,52 @@ class VideoPlayerViewModel(
     private suspend fun requestPreparedPlayback(
         identity: PlayRequestIdentity,
         preferLastPlayTime: Boolean,
-        replaceInPlace: Boolean
+        replaceInPlace: Boolean,
+        playbackPositionMs: Long = pendingSeekPositionMs,
+        playWhenReady: Boolean = pendingPlayWhenReady,
+        qualityCandidates: List<Int> = qualityPolicy.buildCandidates(selectedQualityId)
     ): PreparedPlayback? {
         val requestStartMs = System.currentTimeMillis()
-        val lockedQualityId = selectedQualityId ?: 80
-        val fnval = streamResolver.buildFnval(lockedQualityId)
-        val fourk = streamResolver.buildFourk(lockedQualityId)
+        val preferredQualityId = qualityCandidates.firstOrNull() ?: selectedQualityId ?: 80
         AppLog.d(
             TAG,
-            "loadPlayUrl start: aid=${identity.aid ?: 0L}, bvid=${identity.bvid.orEmpty()}, cid=${identity.cid}, seasonId=${currentSeasonId ?: 0L}, epId=${identity.epId ?: 0L}, qn=$lockedQualityId, fnval=$fnval, fourk=$fourk, hasWbi=${playInfoGateway.hasWbiKeys()}"
+            "loadPlayUrl start: aid=${identity.aid ?: 0L}, bvid=${identity.bvid.orEmpty()}, cid=${identity.cid}, seasonId=${currentSeasonId ?: 0L}, epId=${identity.epId ?: 0L}, qn=$preferredQualityId, candidates=$qualityCandidates, fnval=${streamResolver.buildFnval(preferredQualityId)}, fourk=${streamResolver.buildFourk(preferredQualityId)}, hasWbi=${playInfoGateway.hasWbiKeys()}"
         )
-        val response = playInfoGateway.requestPlayInfo(
-            aid = identity.aid,
-            bvid = identity.bvid,
-            cid = identity.cid,
-            epId = identity.epId,
-            qualityId = lockedQualityId,
-            fnval = fnval,
-            fourk = fourk
-        ) ?: return null
-        if (!response.isSuccess || response.data == null) {
-            AppLog.e(
+
+        val cachedPlayInfo = identity.bvid
+            ?.takeIf { !replaceInPlace && it.isNotBlank() && identity.epId == null }
+            ?.let { bvid -> VideoPlayerPlayInfoCache.get(bvid = bvid, cid = identity.cid) }
+            ?.takeIf(::hasPlayableMedia)
+
+        val (initialPlayInfo, effectiveRequestedQualityId) = if (cachedPlayInfo != null) {
+            AppLog.d(
                 TAG,
-                "loadPlayUrl response failure: code=${response.code}, message=${response.message}"
+                "loadPlayUrl cache hit: bvid=${identity.bvid.orEmpty()}, cid=${identity.cid}, qn=$preferredQualityId"
             )
-            return null
+            cachedPlayInfo to preferredQualityId
+        } else {
+            val playInfoFetch = requestPlayInfoWithQualityFallback(
+                identity = identity,
+                qualityCandidates = qualityCandidates
+            ) ?: return null
+            val response = playInfoFetch.response
+            if (!response.isSuccess || response.data == null) {
+                AppLog.e(
+                    TAG,
+                    "loadPlayUrl response failure: code=${response.code}, message=${response.message}"
+                )
+                return null
+            }
+            response.data to playInfoFetch.requestedQualityId
         }
 
-        val initialPlayInfo = response.data
+        identity.bvid
+            ?.takeIf { it.isNotBlank() && identity.epId == null }
+            ?.let { bvid -> VideoPlayerPlayInfoCache.put(bvid = bvid, cid = identity.cid, playInfo = initialPlayInfo) }
+
         val initialQualities = streamResolver.buildQualityList(initialPlayInfo)
         val resolvedQualityId = resolvePlayableQualityId(
-            requestedQualityId = lockedQualityId,
+            requestedQualityId = effectiveRequestedQualityId,
             playInfo = initialPlayInfo,
             availableQualities = initialQualities,
             reason = "initial_request"
@@ -879,7 +901,7 @@ class VideoPlayerViewModel(
 
         val rawResumePosition = when {
             useServerResume -> initialPlayInfo.lastPlayTime
-            else -> pendingSeekPositionMs
+            else -> playbackPositionMs
         }
 
         val shouldResume = rawResumePosition > 5000L
@@ -908,13 +930,18 @@ class VideoPlayerViewModel(
             selectionSnapshot = selectionSnapshot,
             mediaSource = mediaSource,
             seekToStart = seekToStart,
+            playWhenReady = playWhenReady,
             resumeHintPositionMs = resumeHintPositionMs,
             replaceInPlace = replaceInPlace,
             requestDurationMs = System.currentTimeMillis() - requestStartMs
         )
     }
 
-    private fun applyPreparedPlayback(preparedPlayback: PreparedPlayback) {
+    private fun applyPreparedPlayback(
+        preparedPlayback: PreparedPlayback,
+        resetFallbackAttempts: Boolean = true,
+        countCurrentAttemptAsFallback: Boolean = false
+    ) {
         currentPlayInfo = preparedPlayback.playInfo
         selectedQualityId = preparedPlayback.selectionSnapshot.selectedQualityId
         selectedAudioId = preparedPlayback.selectionSnapshot.selectedAudioId
@@ -928,20 +955,19 @@ class VideoPlayerViewModel(
             lastReportedHeartbeatPositionSec = -1L
         }
 
-        resetFallbackState()
         initializeFallbackPlan(
             playInfo = preparedPlayback.playInfo,
             lockedQualityId = preparedPlayback.selectionSnapshot.selectedQualityId ?: selectedQualityId ?: 80,
             selectedAudioId = preparedPlayback.selectionSnapshot.selectedAudioId,
             preferredCodec = preparedPlayback.selectionSnapshot.selectedCodec,
-            resetAttempts = true
+            resetAttempts = resetFallbackAttempts
         )
-        rememberCurrentFallbackAttempt(countAsFallback = false)
+        rememberCurrentFallbackAttempt(countAsFallback = countCurrentAttemptAsFallback)
 
         _playbackRequest.value = PlaybackRequest(
             mediaSource = preparedPlayback.mediaSource,
             seekPositionMs = preparedPlayback.seekToStart,
-            playWhenReady = pendingPlayWhenReady,
+            playWhenReady = preparedPlayback.playWhenReady,
             replaceInPlace = preparedPlayback.replaceInPlace
         )
         AppLog.d(
@@ -1078,73 +1104,25 @@ class VideoPlayerViewModel(
         val identity = currentPlayRequestIdentity() ?: return false
         val lockedQualityId = selectedQualityId ?: 80
         viewModelScope.launch {
-            val fnval = streamResolver.buildFnval(lockedQualityId)
-            val fourk = streamResolver.buildFourk(lockedQualityId)
-            val response = playInfoGateway.requestPlayInfo(
-                aid = identity.aid,
-                bvid = identity.bvid,
-                cid = identity.cid,
-                epId = identity.epId,
-                qualityId = lockedQualityId,
-                fnval = fnval,
-                fourk = fourk
+            val preparedPlayback = requestPreparedPlayback(
+                identity = identity,
+                preferLastPlayTime = false,
+                replaceInPlace = true,
+                playbackPositionMs = lastPlaybackPositionMs,
+                playWhenReady = true,
+                qualityCandidates = qualityPolicy.buildCandidates(lockedQualityId)
             )
-            if (response != null && response.isSuccess && response.data != null) {
-                val playInfo = response.data
-                val availableQualities = streamResolver.buildQualityList(playInfo)
-                val resolvedQualityId = resolvePlayableQualityId(
-                    requestedQualityId = lockedQualityId,
-                    playInfo = playInfo,
-                    availableQualities = availableQualities,
-                    reason = "refresh_playurl"
+            if (preparedPlayback != null) {
+                applyPreparedPlayback(
+                    preparedPlayback = preparedPlayback,
+                    resetFallbackAttempts = false,
+                    countCurrentAttemptAsFallback = true
                 )
-                var selectionSnapshot = streamResolver.resolveSelections(
-                    playInfo = playInfo,
-                    preferredQualityId = resolvedQualityId,
-                    preferredAudioId = selectedAudioId,
-                    preferredCodec = selectedCodec
+                AppLog.d(
+                    TAG,
+                    "refresh playurl success: reason=$reason, requestedQuality=$lockedQualityId, actualQuality=${preparedPlayback.selectionSnapshot.selectedQualityId}"
                 )
-                if (selectionSnapshot.selectedQualityId != resolvedQualityId) {
-                    selectionSnapshot = selectionSnapshot.copy(selectedQualityId = resolvedQualityId)
-                }
-                val mediaSourceSelection = streamResolver.buildMediaSource(
-                    playInfo = playInfo,
-                    selectedQualityId = resolvedQualityId,
-                    selectedAudioId = selectionSnapshot.selectedAudioId,
-                    selectedCodec = selectionSnapshot.selectedCodec
-                )
-                if (mediaSourceSelection != null) {
-                    currentPlayInfo = playInfo
-                    selectedQualityId = resolvedQualityId
-                    selectedAudioId = selectionSnapshot.selectedAudioId
-                    selectedCodec = selectionSnapshot.selectedCodec
-                    applySelectionSnapshot(selectionSnapshot)
-                    initializeFallbackPlan(
-                        playInfo = playInfo,
-                        lockedQualityId = resolvedQualityId,
-                        selectedAudioId = selectionSnapshot.selectedAudioId,
-                        preferredCodec = selectionSnapshot.selectedCodec,
-                        resetAttempts = false
-                    )
-                    if (!rememberCurrentFallbackAttempt(countAsFallback = true)) {
-                        if (!trySwitchCodec(lastPlaybackPositionMs, reason = "refresh_duplicate_attempt")) {
-                            _error.value = "当前清晰度下暂无新的可用线路"
-                        }
-                        return@launch
-                    }
-
-                    _playbackRequest.value = PlaybackRequest(
-                        mediaSource = mediaSourceSelection.mediaSource,
-                        seekPositionMs = lastPlaybackPositionMs,
-                        playWhenReady = true,
-                        replaceInPlace = true
-                    )
-                    AppLog.d(
-                        TAG,
-                        "refresh playurl success: reason=$reason, requestedQuality=$lockedQualityId, actualQuality=$resolvedQualityId"
-                    )
-                    return@launch
-                }
+                return@launch
             }
             if (!trySwitchCodec(lastPlaybackPositionMs, reason = "refresh_failed")) {
                 _error.value = "当前清晰度下播放失败，请稍后重试"
@@ -1269,6 +1247,80 @@ class VideoPlayerViewModel(
         audioUrl: String?
     ): String {
         return "$qualityId|${codec.name}|$videoUrl|${audioUrl.orEmpty()}"
+    }
+
+    private suspend fun requestPlayInfoWithQualityFallback(
+        identity: PlayRequestIdentity,
+        qualityCandidates: List<Int>
+    ): PlayInfoFetchResult? {
+        val attemptedQualities = linkedSetOf<Int>()
+        val requestedQualityId = qualityCandidates.firstOrNull() ?: selectedQualityId ?: 80
+        var lastResult: PlayInfoFetchResult? = null
+        var allowWbi = true
+        qualityCandidates.forEach { qualityId ->
+            if (!attemptedQualities.add(qualityId)) {
+                return@forEach
+            }
+            val response = playInfoGateway.requestPlayInfo(
+                aid = identity.aid,
+                bvid = identity.bvid,
+                cid = identity.cid,
+                epId = identity.epId,
+                qualityId = qualityId,
+                fnval = streamResolver.buildFnval(qualityId),
+                fourk = streamResolver.buildFourk(qualityId),
+                allowWbi = allowWbi
+            ) ?: return@forEach
+            allowWbi = false
+            lastResult = PlayInfoFetchResult(
+                requestedQualityId = qualityId,
+                response = response
+            )
+            val playInfo = response.data
+            if (response.isSuccess && hasPlayableMedia(playInfo)) {
+                if (qualityId != requestedQualityId) {
+                    AppLog.w(
+                        TAG,
+                        "playurl fallback request succeeded: requested=$requestedQualityId, actualRequest=$qualityId, cid=${identity.cid}"
+                    )
+                }
+                if (response.isTryLookBypass) {
+                    AppLog.w(
+                        TAG,
+                        "playurl try_look bypass activated: requested=$requestedQualityId, actualRequest=$qualityId, cid=${identity.cid}"
+                    )
+                }
+                return lastResult
+            }
+            if (response.code == -351 || response.code == -412 || response.code == -352) {
+                AppLog.w(
+                    TAG,
+                    "playurl risk-control detected: code=${response.code}, tried=$qualityId, cid=${identity.cid}, stopFurtherFallback=true"
+                )
+                return lastResult
+            }
+            if (response.code == 0 && playInfo != null && !hasPlayableMedia(playInfo)) {
+                AppLog.w(
+                    TAG,
+                    "playurl empty media payload (soft risk-control): tried=$qualityId, cid=${identity.cid}, stopFurtherFallback=true"
+                )
+                return lastResult
+            }
+            AppLog.w(
+                TAG,
+                "playurl fallback request skipped: requested=$requestedQualityId, tried=$qualityId, code=${response.code}, hasData=${playInfo != null}, dashVideo=${playInfo?.dash?.video?.size ?: 0}, durl=${playInfo?.durl?.size ?: 0}, quality=${playInfo?.quality ?: 0}"
+            )
+        }
+        return lastResult
+    }
+
+    private fun hasPlayableMedia(playInfo: PlayInfoModel?): Boolean {
+        if (playInfo == null) {
+            return false
+        }
+        val hasDashVideo = playInfo.dash?.video.orEmpty().isNotEmpty()
+        val hasDurl = playInfo.durl.orEmpty().any { it.url.isNotBlank() }
+        return hasDashVideo || hasDurl
     }
 
     private fun resolvePlayableQualityId(

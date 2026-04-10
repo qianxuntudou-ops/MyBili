@@ -156,6 +156,23 @@ interface ApiService {
         @QueryMap params: Map<String, String>
     ): BaseResponse<PlayInfoModel>
 
+    @GET("x/player/playurl")
+    suspend fun getVideoPlayInfoTryLook(
+        @Query("avid") avid: Long?,
+        @Query("bvid") bvid: String?,
+        @Query("cid") cid: Long,
+        @Query("qn") qn: Int = 80,
+        @Query("fnval") fnval: Int = 4048,
+        @Query("fourk") fourk: Int = 1,
+        @Query("fnver") fnver: Int = 0,
+        @Query("try_look") tryLook: Int = 1
+    ): BaseResponse<PlayInfoModel>
+
+    @GET("x/player/wbi/playurl?voice_balance=1&gaia_source=pre-load&isGaiaAvoided=true")
+    suspend fun getVideoPlayInfoWbiTryLook(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<PlayInfoModel>
+
     @GET("x/player/v2")
     suspend fun getPlayerInfo(
         @Query("aid") aid: Long?,

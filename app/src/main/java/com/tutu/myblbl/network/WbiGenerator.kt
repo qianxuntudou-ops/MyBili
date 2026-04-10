@@ -25,13 +25,16 @@ object WbiGenerator {
         val mixinKey = getMixinKey(imgKey + subKey)
         val wts = System.currentTimeMillis() / 1000
 
-        val sortedParams = TreeMap(params)
+        val cleanParams = params.filterKeys { it.isNotBlank() }
+        val sortedParams = TreeMap(cleanParams)
         sortedParams["wts"] = wts.toString()
 
         val filteredParams = mutableMapOf<String, String>()
         sortedParams.forEach { (key, value) ->
-            val filteredValue = filterSpecialChars(value)
-            filteredParams[key] = filteredValue
+            if (key.isNotBlank()) {
+                val filteredValue = filterSpecialChars(value)
+                filteredParams[key] = filteredValue
+            }
         }
 
         val query = filteredParams.entries
