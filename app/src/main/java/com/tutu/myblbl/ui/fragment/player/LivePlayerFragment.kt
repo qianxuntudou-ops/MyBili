@@ -203,6 +203,7 @@ class LivePlayerFragment : Fragment() {
         super.onDestroyView()
         player?.removeListener(playerListener)
         binding.playerView.destroy()
+        PlayerAudioNormalizer.release(player)
         player?.release()
         activity?.let { ViewUtils.keepScreenOn(it, false) }
         player = null

@@ -525,6 +525,21 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
             if (target?.isAttachedToWindow == true && target.isShown && target.isFocusable) {
                 val result = target.requestFocus()
                 AppLog.d("FocusDebug", "restoreFocus: requestFocus on target=$target, result=$result")
+                if (result) {
+                    return@postDelayed
+                }
+            }
+            val handledByContent = focusCurrentMainContent(
+                anchorView = target,
+                preferSpatialEntry = false
+            )
+            AppLog.d("FocusDebug", "restoreFocus content fallback: handled=$handledByContent")
+            if (handledByContent) {
+                return@postDelayed
+            }
+            val handledByTabBar = binding.myTabView.focusCurrentTab()
+            AppLog.d("FocusDebug", "restoreFocus tab fallback: handled=$handledByTabBar")
+            if (handledByTabBar) {
                 return@postDelayed
             }
             supportFragmentManager.fragments
@@ -535,10 +550,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
                     val currentFocus = visibleRoot.findFocus()
                     AppLog.d("FocusDebug", "restoreFocus fallback: visibleRoot=$visibleRoot, currentFocus=$currentFocus")
                     currentFocus?.requestFocus()
-                    if (!visibleRoot.hasFocus()) {
-                        val result = visibleRoot.requestFocus()
-                        AppLog.d("FocusDebug", "restoreFocus fallback: requestFocus on root=$visibleRoot, result=$result")
-                    }
                 }
         }, delayMs)
     }

@@ -605,8 +605,10 @@ class MyPlayerSettingView @JvmOverloads constructor(
         animateTransition: Boolean
     ) {
         recyclerView.animate().cancel()
+        recyclerView.animate().setListener(null)
         clearTransientItemStates()
         if (!animateTransition || !isShowing() || adapter.itemCount == 0) {
+            recyclerView.alpha = 1f
             applyMenuRows(menuKey, rows)
             return
         }

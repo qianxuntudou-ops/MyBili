@@ -44,6 +44,11 @@ class LaneItemAdapter(
 
     override fun getItemId(position: Int): Long = getItem(position).stableItemId()
 
+    override fun onViewRecycled(holder: LaneItemViewHolder) {
+        holder.clearFocusState()
+        super.onViewRecycled(holder)
+    }
+
     class LaneItemViewHolder(
         private val binding: CellMovieBinding,
         private val onItemClick: (LaneItemModel) -> Unit,
@@ -57,6 +62,7 @@ class LaneItemAdapter(
                 currentItem?.let(onItemClick)
             }
             binding.clickView.setOnFocusChangeListener { view, hasFocus ->
+                applyFocusState(hasFocus)
                 if (hasFocus) {
                     onItemFocused?.invoke(view)
                 }
@@ -89,9 +95,20 @@ class LaneItemAdapter(
                 binding.textBadge.text = badgeText
                 applyBadgeBackground(item.badgeInfo?.bgColorNight ?: item.badgeInfo?.bgColor)
             }
+
+            applyFocusState(binding.clickView.hasFocus())
         }
 
         fun requestFocus(): Boolean = binding.clickView.requestFocus()
+
+        fun clearFocusState() {
+            applyFocusState(false)
+        }
+
+        private fun applyFocusState(hasFocus: Boolean) {
+            binding.clickView.isSelected = hasFocus
+            binding.textView.isSelected = hasFocus
+        }
 
         private fun applyBadgeBackground(colorString: String?) {
             val context = binding.textBadge.context

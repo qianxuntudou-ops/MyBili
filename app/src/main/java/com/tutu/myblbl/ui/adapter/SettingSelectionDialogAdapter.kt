@@ -59,25 +59,29 @@ class SettingSelectionDialogAdapter(
                     return@setOnFocusChangeListener
                 }
                 if (hasFocus) {
-                    val oldFocusedPosition = focusedPosition
                     focusedPosition = position
-                    if (oldFocusedPosition != RecyclerView.NO_POSITION && oldFocusedPosition != position) {
-                        notifyItemChanged(oldFocusedPosition)
-                    }
-                    notifyItemChanged(position)
                 } else if (focusedPosition == position) {
                     focusedPosition = RecyclerView.NO_POSITION
-                    notifyItemChanged(position)
                 }
+                applyState(
+                    isSelected = position == selectedIndex,
+                    isFocused = hasFocus
+                )
             }
         }
 
         fun bind(option: String, isSelected: Boolean) {
             binding.tvTitle.text = option
+            applyState(
+                isSelected = isSelected,
+                isFocused = binding.root.hasFocus()
+            )
+        }
+
+        private fun applyState(isSelected: Boolean, isFocused: Boolean) {
             binding.tvCurrent.visibility = if (isSelected) View.VISIBLE else View.GONE
             binding.iconCheck.visibility = if (isSelected) View.VISIBLE else View.GONE
 
-            val isFocused = bindingAdapterPosition == focusedPosition
             binding.root.isSelected = isSelected
             binding.root.animate()
                 .scaleX(if (isFocused) 1.02f else 1f)

@@ -50,6 +50,7 @@ internal object PlayerInstancePool {
     fun releaseNow(reason: String) {
         cancelPendingRelease()
         isAttached = false
+        cachedPlayer?.let(PlayerAudioNormalizer::release)
         cachedPlayer?.release()
         cachedPlayer = null
         AppLog.d(TAG, "releaseNow: reason=$reason")
@@ -63,6 +64,7 @@ internal object PlayerInstancePool {
                 if (isAttached) {
                     return@synchronized
                 }
+                cachedPlayer?.let(PlayerAudioNormalizer::release)
                 cachedPlayer?.release()
                 cachedPlayer = null
                 pendingReleaseRunnable = null
