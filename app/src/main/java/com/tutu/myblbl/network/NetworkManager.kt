@@ -1,6 +1,9 @@
+@file:Suppress("SpellCheckingInspection")
+
 package com.tutu.myblbl.network
 
 import android.content.Context
+import androidx.core.content.edit
 import com.google.gson.GsonBuilder
 import com.tutu.myblbl.BuildConfig
 import com.tutu.myblbl.model.BaseResponse
@@ -71,10 +74,10 @@ object NetworkManager {
     
     private val gson by lazy {
         GsonBuilder()
-            .registerTypeAdapter(Long::class.java, FlexibleLongAdapter())
-            .registerTypeAdapter(java.lang.Long::class.java, FlexibleLongAdapter())
-            .registerTypeAdapter(Int::class.java, FlexibleIntAdapter())
-            .registerTypeAdapter(java.lang.Integer::class.java, FlexibleIntAdapter())
+            .registerTypeAdapter(Long::class.javaPrimitiveType, FlexibleLongAdapter())
+            .registerTypeAdapter(Long::class.javaObjectType, FlexibleLongAdapter())
+            .registerTypeAdapter(Int::class.javaPrimitiveType, FlexibleIntAdapter())
+            .registerTypeAdapter(Int::class.javaObjectType, FlexibleIntAdapter())
             .create()
     }
 
@@ -144,10 +147,9 @@ object NetworkManager {
         val context = appContext
         val newUserAgent = generateDesktopUserAgent()
         currentUA = newUserAgent
-        context?.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            ?.edit()
-            ?.putString(KEY_CURRENT_UA, newUserAgent)
-            ?.apply()
+        context?.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)?.edit {
+            putString(KEY_CURRENT_UA, newUserAgent)
+        }
         AppLog.d(TAG, "refreshUserAgent: ua=${newUserAgent.take(80)}")
         return newUserAgent
     }
@@ -269,7 +271,9 @@ object NetworkManager {
             return stored
         }
         val generated = generateDesktopUserAgent()
-        prefs.edit().putString(KEY_CURRENT_UA, generated).apply()
+        prefs.edit {
+            putString(KEY_CURRENT_UA, generated)
+        }
         return generated
     }
 

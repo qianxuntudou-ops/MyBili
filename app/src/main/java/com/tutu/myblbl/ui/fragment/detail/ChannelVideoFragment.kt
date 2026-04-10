@@ -3,7 +3,6 @@ package com.tutu.myblbl.ui.fragment.detail
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.os.bundleOf
-import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R

@@ -175,7 +175,6 @@ class AllSeriesFragment : BaseFragment<FragmentAllSeriesBinding>(), OnBackPresse
                 true
             )
         )
-        binding.recyclerView.setHasFixedSize(true)
         binding.recyclerView.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
             if ((right - left) != (oldRight - oldLeft)) {
                 updateContentGridMetrics()

@@ -1,3 +1,5 @@
+@file:Suppress("SpellCheckingInspection")
+
 package com.tutu.myblbl.ui.fragment.player
 
 import android.content.Context
@@ -9,7 +11,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.MediaSource
 import com.google.gson.Gson
-import com.tutu.myblbl.model.BaseResponse
 import com.tutu.myblbl.model.dm.AdvancedDanmakuParser
 import com.tutu.myblbl.model.dm.DmColorfulStyleParser
 import com.tutu.myblbl.model.dm.DmModel
@@ -39,10 +40,10 @@ import com.tutu.myblbl.utils.PlayerSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
@@ -62,7 +63,8 @@ class VideoPlayerViewModel(
         private const val TAG = "VideoPlayerViewModel"
         private const val MAX_FALLBACK_ATTEMPTS = 8
         private const val MAX_PLAYINFO_REFRESH_RETRY = 2
-        private const val VERBOSE_DANMAKU_CANDIDATE_LOG = false
+        private val verboseDanmakuCandidateLog =
+            java.lang.Boolean.getBoolean("myblbl.verbose_danmaku_candidate_log")
     }
 
     data class PlayableEpisode(
@@ -301,7 +303,7 @@ class VideoPlayerViewModel(
         shouldAutoSelectSubtitle = currentSettings.showSubtitleByDefault
         sessionStartTimestampMs = 0L
         lastReportedHeartbeatPositionSec = -1L
-        resetFallbackState(resetRefreshBudget = true)
+        resetFallbackState()
         val loadGeneration = ++videoLoadGeneration
         _selectedSubtitleIndex.value = -1
         _currentSubtitleText.value = null
@@ -333,21 +335,6 @@ class VideoPlayerViewModel(
                 _isLoading.value = false
             }
         }
-    }
-
-    fun reloadCurrentVideo() {
-        if (currentAid == null && currentBvid.isNullOrBlank() && !isPgcPlayback()) {
-            return
-        }
-        reportPlaybackHeartbeat()
-        loadVideoInfo(
-            aid = currentAid,
-            bvid = currentBvid,
-            cid = currentCid,
-            seasonId = currentSeasonId ?: 0L,
-            epId = currentEpId ?: 0L,
-            startEpisodeIndex = launchStartEpisodeIndex
-        )
     }
 
     fun playPrevious() {
@@ -578,9 +565,7 @@ class VideoPlayerViewModel(
                 )
                 aid?.takeIf { it > 0L }?.let { params["aid"] = it.toString() }
                 bvid?.takeIf { it.isNotBlank() }?.let { params["bvid"] = it }
-                if (cid > 0L) {
-                    params["cid"] = cid.toString()
-                }
+                params["cid"] = cid.toString()
                 NetworkManager.getUserInfo()
                     ?.mid
                     ?.takeIf { it > 0L }
@@ -773,7 +758,7 @@ class VideoPlayerViewModel(
             return@coroutineScope
         }
 
-        val related = detail.related.takeUnless { it.isNullOrEmpty() }
+        val related = detail.related.orEmpty()
         _subtitles.value = detail.view?.subtitle?.list
             ?.map { it.toSubtitleInfoModel() }
             .orEmpty()
@@ -796,7 +781,7 @@ class VideoPlayerViewModel(
             loadPlayUrl(preferLastPlayTime = preferLastPlayTime, loadGeneration = loadGeneration)
         }
 
-        if (!related.isNullOrEmpty()) {
+        if (related.isNotEmpty()) {
             _relatedVideos.value = related
         } else {
             viewModelScope.launch {
@@ -876,7 +861,7 @@ class VideoPlayerViewModel(
         if (selectionSnapshot.selectedQualityId != resolvedQualityId) {
             selectionSnapshot = selectionSnapshot.copy(selectedQualityId = resolvedQualityId)
         }
-        var mediaSourceSelection = streamResolver.buildMediaSource(
+        val mediaSourceSelection = streamResolver.buildMediaSource(
             playInfo = initialPlayInfo,
             selectedQualityId = resolvedQualityId,
             selectedAudioId = selectionSnapshot.selectedAudioId,
@@ -911,12 +896,8 @@ class VideoPlayerViewModel(
             return null
         }
 
-        val (seekToStart, resumeHintPositionMs) = if (replaceInPlace) {
-            startPosition to null
-        } else {
-            val hint = startPosition.takeIf { shouldResume }
-            (hint?.let { 0L } ?: startPosition) to hint
-        }
+        val resumeHintPositionMs = startPosition.takeIf { shouldResume && !replaceInPlace }
+        val seekToStart = if (resumeHintPositionMs != null) 0L else startPosition
         AppLog.d(
             TAG,
             "loadPlayUrl: startPosition=$startPosition, shouldShowHint=${resumeHintPositionMs != null}, seekToStart=$seekToStart, replaceInPlace=$replaceInPlace"
@@ -947,7 +928,7 @@ class VideoPlayerViewModel(
             lastReportedHeartbeatPositionSec = -1L
         }
 
-        resetFallbackState(resetRefreshBudget = true)
+        resetFallbackState()
         initializeFallbackPlan(
             playInfo = preparedPlayback.playInfo,
             lockedQualityId = preparedPlayback.selectionSnapshot.selectedQualityId ?: selectedQualityId ?: 80,
@@ -1255,15 +1236,13 @@ class VideoPlayerViewModel(
         }
     }
 
-    private fun resetFallbackState(resetRefreshBudget: Boolean) {
+    private fun resetFallbackState() {
         currentStreamFallbackPlan = null
         fallbackRouteIndex = 0
         fallbackCdnIndex = 0
         fallbackAttemptCount = 0
         attemptedFallbackSignatures.clear()
-        if (resetRefreshBudget) {
-            playInfoRefreshRetryCount = 0
-        }
+        playInfoRefreshRetryCount = 0
     }
 
     private fun rememberCurrentFallbackAttempt(countAsFallback: Boolean): Boolean {
@@ -1530,7 +1509,7 @@ class VideoPlayerViewModel(
                                 segmentIndices = listOf(segmentIndex)
                             )
                         }
-                    }.map { it.await() }
+                    }.awaitAll()
                     val chunkDanmaku = buildList {
                         batchResults.forEach { addAll(it.regularItems) }
                     }
@@ -1801,7 +1780,7 @@ class VideoPlayerViewModel(
             TAG,
             "loadDanmaku candidates[$label]: found ${candidates.size} rolling candidate(s) with extra style fields, colorfulSummary=$colorfulSummary, attrSummary=$attrSummary"
         )
-        if (!VERBOSE_DANMAKU_CANDIDATE_LOG) {
+        if (!verboseDanmakuCandidateLog) {
             return
         }
         candidates
@@ -1814,10 +1793,10 @@ class VideoPlayerViewModel(
             .distinctBy { Triple("${it.attr}/${it.colorful}", it.color, it.content.take(12)) }
             .take(8)
             .forEachIndexed { index, item ->
-            AppLog.w(
-                TAG,
-                "loadDanmaku candidate[$label][$index]: id=${item.id}, progress=${item.progress}, mode=${item.mode}, color=${item.color.toColorHex()}, colorful=${item.colorful}, colorfulSrc=${item.colorfulSrc.toPreview(120)}, pool=${item.pool}, attr=${item.attr}, ai=${item.aiFlagScore}, action=${item.action.toPreview(120)}, animation=${item.animation.toPreview(120)}, content=${item.content.toPreview(60)}"
-            )
+                AppLog.w(
+                    TAG,
+                    "loadDanmaku candidate[$label][$index]: id=${item.id}, progress=${item.progress}, mode=${item.mode}, color=${item.color.toColorHex()}, colorful=${item.colorful}, colorfulSrc=${item.colorfulSrc.toPreview(120)}, pool=${item.pool}, attr=${item.attr}, ai=${item.aiFlagScore}, action=${item.action.toPreview(120)}, animation=${item.animation.toPreview(120)}, content=${item.content.toPreview(60)}"
+                )
             }
     }
 

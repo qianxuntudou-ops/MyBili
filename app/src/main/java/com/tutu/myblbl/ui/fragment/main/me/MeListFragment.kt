@@ -1,3 +1,5 @@
+@file:Suppress("SpellCheckingInspection")
+
 package com.tutu.myblbl.ui.fragment.main.me
 
 import android.os.Bundle
@@ -5,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -337,7 +340,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
         if (!isAdded || view == null) {
             return false
         }
-        if (binding.emptyContainer.visibility == View.VISIBLE && binding.btnRetry.isShown) {
+        if (binding.emptyContainer.isVisible && binding.btnRetry.isShown) {
             val handled = binding.btnRetry.requestFocus()
             AppLog.d(TAG, "MeListFragment.focusPrimaryContent retry: type=$type handled=$handled")
             return handled
