@@ -2,6 +2,7 @@ package com.tutu.myblbl.di
 
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.repository.AllSeriesRepository
@@ -73,8 +74,13 @@ val viewModelModule = module {
     viewModel { SeriesDetailViewModel(get()) }
 }
 
+val eventModule = module {
+    single { AppEventHub() }
+}
+
 val appModules = listOf(
     networkModule,
     repositoryModule,
+    eventModule,
     viewModelModule
 )

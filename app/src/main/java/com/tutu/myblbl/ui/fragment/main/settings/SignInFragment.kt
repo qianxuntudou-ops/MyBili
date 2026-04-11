@@ -10,6 +10,7 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentSignInBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.repository.AuthRepository
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.base.BaseFragment
@@ -19,7 +20,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
 import org.koin.android.ext.android.inject
 
 class SignInFragment : BaseFragment<FragmentSignInBinding>() {
@@ -29,6 +29,7 @@ class SignInFragment : BaseFragment<FragmentSignInBinding>() {
     }
 
     private val authRepository: AuthRepository by inject()
+    private val appEventHub: AppEventHub by inject()
     private val userRepository: UserRepository by inject()
     private var qrcodeKey = ""
     private var pollingJob: Job? = null
@@ -170,8 +171,7 @@ class SignInFragment : BaseFragment<FragmentSignInBinding>() {
         lifecycleScope.launch {
             userRepository.refreshCurrentUserInfo()
             parentFragmentManager.popBackStackImmediate()
-            EventBus.getDefault().post("signIn")
-            EventBus.getDefault().post("updateUserInfo")
+            appEventHub.dispatch(AppEventHub.Event.UserSessionChanged)
         }
     }
 

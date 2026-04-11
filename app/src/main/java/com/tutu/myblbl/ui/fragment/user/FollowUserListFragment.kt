@@ -7,10 +7,13 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentFollowUserListBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.user.FollowingModel
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.adapter.FollowUserAdapter
@@ -18,10 +21,8 @@ import com.tutu.myblbl.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.detail.UserSpaceFragment
 import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
 import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
 import org.koin.android.ext.android.inject
 
 class FollowUserListFragment : BaseFragment<FragmentFollowUserListBinding>() {
@@ -44,6 +45,7 @@ class FollowUserListFragment : BaseFragment<FragmentFollowUserListBinding>() {
         }
     }
 
+    private val appEventHub: AppEventHub by inject()
     private val userRepository: UserRepository by inject()
 
     private lateinit var adapter: FollowUserAdapter
@@ -115,23 +117,21 @@ class FollowUserListFragment : BaseFragment<FragmentFollowUserListBinding>() {
 
     override fun onResume() {
         super.onResume()
-        EventBus.getDefault().register(this)
         restoreFocus()
     }
 
-    override fun onPause() {
-        super.onPause()
-        EventBus.getDefault().unregister(this)
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        if (isHidden || !isVisible) return
-        if (event in setOf("signIn", "updateUserInfo")) {
-            currentPage = 1
-            hasMore = true
-            totalCount = 0
-            loadUsers()
+    override fun initObserver() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (event == AppEventHub.Event.UserSessionChanged && !isHidden && isVisible) {
+                        currentPage = 1
+                        hasMore = true
+                        totalCount = 0
+                        loadUsers()
+                    }
+                }
+            }
         }
     }
 

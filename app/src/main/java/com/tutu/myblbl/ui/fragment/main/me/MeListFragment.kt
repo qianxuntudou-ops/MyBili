@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.reflect.TypeToken
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentMeTabListBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.video.HistoryVideoModel
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.HistoryVideoAdapter
@@ -30,9 +31,7 @@ import com.tutu.myblbl.utils.SwipeRefreshHelper
 import com.tutu.myblbl.utils.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
@@ -55,6 +54,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
         }
     }
 
+    private val appEventHub: AppEventHub by inject()
     private val viewModel: MeListViewModel by viewModel()
     private var videoAdapter: VideoAdapter? = null
     private var historyAdapter: HistoryVideoAdapter? = null
@@ -160,16 +160,10 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
 
     override fun onResume() {
         super.onResume()
-        EventBus.getDefault().register(this)
         if (pendingRestoreFocus) {
             pendingRestoreFocus = false
             restoreContentFocus()
         }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        EventBus.getDefault().unregister(this)
     }
 
     override fun initObserver() {
@@ -205,6 +199,35 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
                         if (!hasContentItems()) {
                             showState(it, showRetry = shouldShowRetry(it))
                         }
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (isHidden || !isVisible) {
+                        return@collectLatest
+                    }
+                    when (event) {
+                        is AppEventHub.Event.PlaybackProgressUpdated -> {
+                            if (type == TYPE_HISTORY) {
+                                historyAdapter?.updateProgressFromPlayer(
+                                    event.aid,
+                                    event.cid,
+                                    event.progressMs
+                                )
+                            }
+                        }
+
+                        AppEventHub.Event.UserSessionChanged -> {
+                            if (type == TYPE_HISTORY || type == TYPE_LATER) {
+                                refresh()
+                            }
+                        }
+
+                        else -> Unit
                     }
                 }
             }
@@ -507,30 +530,4 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
         }
     }
 
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        if (isHidden || !isVisible) {
-            return
-        }
-        if (event.startsWith("playUgc|")) {
-            if (type == TYPE_HISTORY) {
-                val payload = event.split("|")
-                if (payload.size == 4) {
-                    val aid = payload[1].toLongOrNull() ?: return
-                    val cid = payload[2].toLongOrNull() ?: return
-                    val progressMs = payload[3].toLongOrNull() ?: return
-                    historyAdapter?.updateProgressFromPlayer(aid, cid, progressMs)
-                }
-            }
-            return
-        }
-        val refreshEvents = when (type) {
-            TYPE_HISTORY -> setOf("signIn", "updateUserInfo")
-            TYPE_LATER -> setOf("signIn", "updateUserInfo")
-            else -> emptySet()
-        }
-        if (event in refreshEvents) {
-            refresh()
-        }
-    }
 }

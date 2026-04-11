@@ -8,11 +8,14 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentSeriesDetailBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.episode.EpisodeModel
 import com.tutu.myblbl.model.series.EpisodeProgressModel
 import com.tutu.myblbl.model.series.EpisodesDetailModel
@@ -22,10 +25,9 @@ import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.SeriesDetailContentAdapter
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.VideoRouteNavigator
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class SeriesDetailFragment : Fragment() {
@@ -51,6 +53,7 @@ class SeriesDetailFragment : Fragment() {
     private var lastContentStructureKey: String? = null
     private var pendingHeaderFocusAnchorX: Int? = null
     private var pendingHeaderFocusRetries: Int = 0
+    private val appEventHub: AppEventHub by inject()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -79,34 +82,11 @@ class SeriesDetailFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        EventBus.getDefault().register(this)
         binding.recyclerView.post {
             if (!isAdded || view == null || pendingPrimaryFocus) {
                 return@post
             }
             restoreFocus()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        EventBus.getDefault().unregister(this)
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        if (isHidden || !isVisible) return
-        if (!event.startsWith("playEpisode")) return
-        try {
-            val parts = event.split("|")
-            if (parts.size == 4) {
-                val epId = parts[1].toLong()
-                val timeMs = parts[2].toLong() / 1000
-                val epIndex = parts[3]
-                viewModel.updateEpisodeProgress(epId, timeMs, epIndex)
-            }
-        } catch (e: Exception) {
-            AppLog.e("SeriesDetailFragment", "onMessageEvent parse failed: event=$event", e)
         }
     }
 
@@ -185,6 +165,23 @@ class SeriesDetailFragment : Fragment() {
 
                     is SeriesDetailViewModel.UiMessage.Text -> {
                         Toast.makeText(requireContext(), message.value, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (isHidden || !isVisible) {
+                        return@collectLatest
+                    }
+                    if (event is AppEventHub.Event.EpisodePlaybackProgressUpdated) {
+                        viewModel.updateEpisodeProgress(
+                            epId = event.episodeId,
+                            timeMs = event.progressMs / 1000,
+                            epIndex = event.episodeIndex
+                        )
                     }
                 }
             }

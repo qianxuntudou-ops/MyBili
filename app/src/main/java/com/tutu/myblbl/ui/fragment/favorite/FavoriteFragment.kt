@@ -7,11 +7,14 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.os.bundleOf
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.reflect.TypeToken
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentFavoriteBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.repository.FavoriteRepository
@@ -26,12 +29,10 @@ import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.FileCacheManager
 import com.tutu.myblbl.utils.SpatialFocusNavigator
 import com.tutu.myblbl.utils.SwipeRefreshHelper
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
 import org.koin.android.ext.android.inject
 
 class FavoriteFragment : BaseFragment<FragmentFavoriteBinding>(), MeTabPage {
@@ -50,6 +51,7 @@ class FavoriteFragment : BaseFragment<FragmentFavoriteBinding>(), MeTabPage {
 
     private var lastRefreshTime = 0L
 
+    private val appEventHub: AppEventHub by inject()
     private val favoriteRepository: FavoriteRepository by inject()
     private val userRepository: UserRepository by inject()
     private lateinit var adapter: FavoriteFolderAdapter
@@ -133,23 +135,21 @@ class FavoriteFragment : BaseFragment<FragmentFavoriteBinding>(), MeTabPage {
 
     override fun onResume() {
         super.onResume()
-        EventBus.getDefault().register(this)
         if (pendingRestoreFocus) {
             pendingRestoreFocus = false
             restoreFocus()
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        EventBus.getDefault().unregister(this)
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        if (isHidden || !isVisible) return
-        when (event) {
-            "signIn", "updateUserInfo" -> loadFavoriteFolders()
+    override fun initObserver() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (event == AppEventHub.Event.UserSessionChanged && !isHidden && isVisible) {
+                        loadFavoriteFolders()
+                    }
+                }
+            }
         }
     }
 

@@ -13,6 +13,7 @@ import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentMeBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
@@ -25,9 +26,7 @@ import com.tutu.myblbl.utils.enableTouchNavigation
 import com.tutu.myblbl.utils.focusNearestTabTo
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
@@ -38,22 +37,13 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
         fun newInstance(): MeFragment = MeFragment()
     }
 
+    private val appEventHub: AppEventHub by inject()
     private val mainNavigationViewModel: MainNavigationViewModel by activityViewModels()
     private val viewModel: MeViewModel by viewModel()
     private lateinit var tabLayout: TabLayout
     private lateinit var viewPager: ViewPager2
     private lateinit var adapter: MeFragmentAdapter
     private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
-
-    override fun onResume() {
-        super.onResume()
-        EventBus.getDefault().register(this)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        EventBus.getDefault().unregister(this)
-    }
 
     override fun getViewBinding(
         inflater: LayoutInflater,
@@ -178,6 +168,21 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (event == AppEventHub.Event.UserSessionChanged && !isHidden) {
+                        viewModel.loadUserInfo()
+                        adapter.getFragments().forEach { fragment ->
+                            if (fragment.view != null) {
+                                (fragment as? MeTabPage)?.refresh()
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun updateUserInfo(avatarUrl: String) {
@@ -206,21 +211,6 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
             .getSharedPreferences("app_settings", android.content.Context.MODE_PRIVATE)
             .getInt("defaultStartPage", 1)
         return (startPage - 4).coerceIn(0, adapter.itemCount - 1)
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        if (isHidden) return
-        when (event) {
-            "signIn", "updateUserInfo" -> {
-                viewModel.loadUserInfo()
-                adapter.getFragments().forEach { fragment ->
-                    if (fragment.view != null) {
-                        (fragment as? MeTabPage)?.refresh()
-                    }
-                }
-            }
-        }
     }
 
     fun scrollToTop() {

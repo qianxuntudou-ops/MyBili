@@ -17,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import com.tutu.myblbl.R
 import com.tutu.myblbl.MyBLBLApplication
 import com.tutu.myblbl.databinding.ActivityMainBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.base.BaseActivity
@@ -39,9 +40,6 @@ import com.tutu.myblbl.ui.view.TabBarView
 import com.tutu.myblbl.utils.AppLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
 import org.koin.android.ext.android.inject
 import java.lang.ref.WeakReference
 
@@ -61,6 +59,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     }
 
     private val fragments = mutableListOf<Fragment>()
+    private val appEventHub: AppEventHub by inject()
     private val mainNavigationViewModel: MainNavigationViewModel by viewModels()
     private val userRepository: UserRepository by inject()
     private var currentFragmentIndex = -1
@@ -85,7 +84,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         restoredFromSavedState = savedInstanceState != null
         restoredTabIndex = savedInstanceState?.getInt(STATE_CURRENT_TAB_INDEX, -1) ?: -1
         super.onCreate(savedInstanceState)
-        EventBus.getDefault().register(this)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 handleBackPressed()
@@ -105,6 +103,15 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
                 mainNavigationViewModel.events.collect { event ->
                     if (event == MainNavigationViewModel.Event.HomeContentReady) {
                         dismissSplash()
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collect { event ->
+                    if (event == AppEventHub.Event.UserSessionChanged) {
+                        refreshAvatar()
                     }
                 }
             }
@@ -290,13 +297,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
             return
         }
         showUserInfoDialog()
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        if (event == "signIn" || event == "updateUserInfo") {
-            refreshAvatar()
-        }
     }
 
     private fun dismissSplash() {
@@ -654,11 +654,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
             mainNavigationViewModel.dispatch(MainNavigationViewModel.Event.MenuPressed)
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        EventBus.getDefault().unregister(this)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

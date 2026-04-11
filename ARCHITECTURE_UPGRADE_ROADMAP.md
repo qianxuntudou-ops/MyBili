@@ -19,6 +19,9 @@
 - 移除了 UI 层直接 `new Repository()` 的主要入口
 - 将 `SeriesDetailViewModel`、`LivePlayerViewModel` 切到统一注入链路
 - 将 repository wrapper 层改为显式接收 delegate，不再默认内部直接 new remote repository
+- 引入 `MainNavigationViewModel`，将主 Tab / 子 Tab / 返回 / 菜单等高频导航事件迁出字符串广播
+- 引入 `AppEventHub`，将登录态刷新与播放进度同步改为显式 typed event
+- 已移除项目中的 `EventBus` 代码依赖与 Gradle 依赖
 - 修复了本轮重构中暴露出的编译问题和测试构造器适配问题
 - 已通过：
   - `:app:compileDebugKotlin`
@@ -72,21 +75,22 @@
 
 ### 需要做的事
 
-- [ ] 盘点所有 `EventBus` 事件名，建立事件清单
-- [ ] 区分三类事件：
+- [x] 盘点所有 `EventBus` 事件名，建立事件清单
+- [x] 区分三类事件：
   - 全局导航事件
   - 同页面 / 同容器协调事件
   - 一次性动作回调事件
-- [ ] 为 `MainActivity` 引入共享的 `MainSharedViewModel`
-- [ ] 用 `SharedFlow` / `StateFlow` 替换首页 Tab、我的页 Tab、返回刷新等高频事件
-- [ ] 优先迁移 `HomeFragment`、`HomeLaneFragment`、`MeFragment`、`MeSeriesFragment`
-- [ ] 为播放器、详情页保留暂时兼容层，避免一次动太多
-- [ ] 删除已迁移链路上的 `EventBus.register/unregister/post`
+- [x] 为 `MainActivity` 引入共享的 `MainSharedViewModel`
+- [x] 用 `SharedFlow` / `StateFlow` 替换首页 Tab、我的页 Tab、返回刷新等高频事件
+- [x] 优先迁移 `HomeFragment`、`HomeLaneFragment`、`MeFragment`、`MeSeriesFragment`
+- [x] 用 `AppEventHub` 承接登录态刷新与播放器进度同步
+- [x] 删除已迁移链路上的 `EventBus.register/unregister/post`
 
 ### 推荐产出
 
 - `ui/main/MainSharedViewModel.kt`
 - `ui/main/MainEvent.kt`
+- `event/AppEventHub.kt`
 - 事件迁移说明文档
 
 ### 验收标准
@@ -94,7 +98,7 @@
 - 首页主 Tab 和子 Tab 行为与当前保持一致
 - “点击当前 Tab 刷新”“菜单键刷新”“返回后焦点恢复”等行为无回归
 - 已迁移页面不再依赖 `EventBus`
-- 至少为共享 ViewModel 的关键事件流补充测试或行为验证说明
+- 至少为共享 ViewModel / AppEventHub 的关键事件流补充测试或行为验证说明
 
 ---
 
@@ -308,11 +312,12 @@ app/src/main/java/com/tutu/myblbl/
 
 建议下一轮直接做下面这些：
 
-- [ ] 建立 `EventBus` 事件清单文档
-- [ ] 为 `MainActivity` 增加共享 `MainSharedViewModel`
-- [ ] 先迁移 `Home` / `Me` 的 Tab 刷新与选择事件
+- [x] 建立事件迁移状态文档
+- [x] 为 `MainActivity` 增加共享 `MainSharedViewModel`
+- [x] 迁移 `Home` / `Me` / `Category` / `Dynamic` / `Live` 的导航事件
 - [ ] 把 `NetworkManager` 中 session / auth 相关逻辑列出拆分清单
-- [ ] 为首页与播放器链路补最小必要测试
+- [ ] 为首页与播放器链路补更完整的自动化测试
+- [ ] 评估新的 `AppEventHub` / `MainNavigationViewModel` 最终目录归属
 
 ## 最终判断
 

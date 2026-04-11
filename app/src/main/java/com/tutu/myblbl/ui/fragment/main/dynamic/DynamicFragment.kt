@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentDynamicBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.user.FollowingModel
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.network.NetworkManager
@@ -32,9 +33,7 @@ import com.tutu.myblbl.utils.SwipeRefreshHelper
 import com.tutu.myblbl.utils.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarget {
@@ -46,6 +45,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
         fun newInstance(): DynamicFragment = DynamicFragment()
     }
 
+    private val appEventHub: AppEventHub by inject()
     private val viewModel: DynamicViewModel by viewModel()
     private val mainNavigationViewModel: MainNavigationViewModel by activityViewModels()
     private lateinit var upAdapter: DynamicUpAdapter
@@ -60,11 +60,6 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
     private var lastToastMessage: String? = null
     private var lastFocusedVideoPosition = 0
     private var pendingScrollToTop = false
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        EventBus.getDefault().register(this)
-    }
 
     override fun getViewBinding(
         inflater: LayoutInflater,
@@ -289,6 +284,17 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
                         }
 
                         else -> Unit
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (event == AppEventHub.Event.UserSessionChanged && !isHidden) {
+                        currentUpId = 0L
+                        loadData()
                     }
                 }
             }
@@ -528,23 +534,6 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
     private fun shouldRefresh(): Boolean {
         return videoAdapter.itemCount == 0 || upAdapter.itemCount == 0 ||
                 System.currentTimeMillis() - lastRefreshTime >= CACHE_TTL_MS
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        when (event) {
-            "signIn", "updateUserInfo" -> {
-                if (!isHidden) {
-                    currentUpId = 0L
-                    loadData()
-                }
-            }
-        }
-    }
-
-    override fun onDestroy() {
-        EventBus.getDefault().unregister(this)
-        super.onDestroy()
     }
 
     private fun View.isDescendantOf(ancestor: View): Boolean {

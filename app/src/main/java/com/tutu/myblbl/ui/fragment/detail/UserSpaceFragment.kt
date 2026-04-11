@@ -6,12 +6,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.os.bundleOf
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentUserSpaceBinding
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.user.CheckRelationModel
 import com.tutu.myblbl.model.user.UserSpaceInfo
 import com.tutu.myblbl.network.NetworkManager
@@ -25,10 +28,8 @@ import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
 import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.VideoRouteNavigator
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.greenrobot.eventbus.EventBus
-import org.greenrobot.eventbus.Subscribe
-import org.greenrobot.eventbus.ThreadMode
 import org.koin.android.ext.android.inject
 
 class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
@@ -55,6 +56,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
     private var mid: Long = 0
     private var userSpaceInfo: UserSpaceInfo? = null
 
+    private val appEventHub: AppEventHub by inject()
     private val userRepository: UserRepository by inject()
     private lateinit var headerAdapter: UserSpaceHeaderAdapter
     private lateinit var videoAdapter: VideoAdapter
@@ -70,7 +72,6 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
 
     override fun onResume() {
         super.onResume()
-        EventBus.getDefault().register(this)
         restoreFocus()
     }
 
@@ -187,12 +188,17 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
         requestHeaderFocus(FocusArea.BACK)
     }
 
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onMessageEvent(event: String) {
-        if ((event == "signIn" || event == "updateUserInfo") && !isHidden) {
-            loadUserInfo()
-            loadUserStat()
-            refreshUserVideos()
+    override fun initObserver() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (event == AppEventHub.Event.UserSessionChanged && !isHidden) {
+                        loadUserInfo()
+                        loadUserStat()
+                        refreshUserVideos()
+                    }
+                }
+            }
         }
     }
 
@@ -481,10 +487,5 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
             binding.recyclerViewVideos.post { requestVideoFocus(targetPosition, retries - 1) }
         }
         return false
-    }
-
-    override fun onPause() {
-        super.onPause()
-        EventBus.getDefault().unregister(this)
     }
 }
