@@ -272,7 +272,6 @@ class VideoPlayerViewModel(
                 "x-bili-gaia-vtoken=$gaiaVtoken; domain=bilibili.com; path=/; secure; expires=$expiresAt"
             )
         )
-        AppLog.i(TAG, "gaia_vtoken saved, triggering playInfo refresh")
         playInfoRefreshRetryCount = 0
         loadPlayUrlWithCurrentContext(reason = "gaia_vgate_verified")
     }
@@ -361,10 +360,6 @@ class VideoPlayerViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                AppLog.d(
-                    TAG,
-                    "loadVideoInfo start: aid=${currentAid ?: 0L}, bvid=${currentBvid.orEmpty()}, cid=$currentCid, seasonId=${currentSeasonId ?: 0L}, epId=${currentEpId ?: 0L}, seek=$pendingSeekPositionMs"
-                )
                 if (isPgcPlayback()) {
                     loadPgcVideoInfo(loadGeneration)
                     return@launch
@@ -790,10 +785,6 @@ class VideoPlayerViewModel(
         currentAid = selectedEpisode?.aid?.takeIf { it > 0L } ?: currentAid
         currentBvid = selectedEpisode?.bvid?.takeIf { it.isNotBlank() } ?: currentBvid
         _currentCidLive.value = currentCid
-        AppLog.d(
-            TAG,
-            "loadUgcVideoInfo detail success: aid=${currentAid ?: 0L}, bvid=${currentBvid.orEmpty()}, cid=$currentCid, episodes=${episodeItems.size}, selectedIndex=$selectedIndex"
-        )
 
         if (currentCid <= 0L) {
             _error.value = "未找到可播放分P"
@@ -865,10 +856,6 @@ class VideoPlayerViewModel(
     ): PreparedPlayback? {
         val requestStartMs = System.currentTimeMillis()
         val preferredQualityId = qualityCandidates.firstOrNull() ?: selectedQualityId ?: 80
-        AppLog.d(
-            TAG,
-            "loadPlayUrl start: aid=${identity.aid ?: 0L}, bvid=${identity.bvid.orEmpty()}, cid=${identity.cid}, seasonId=${currentSeasonId ?: 0L}, epId=${identity.epId ?: 0L}, qn=$preferredQualityId, candidates=$qualityCandidates, fnval=${streamResolver.buildFnval(preferredQualityId)}, fourk=${streamResolver.buildFourk(preferredQualityId)}, hasWbi=${playInfoGateway.hasWbiKeys()}"
-        )
 
         val cachedPlayInfo = identity.bvid
             ?.takeIf { !replaceInPlace && it.isNotBlank() && identity.epId == null }
@@ -876,10 +863,6 @@ class VideoPlayerViewModel(
             ?.takeIf(::hasPlayableMedia)
 
         val (initialPlayInfo, effectiveRequestedQualityId) = if (cachedPlayInfo != null) {
-            AppLog.d(
-                TAG,
-                "loadPlayUrl cache hit: bvid=${identity.bvid.orEmpty()}, cid=${identity.cid}, qn=$preferredQualityId"
-            )
             cachedPlayInfo to preferredQualityId
         } else {
             val playInfoFetch = requestPlayInfoWithQualityFallback(
@@ -937,11 +920,6 @@ class VideoPlayerViewModel(
             selectedCodec = selectionSnapshot.selectedCodec
         )
 
-        AppLog.d(
-            TAG,
-            "loadPlayUrl success: dashVideo=${initialPlayInfo.dash?.video?.size ?: 0}, dashAudio=${initialPlayInfo.dash?.audio?.size ?: 0}, durl=${initialPlayInfo.durl?.size ?: 0}, quality=${initialPlayInfo.quality}"
-        )
-
         val useServerResume = preferLastPlayTime &&
             initialPlayInfo.lastPlayCid == identity.cid &&
             initialPlayInfo.lastPlayTime > 5000L
@@ -955,11 +933,6 @@ class VideoPlayerViewModel(
 
         val startPosition = rawResumePosition.takeIf { shouldResume } ?: 0L
 
-        AppLog.d(
-            TAG,
-            "loadPlayUrl resume check: preferLastPlayTime=$preferLastPlayTime, lastPlayCid=${initialPlayInfo.lastPlayCid}, cid=${identity.cid}, lastPlayTime=${initialPlayInfo.lastPlayTime}, pendingSeekPositionMs=$pendingSeekPositionMs, useServerResume=$useServerResume, rawResumePosition=$rawResumePosition, shouldResume=$shouldResume"
-        )
-
         val mediaSource = mediaSourceSelection?.mediaSource ?: run {
             AppLog.e(TAG, "loadPlayUrl mediaSource missing: cid=${identity.cid}")
             return null
@@ -967,10 +940,6 @@ class VideoPlayerViewModel(
 
         val resumeHintPositionMs = startPosition.takeIf { shouldResume && !replaceInPlace }
         val seekToStart = if (resumeHintPositionMs != null) 0L else startPosition
-        AppLog.d(
-            TAG,
-            "loadPlayUrl: startPosition=$startPosition, shouldShowHint=${resumeHintPositionMs != null}, seekToStart=$seekToStart, replaceInPlace=$replaceInPlace"
-        )
         return PreparedPlayback(
             identity = identity,
             playInfo = initialPlayInfo,
@@ -1016,10 +985,6 @@ class VideoPlayerViewModel(
             seekPositionMs = preparedPlayback.seekToStart,
             playWhenReady = preparedPlayback.playWhenReady,
             replaceInPlace = preparedPlayback.replaceInPlace
-        )
-        AppLog.d(
-            TAG,
-            "loadPlayUrl prepared playback request in ${preparedPlayback.requestDurationMs}ms: cid=${preparedPlayback.identity.cid}, seek=${preparedPlayback.seekToStart}, replaceInPlace=${preparedPlayback.replaceInPlace}"
         )
         preparedPlayback.resumeHintPositionMs?.let { targetPositionMs ->
             _resumeHint.value = ResumeProgressHint(targetPositionMs = targetPositionMs)
@@ -1460,10 +1425,6 @@ class VideoPlayerViewModel(
             }
 
             playerInfoDeferred.await()?.let { wrapper ->
-                AppLog.d(
-                    TAG,
-                    "loadPlayerExtras success: cid=$cid, subtitles=${wrapper.subtitle?.subtitles?.size ?: 0}, interaction=${wrapper.interaction != null}"
-                )
                 val subtitleTracks = wrapper.subtitle?.subtitles.orEmpty()
                 if (subtitleTracks.isNotEmpty()) {
                     _subtitles.value = subtitleTracks
@@ -1587,10 +1548,6 @@ class VideoPlayerViewModel(
                 items = initialPayload.regularItems,
                 danmakuView = danmakuView
             )
-            AppLog.d(
-                TAG,
-                "loadDanmaku first batch ready in ${System.currentTimeMillis() - danmakuStartMs}ms: cid=$cid, items=${initialPayload.regularItems.size}, specialItems=${initialPayload.specialItems.size}, segments=$segmentCount"
-            )
             if (segmentCount <= 1) {
                 return@launch
             }
@@ -1637,10 +1594,6 @@ class VideoPlayerViewModel(
                 label = "full",
                 items = fullDanmaku,
                 danmakuView = danmakuView
-            )
-            AppLog.d(
-                TAG,
-                "loadDanmaku fully loaded in ${System.currentTimeMillis() - danmakuStartMs}ms: cid=$cid, items=${fullDanmaku.size}, segments=$segmentCount"
             )
         }
     }
@@ -1702,10 +1655,6 @@ class VideoPlayerViewModel(
                     )
                 }
             }
-            AppLog.d(
-                TAG,
-                "loadDanmaku segment[$segmentIndex]: bytes=${bytes.size}, state=${segment.state}, elems=${segment.elems.size}, regularAdded=${regularItems.size - regularStartIndex}, specialAdded=${specialItems.size - specialStartIndex}, advancedRaw=$advancedCount, colorfulSrc=${segment.colorfulSrc.size}"
-            )
         }
         SpecialDanmakuPayload(
             regularItems = regularItems,
@@ -1789,11 +1738,6 @@ class VideoPlayerViewModel(
             return
         }
         val specialCount = danmakuView.specialDanmakuUrls.size
-        val smartFilter = danmakuView.smartFilterConfig
-        AppLog.d(
-            TAG,
-            "loadDanmaku meta: cid=$cid, aid=$aid, durationMs=$durationMs, segments=$segmentCount, totalCount=${danmakuView.totalCount}, pageSizeMs=${danmakuView.segmentDurationMs}, specialPackages=$specialCount, smartFilterCloudLevel=${smartFilter.cloudLevel}, smartFilterCloudSwitch=${smartFilter.cloudSwitch}, smartFilterCloudText=${smartFilter.cloudText.ifBlank { "-" }}, smartFilterPlayerLevel=${smartFilter.playerLevel}, smartFilterPlayerEnabled=${smartFilter.playerEnabled}, smartFilterResolvedLevel=${smartFilter.resolvedLevel}, smartFilterResolvedEnabled=${smartFilter.resolvedEnabled}"
-        )
         if (specialCount > 0) {
             AppLog.w(
                 TAG,
@@ -1808,27 +1752,10 @@ class VideoPlayerViewModel(
         danmakuView: DmWebViewReplyProto?
     ) {
         if (items.isEmpty()) {
-            AppLog.d(TAG, "loadDanmaku diagnostics[$label]: empty")
             return
         }
-        val modeSummary = items.groupingBy { it.mode }
-            .eachCount()
-            .toSortedMap()
-            .entries
-            .joinToString(separator = ",") { "${it.key}:${it.value}" }
-        val coloredCount = items.count { color ->
-            color.color != 0 && color.color != 0xFFFFFF
-        }
         val advancedCount = items.count { it.mode == 7 }
-        val colorfulCount = items.count { it.colorful != 0 }
-        val colorfulSrcCount = items.count { it.colorfulSrc.isNotBlank() }
-        val actionCount = items.count { it.action.isNotBlank() }
-        val animationCount = items.count { it.animation.isNotBlank() }
         val unsupportedCount = items.count { it.mode !in setOf(1, 4, 5, 6, 7) }
-        AppLog.d(
-            TAG,
-            "loadDanmaku diagnostics[$label]: total=${items.size}, modes=$modeSummary, colored=$coloredCount, colorful=$colorfulCount, colorfulSrc=$colorfulSrcCount, advanced=$advancedCount, action=$actionCount, animation=$animationCount, unsupportedModes=$unsupportedCount, specialPackages=${danmakuView?.specialDanmakuUrls?.size ?: 0}"
-        )
         if (advancedCount > 0) {
             AppLog.w(
                 TAG,
@@ -1860,7 +1787,6 @@ class VideoPlayerViewModel(
                 )
         }
         if (candidates.isEmpty()) {
-            AppLog.d(TAG, "loadDanmaku candidates[$label]: no rolling special-color candidates")
             return
         }
         val colorfulSummary = candidates.groupingBy { it.colorful }
@@ -1947,18 +1873,6 @@ class VideoPlayerViewModel(
     }
 
     private fun applySelectionSnapshot(snapshot: VideoPlayerStreamResolver.SelectionSnapshot) {
-        if (selectedQualityId != null && snapshot.selectedQualityId != selectedQualityId) {
-            AppLog.d(
-                TAG,
-                "syncSelections: quality downgraded to ${VideoQuality.fromId(snapshot.selectedQualityId ?: 0).name}"
-            )
-        }
-        if (selectedAudioId != null && snapshot.selectedAudioId != selectedAudioId && snapshot.selectedAudioId != null) {
-            AppLog.d(
-                TAG,
-                "syncSelections: audio quality downgraded to ${AudioQuality.fromId(snapshot.selectedAudioId).name}"
-            )
-        }
         selectedQualityId = snapshot.selectedQualityId
         selectedAudioId = snapshot.selectedAudioId
         selectedCodec = snapshot.selectedCodec

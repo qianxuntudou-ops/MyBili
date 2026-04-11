@@ -60,7 +60,6 @@ class LiveRecommendFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveT
     }
 
     override fun initData() {
-        AppLog.d(TAG, "[LiveRecommend] initData")
         viewModel.loadData()
     }
 
@@ -68,12 +67,9 @@ class LiveRecommendFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveT
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.recommendData.collectLatest { data ->
-                    AppLog.d(TAG, "[LiveRecommend] recommendData collected: data=${data != null}")
                     swipeRefreshLayout?.isRefreshing = false
                     val sections = buildSections(data)
-                    AppLog.d(TAG, "[LiveRecommend] sections.size=${sections.size}, adapter.itemCount before=${adapter.itemCount}")
                     adapter.setData(sections)
-                    AppLog.d(TAG, "[LiveRecommend] adapter.itemCount after=${adapter.itemCount}")
                 }
             }
         }
@@ -179,7 +175,6 @@ class LiveRecommendFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveT
     }
 
     private fun buildSections(data: LiveListWrapper?): List<LiveRecommendSection> {
-        AppLog.d(TAG, "buildSections: data=${data != null}, recommendRoomList.size=${data?.recommendRoomList?.size ?: "null"}, roomList.size=${data?.roomList?.size ?: "null"}")
         if (data == null) {
             return emptyList()
         }

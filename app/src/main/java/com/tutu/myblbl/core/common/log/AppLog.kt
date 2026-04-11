@@ -5,15 +5,17 @@ import com.tutu.myblbl.BuildConfig
 
 object AppLog {
 
+    private const val ENABLE_DEBUG_LOGS = false
+
     fun d(tag: String, message: String) {
-        if (!BuildConfig.DEBUG) return
+        if (!BuildConfig.DEBUG || !ENABLE_DEBUG_LOGS) return
         runCatching {
             Log.d(tag, message)
         }
     }
 
     fun i(tag: String, message: String) {
-        if (!BuildConfig.DEBUG) return
+        if (!BuildConfig.DEBUG || !ENABLE_DEBUG_LOGS) return
         runCatching {
             Log.i(tag, message)
         }
@@ -34,7 +36,7 @@ object AppLog {
     }
 
     fun v(tag: String, message: String) {
-        if (!BuildConfig.DEBUG) return
+        if (!BuildConfig.DEBUG || !ENABLE_DEBUG_LOGS) return
         runCatching {
             Log.v(tag, message)
         }

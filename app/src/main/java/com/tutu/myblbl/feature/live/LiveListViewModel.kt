@@ -42,7 +42,6 @@ class LiveListViewModel(
     private var currentPage = 0
 
     fun startArea(parentAreaId: Long, areaId: Long, preserveExisting: Boolean = false) {
-        AppLog.d("LiveListVM", "startArea: parentAreaId=$parentAreaId, areaId=$areaId, preserveExisting=$preserveExisting")
         val areaChanged = currentParentAreaId != parentAreaId || currentAreaId != areaId
         currentParentAreaId = parentAreaId
         currentAreaId = areaId
@@ -57,12 +56,10 @@ class LiveListViewModel(
 
     fun loadNextPage() {
         if (_loading.value || !_hasMore.value) {
-            AppLog.d("LiveListVM", "loadNextPage skipped: loading=${_loading.value}, hasMore=${_hasMore.value}")
             return
         }
 
         val nextPage = currentPage + 1
-        AppLog.d("LiveListVM", "loadNextPage: page=$nextPage, currentRooms=${_rooms.value.size}")
 
         viewModelScope.launch {
             _loading.value = true
@@ -95,7 +92,6 @@ class LiveListViewModel(
         } else {
             LiveListStatus.Content
         }
-        AppLog.d("LiveListVM", "applyRoomPage: page=$nextPage, rooms=${roomPage.rooms.size}, total=${_rooms.value.size}, hasMore=${roomPage.hasMore}, status=${_status.value}")
     }
 
     private fun handleLoadFailure(exception: Throwable) {

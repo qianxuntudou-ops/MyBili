@@ -77,7 +77,6 @@ class BiliSecurityCoordinator(
             refreshCookieIfNeededOncePerDay()
 
             lastEnsureHealthyForPlayMs = System.currentTimeMillis()
-            AppLog.d(tag, "ensureHealthyForPlay done")
         }
     }
 
@@ -114,10 +113,6 @@ class BiliSecurityCoordinator(
             if (success) {
                 lastPrewarmTimestampMs = now
             }
-            AppLog.d(
-                tag,
-                "prewarmWebSession done: success=$success, mainPageLoaded=$mainPageLoaded, navSuccess=$navSuccess, forceUaRefresh=$forceUaRefresh, hasSess=${cookieManager.hasSessionCookie()}, identityCookies=${hasBaselineIdentityCookies()}, ua=${userAgentProvider().take(80)}"
-            )
             success
         }
     }
@@ -267,7 +262,6 @@ class BiliSecurityCoordinator(
                     buildCookie("bili_ticket_expires", expiresSec.toString(), expiresAt)
                 ).map { encodeCookieDirect(it) }
             )
-            AppLog.d(tag, "ensureBiliTicket success")
         }.onFailure {
             AppLog.w(tag, "ensureBiliTicket failed: ${it.message}")
         }
@@ -323,7 +317,6 @@ class BiliSecurityCoordinator(
                 if (resp.isSuccessful) {
                     buvidActivatedMid = mid
                     buvidActivatedDay = epochDay
-                    AppLog.d(tag, "ensureBuvidActiveOncePerDay ok mid=$mid")
                 }
             }
         }.onFailure {
@@ -395,7 +388,6 @@ class BiliSecurityCoordinator(
             }
             if (respCookies.isNotEmpty()) {
                 cookieManager.saveCookies(respCookies)
-                AppLog.d(tag, "refreshCookie success")
             }
             cookieRefreshCheckedDay = epochDay
         }.onFailure {

@@ -36,11 +36,9 @@ class LiveRecommendViewModel(
 
     fun loadData(forceRefresh: Boolean = false) {
         if (_loading.value && !forceRefresh) {
-            AppLog.d("LiveRecommendVM", "loadData skipped: already loading")
             return
         }
 
-        AppLog.d("LiveRecommendVM", "loadData: forceRefresh=$forceRefresh")
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
@@ -48,11 +46,9 @@ class LiveRecommendViewModel(
 
             liveRepository.getLiveRecommend().fold(
                 onSuccess = { data ->
-                    AppLog.d("LiveRecommendVM", "loadData success: recommendRoomList=${data.recommendRoomList?.size ?: "null"}, roomList=${data.roomList?.size ?: "null"}")
                     _recommendData.value = data
                     lastLoadedAt = System.currentTimeMillis()
                     val hasContent = hasContent(data)
-                    AppLog.d("LiveRecommendVM", "hasContent=$hasContent")
                     _status.value = if (hasContent) {
                         LiveRecommendStatus.Content
                     } else {

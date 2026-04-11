@@ -83,10 +83,6 @@ object NetworkManager {
         appContext = applicationContext
         internalCookieManager.init(applicationContext)
         userAgentStore.init(applicationContext)
-        AppLog.d(
-            TAG,
-            "init: ua=${currentUserAgentValue.take(80)}, hasSess=${internalCookieManager.hasSessionCookie()}, userMid=${sessionStore.getUserInfo()?.mid ?: 0L}"
-        )
     }
 
     fun setWbiInfo(imgKey: String, subKey: String) {
@@ -130,7 +126,6 @@ object NetworkManager {
 
     fun refreshUserAgent(): String {
         val newUserAgent = userAgentStore.refreshUserAgent(appContext)
-        AppLog.d(TAG, "refreshUserAgent: ua=${newUserAgent.take(80)}")
         return newUserAgent
     }
 
@@ -167,10 +162,6 @@ object NetworkManager {
         if (info != null) {
             return info
         }
-        AppLog.d(
-            TAG,
-            "syncUserSession: source=$source code=${response.code} message=${response.errorMessage}"
-        )
         return null
     }
 

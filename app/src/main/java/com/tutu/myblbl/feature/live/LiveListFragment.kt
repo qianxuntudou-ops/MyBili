@@ -14,7 +14,6 @@ import com.tutu.myblbl.model.live.LiveRoomItem
 import com.tutu.myblbl.ui.activity.LivePlayerActivity
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
-import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
 import com.tutu.myblbl.core.common.ext.toast
@@ -102,7 +101,6 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
     }
 
     override fun initData() {
-        com.tutu.myblbl.core.common.log.AppLog.d("LiveListFragment", "initData: parentAreaId=$parentAreaId, areaId=$areaId, title=$title")
         viewModel.startArea(parentAreaId, areaId)
     }
 
@@ -111,7 +109,6 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.rooms.collectLatest { rawRooms ->
                     val rooms = ContentFilter.filterLiveRooms(requireContext(), rawRooms)
-                    AppLog.d("LiveList", "rooms collected: size=${rooms.size}, isFirstPageLoad=$isFirstPageLoad")
                     swipeRefreshLayout?.isRefreshing = false
                     adapter.setData(rooms)
                     if (isFirstPageLoad && rooms.isNotEmpty()) {

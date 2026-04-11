@@ -3,7 +3,6 @@ package com.tutu.myblbl.feature.player
 import android.content.Intent
 import android.os.Bundle
 import android.os.Build
-import android.os.SystemClock
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -145,13 +144,6 @@ class VideoPlayerFragment : Fragment() {
     private var bottomProgressSeekPreviewDurationMs: Long = 0L
     private val sessionCoordinator = PlayerSessionCoordinator()
     private var resumePlaybackWhenStarted: Boolean = false
-    private var playbackTraceSessionId: Long = 0L
-    private var pendingPlaybackOriginElapsedMs: Long = 0L
-    private var currentPlaybackOriginElapsedMs: Long = 0L
-    private var currentPlaybackRequestElapsedMs: Long = 0L
-    private var didLogReadyForCurrentSession = false
-    private var didLogFirstFrameForCurrentSession = false
-    private var didLogFirstDanmakuForCurrentSession = false
 
     private val gaiaVgateLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -159,11 +151,8 @@ class VideoPlayerFragment : Fragment() {
         if (result.resultCode == androidx.appcompat.app.AppCompatActivity.RESULT_OK) {
             val gaiaVtoken = result.data?.getStringExtra(GaiaVgateActivity.EXTRA_GAIA_VTOKEN)
             if (!gaiaVtoken.isNullOrBlank()) {
-                AppLog.i(TAG, "GaiaVgate returned gaia_vtoken, len=${gaiaVtoken.length}")
                 viewModel.onGaiaVgateResult(gaiaVtoken)
             }
-        } else {
-            AppLog.w(TAG, "GaiaVgate cancelled or failed")
         }
     }
 
@@ -189,10 +178,6 @@ class VideoPlayerFragment : Fragment() {
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            AppLog.d(
-                TAG,
-                "onPlaybackStateChanged: state=${playbackState.toPlaybackStateName()}, playWhenReady=${player?.playWhenReady}, isPlaying=${player?.isPlaying}, position=${player?.currentPosition}"
-            )
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
                     viewModel.setLoading(true)
@@ -200,12 +185,6 @@ class VideoPlayerFragment : Fragment() {
                 }
                 Player.STATE_READY -> {
                     viewModel.setLoading(false)
-                    logPlaybackTraceEvent(
-                        event = "state_ready",
-                        onceFlag = didLogReadyForCurrentSession
-                    ) {
-                        didLogReadyForCurrentSession = true
-                    }
                     if (player?.playWhenReady == true) {
                         playerView.resumeDanmaku()
                     }
@@ -236,10 +215,6 @@ class VideoPlayerFragment : Fragment() {
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            AppLog.d(
-                TAG,
-                "onIsPlayingChanged: isPlaying=$isPlaying, state=${player?.playbackState?.toPlaybackStateName()}, playWhenReady=${player?.playWhenReady}, position=${player?.currentPosition}"
-            )
             if (isPlaying) {
                 playerView.resumeDanmaku()
                 progressCoordinator.restart()
@@ -252,10 +227,6 @@ class VideoPlayerFragment : Fragment() {
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-            AppLog.d(
-                TAG,
-                "onPlayWhenReadyChanged: playWhenReady=$playWhenReady, reason=$reason, state=${player?.playbackState?.toPlaybackStateName()}, position=${player?.currentPosition}"
-            )
             resumePlaybackWhenStarted = playWhenReady
             syncPlaybackEnvironment()
         }
@@ -288,11 +259,6 @@ class VideoPlayerFragment : Fragment() {
                 launchContext.epId > 0L ||
                 launchContext.seasonId > 0L
             ) {
-                AppLog.d(
-                    TAG,
-                    "load launchContext: aid=${launchContext.aid}, bvid=${launchContext.bvid}, cid=${launchContext.cid}, epId=${launchContext.epId}, seasonId=${launchContext.seasonId}, seek=${launchContext.seekPositionMs}, requestElapsedMs=${launchContext.requestElapsedMs}"
-                )
-                pendingPlaybackOriginElapsedMs = launchContext.requestElapsedMs
                 viewModel.loadVideoInfo(
                     aid = launchContext.aid,
                     bvid = launchContext.bvid,
@@ -423,14 +389,7 @@ class VideoPlayerFragment : Fragment() {
         }
         playerView.setPlayer(player)
         playerView.setRenderEventListener(object : MyPlayerView.RenderEventListener {
-            override fun onRenderedFirstFrame() {
-                logPlaybackTraceEvent(
-                    event = "first_frame",
-                    onceFlag = didLogFirstFrameForCurrentSession
-                ) {
-                    didLogFirstFrameForCurrentSession = true
-                }
-            }
+            override fun onRenderedFirstFrame() = Unit
         })
         playerView.setControllerVisibilityListener(object : MyPlayerView.ControllerVisibilityListener {
             override fun onVisibilityChanged(visibility: Int) {
@@ -629,11 +588,6 @@ class VideoPlayerFragment : Fragment() {
             val playbackRequest = request ?: return@observe
             viewModel.setErrorMessage(null)
             resumePlaybackWhenStarted = playbackRequest.playWhenReady
-            AppLog.d(
-                TAG,
-                "apply playback request: seek=${playbackRequest.seekPositionMs}, playWhenReady=${playbackRequest.playWhenReady}, inPlace=${playbackRequest.replaceInPlace}"
-            )
-            beginPlaybackTrace(playbackRequest)
 
             if (playbackRequest.replaceInPlace) {
                 playerView.showController()
@@ -702,14 +656,6 @@ class VideoPlayerFragment : Fragment() {
         }
 
         viewModel.danmakuUpdates.observe(viewLifecycleOwner) { update ->
-            if (update.items.isNotEmpty() && !didLogFirstDanmakuForCurrentSession) {
-                logPlaybackTraceEvent(
-                    event = "first_danmaku_applied",
-                    onceFlag = didLogFirstDanmakuForCurrentSession
-                ) {
-                    didLogFirstDanmakuForCurrentSession = true
-                }
-            }
             if (update.replace) {
                 playerView.setDanmakuData(update.items)
             } else {
@@ -722,14 +668,6 @@ class VideoPlayerFragment : Fragment() {
         }
 
         viewModel.specialDanmaku.observe(viewLifecycleOwner) { data ->
-            if (data.isNotEmpty() && !didLogFirstDanmakuForCurrentSession) {
-                logPlaybackTraceEvent(
-                    event = "first_danmaku_applied",
-                    onceFlag = didLogFirstDanmakuForCurrentSession
-                ) {
-                    didLogFirstDanmakuForCurrentSession = true
-                }
-            }
             playerView.setSpecialDanmakuData(data)
             updateDanmakuSwitchVisibility()
         }
@@ -832,45 +770,6 @@ class VideoPlayerFragment : Fragment() {
             Player.STATE_ENDED -> "ENDED"
             else -> "UNKNOWN($this)"
         }
-    }
-
-    private fun beginPlaybackTrace(playbackRequest: VideoPlayerViewModel.PlaybackRequest) {
-        playbackTraceSessionId += 1L
-        currentPlaybackRequestElapsedMs = SystemClock.elapsedRealtime()
-        currentPlaybackOriginElapsedMs = pendingPlaybackOriginElapsedMs
-            .takeIf { it > 0L }
-            ?: currentPlaybackRequestElapsedMs
-        pendingPlaybackOriginElapsedMs = 0L
-        didLogReadyForCurrentSession = false
-        didLogFirstFrameForCurrentSession = false
-        didLogFirstDanmakuForCurrentSession = false
-        AppLog.d(
-            TAG,
-            buildPlaybackTraceMessage(
-                event = "playback_request",
-                extra = "seek=${playbackRequest.seekPositionMs}, inPlace=${playbackRequest.replaceInPlace}"
-            )
-        )
-    }
-
-    private fun logPlaybackTraceEvent(
-        event: String,
-        onceFlag: Boolean,
-        markLogged: () -> Unit
-    ) {
-        if (onceFlag || currentPlaybackRequestElapsedMs <= 0L) {
-            return
-        }
-        markLogged()
-        AppLog.d(TAG, buildPlaybackTraceMessage(event))
-    }
-
-    private fun buildPlaybackTraceMessage(event: String, extra: String = ""): String {
-        val now = SystemClock.elapsedRealtime()
-        val fromOriginMs = (now - currentPlaybackOriginElapsedMs).coerceAtLeast(0L)
-        val fromRequestMs = (now - currentPlaybackRequestElapsedMs).coerceAtLeast(0L)
-        val suffix = if (extra.isBlank()) "" else ", $extra"
-        return "perf session=$playbackTraceSessionId event=$event fromOrigin=${fromOriginMs}ms fromRequest=${fromRequestMs}ms$suffix"
     }
 
     private fun renderDebugState() {
@@ -1146,7 +1045,6 @@ class VideoPlayerFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        AppLog.d(TAG, "onStart")
         resumePlaybackIfNeeded(reason = "onStart")
         if (resumePlaybackWhenStarted) {
             playerView.resumeDanmaku()
@@ -1163,7 +1061,6 @@ class VideoPlayerFragment : Fragment() {
 
     override fun onStop() {
         super.onStop()
-        AppLog.d(TAG, "onStop")
         playerView.removeCallbacks(resumePlaybackRunnable)
         progressCoordinator.syncNow()
         val (snapshotPositionMs, snapshotPlayWhenReady) = capturePlaybackSnapshot()
@@ -1177,7 +1074,6 @@ class VideoPlayerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        AppLog.d(TAG, "onDestroyView")
         playerView.removeCallbacks(resumePlaybackRunnable)
         stopProgressUpdates()
         resumeHintController.release()
@@ -1205,17 +1101,9 @@ class VideoPlayerFragment : Fragment() {
     private fun resumePlaybackIfNeeded(reason: String) {
         val currentPlayer = player ?: return
         if (!resumePlaybackWhenStarted) {
-            AppLog.d(
-                TAG,
-                "resumePlaybackIfNeeded skipped: reason=$reason, resumePlaybackWhenStarted=false"
-            )
             return
         }
         if (currentPlayer.playbackState == Player.STATE_ENDED) {
-            AppLog.d(
-                TAG,
-                "resumePlaybackIfNeeded skipped: reason=$reason, playbackState=ENDED"
-            )
             return
         }
         if (currentPlayer.playbackState == Player.STATE_IDLE) {
@@ -1223,10 +1111,6 @@ class VideoPlayerFragment : Fragment() {
         }
         currentPlayer.playWhenReady = true
         currentPlayer.play()
-        AppLog.d(
-            TAG,
-            "resumePlaybackIfNeeded applied: reason=$reason, state=${currentPlayer.playbackState.toPlaybackStateName()}, position=${currentPlayer.currentPosition}"
-        )
     }
 
     private fun postPlaybackProgressEvent(positionMs: Long) {
