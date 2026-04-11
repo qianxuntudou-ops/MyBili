@@ -30,7 +30,7 @@ import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.ui.adapter.EpisodeListAdapter
 import com.tutu.myblbl.ui.adapter.VideoAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.ui.dialog.OwnerDetailDialog
 import com.tutu.myblbl.ui.dialog.PlayerActionDialog
 import com.tutu.myblbl.feature.search.SearchNewFragment

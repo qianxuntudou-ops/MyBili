@@ -17,11 +17,11 @@ import com.tutu.myblbl.model.series.timeline.SeriesTimeLineModel
 import com.tutu.myblbl.model.series.timeline.TimeLineADayModel
 import com.tutu.myblbl.repository.SeriesRepository
 import com.tutu.myblbl.ui.adapter.SeriesTimelineAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.base.RecyclerViewFocusRestoreHelper
+import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
-import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.utils.AppLog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest

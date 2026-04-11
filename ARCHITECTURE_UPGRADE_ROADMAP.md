@@ -240,7 +240,7 @@ app/src/main/java/com/tutu/myblbl/
 - [x] 将 `ui/fragment/main/home` 相关逻辑逐步迁到 `feature/home`
 - [x] 将播放器相关逻辑收拢到 `feature/player`
 - [x] 将详情、追番、收藏、用户空间等按 feature 收拢
-- [ ] 将 `ui/base`、通用焦点恢复、通用视图能力放入 `core/ui`
+- [x] 将 `ui/base`、通用焦点恢复、通用视图能力放入 `core/ui`
 - [ ] 将共用 model 中真正跨 feature 的部分保留在 `core/common` 或 `core/model`
 
 ### 执行方式
@@ -264,10 +264,12 @@ app/src/main/java/com/tutu/myblbl/
 - `me` 相关 Fragment / ViewModel / adapter / ui state 已迁入 `feature/me`
 - `category`、`dynamic`、`settings` 已迁入对应 `feature/*` 目录
 - `detail`、`favorite`、`series`、`user` 已迁入对应 `feature/*` 目录
+- `BaseActivity`、`BaseFragment`、`BaseListFragment`、`BaseAdapter`、焦点恢复 helper、通用 layout manager / decoration 已迁入 `core/ui`
+- 主导航 `TabBarView` 已迁入 `core/ui/navigation`，搜索键盘 `KeyboardView` 已回收到 `feature/search/view`
 - 关联的 XML 自定义 View 全限定类名、baseline profile、测试包引用已同步到新的 feature 包名
 - 业务 feature 目录层面的首轮迁移已经基本完成
-- 下一阶段更值得继续推进的是 `ui/base`、通用焦点恢复能力、通用视图组件向 `core/ui` 的收口
-- 另一个值得继续推进的方向是跨 feature 公共 model / helper 的归属收敛
+- `core/ui` 的首轮边界已经建立，后续可继续按需把零散公共 UI 能力收口进去
+- 下一阶段更值得继续推进的是跨 feature 公共 model / helper 的归属收敛
 
 ---
 

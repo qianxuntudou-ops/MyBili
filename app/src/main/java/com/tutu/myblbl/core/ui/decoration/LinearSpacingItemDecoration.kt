@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.widget
+package com.tutu.myblbl.core.ui.decoration
 
 import android.content.Context
 import android.graphics.Rect

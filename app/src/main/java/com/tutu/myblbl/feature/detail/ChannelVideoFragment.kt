@@ -9,9 +9,9 @@ import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentBaseListBinding
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.ui.adapter.VideoAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
-import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
+import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.VideoRouteNavigator
 import kotlinx.coroutines.launch

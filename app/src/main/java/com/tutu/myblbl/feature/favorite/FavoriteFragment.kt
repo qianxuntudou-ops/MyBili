@@ -19,12 +19,12 @@ import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.ui.adapter.FavoriteFolderAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.feature.me.MeFragment
 import com.tutu.myblbl.feature.me.MeTabPage
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
-import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
-import com.tutu.myblbl.ui.base.RecyclerViewFocusRestoreHelper
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
+import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.FileCacheManager
 import com.tutu.myblbl.utils.SpatialFocusNavigator

@@ -17,7 +17,7 @@ import com.tutu.myblbl.model.lane.HomeLaneSection
 import com.tutu.myblbl.model.lane.LaneItemModel
 import com.tutu.myblbl.model.series.timeline.SeriesTimeLineModel
 import com.tutu.myblbl.ui.activity.MainActivity
-import com.tutu.myblbl.ui.base.BaseAdapter
+import com.tutu.myblbl.core.ui.base.BaseAdapter
 
 class HomeLaneAdapter(
     private val onSeriesClick: (LaneItemModel) -> Unit,

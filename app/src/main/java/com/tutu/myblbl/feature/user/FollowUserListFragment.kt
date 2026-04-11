@@ -17,10 +17,10 @@ import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.user.FollowingModel
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.adapter.FollowUserAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.feature.detail.UserSpaceFragment
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
-import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject

@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.view
+package com.tutu.myblbl.core.ui.layout
 
 import android.content.Context
 import androidx.recyclerview.widget.GridLayoutManager

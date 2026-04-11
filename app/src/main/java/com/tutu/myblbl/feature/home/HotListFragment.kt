@@ -10,7 +10,7 @@ import com.tutu.myblbl.R
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.repository.cache.HomeCacheStore
 import com.tutu.myblbl.ui.adapter.VideoAdapter
-import com.tutu.myblbl.ui.base.BaseListFragment
+import com.tutu.myblbl.core.ui.base.BaseListFragment
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.VideoRouteNavigator

@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.DiffUtil
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.ui.base.BaseAdapter
+import com.tutu.myblbl.core.ui.base.BaseAdapter
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.ImageLoader

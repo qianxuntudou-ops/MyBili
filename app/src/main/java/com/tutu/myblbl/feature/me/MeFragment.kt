@@ -15,7 +15,7 @@ import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentMeBinding
 import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.session.NetworkSessionGateway
-import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
 import com.tutu.myblbl.ui.dialog.UserInfoDialog

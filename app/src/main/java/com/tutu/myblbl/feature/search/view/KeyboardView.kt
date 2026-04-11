@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.view.keyboard
+package com.tutu.myblbl.feature.search.view
 
 import android.annotation.SuppressLint
 import android.content.Context

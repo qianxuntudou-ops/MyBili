@@ -14,8 +14,8 @@ import com.tutu.myblbl.databinding.FragmentSettingsBinding
 import com.tutu.myblbl.model.SettingModel
 import com.tutu.myblbl.ui.adapter.SettingAdapter
 import com.tutu.myblbl.ui.adapter.SettingSelectionDialogAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.widget.LinearSpacingItemDecoration
+import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.decoration.LinearSpacingItemDecoration
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.FileCacheManager
 import com.tutu.myblbl.utils.ImageLoader

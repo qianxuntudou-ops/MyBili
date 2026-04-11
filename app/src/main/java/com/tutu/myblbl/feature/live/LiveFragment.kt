@@ -14,7 +14,7 @@ import com.google.android.material.tabs.TabLayoutMediator
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentLiveBinding
 import com.tutu.myblbl.model.live.LiveAreaCategoryParent
-import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
 import com.tutu.myblbl.utils.AppLog

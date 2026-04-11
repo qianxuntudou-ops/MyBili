@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.view
+package com.tutu.myblbl.core.ui.navigation
 
 import android.content.Context
 import android.graphics.PorterDuff

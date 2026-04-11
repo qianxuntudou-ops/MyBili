@@ -10,7 +10,7 @@ import androidx.annotation.OptIn
 import androidx.fragment.app.commit
 import androidx.media3.common.util.UnstableApi
 import com.tutu.myblbl.R
-import com.tutu.myblbl.ui.base.BaseActivity
+import com.tutu.myblbl.core.ui.base.BaseActivity
 import com.tutu.myblbl.databinding.ActivityPlayerBinding
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.feature.player.PlayerLaunchContext

@@ -15,7 +15,7 @@ import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.CookieManager
 import com.tutu.myblbl.repository.AuthRepository
 import com.tutu.myblbl.repository.UserRepository
-import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseFragment
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive

@@ -14,7 +14,7 @@ import com.tutu.myblbl.databinding.FragmentLiveBaseListBinding
 import com.tutu.myblbl.model.live.LiveListWrapper
 import com.tutu.myblbl.model.live.LiveRecommendSection
 import com.tutu.myblbl.ui.activity.LivePlayerActivity
-import com.tutu.myblbl.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.ContentFilter

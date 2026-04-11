@@ -17,9 +17,9 @@ import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.ui.adapter.FavoriteHistoryAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
-import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
+import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest

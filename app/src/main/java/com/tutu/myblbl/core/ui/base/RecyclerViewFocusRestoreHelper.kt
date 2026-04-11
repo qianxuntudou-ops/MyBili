@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.base
+package com.tutu.myblbl.core.ui.base
 
 import androidx.recyclerview.widget.RecyclerView
 

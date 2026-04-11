@@ -44,7 +44,7 @@
             android:textSize="@dimen/px38"
             android:textStyle="bold"/>
     </androidx.appcompat.widget.LinearLayoutCompat>
-    <com.tutu.myblbl.ui.view.keyboard.KeyboardView
+    <com.tutu.myblbl.feature.search.view.KeyboardView
         android:id="@+id/view_keyboard"
         android:clipChildren="false"
         android:layout_width="0dp"

@@ -8,7 +8,7 @@
         android:background="@drawable/background_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
-    <com.tutu.myblbl.ui.view.TabBarView
+    <com.tutu.myblbl.core.ui.navigation.TabBarView
         android:id="@+id/myTabView"
         android:layout_width="@dimen/px100"
         android:layout_height="match_parent"

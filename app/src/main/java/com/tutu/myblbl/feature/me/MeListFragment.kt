@@ -20,10 +20,10 @@ import com.tutu.myblbl.model.video.HistoryVideoModel
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.HistoryVideoAdapter
 import com.tutu.myblbl.ui.adapter.VideoAdapter
-import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.base.RecyclerViewFocusRestoreHelper
+import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.utils.FileCacheManager
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.SpatialFocusNavigator

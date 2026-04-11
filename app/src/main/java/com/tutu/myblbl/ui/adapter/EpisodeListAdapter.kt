@@ -5,7 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.tutu.myblbl.databinding.CellEpisodeBinding
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.ui.base.BaseAdapter
+import com.tutu.myblbl.core.ui.base.BaseAdapter
 import com.tutu.myblbl.utils.ImageLoader
 import com.tutu.myblbl.utils.NumberUtils
 import java.util.Locale

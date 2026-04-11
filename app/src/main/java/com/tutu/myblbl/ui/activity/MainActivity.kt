@@ -20,8 +20,8 @@ import com.tutu.myblbl.databinding.ActivityMainBinding
 import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.UserRepository
-import com.tutu.myblbl.ui.base.BaseActivity
-import com.tutu.myblbl.ui.base.OnBackPressedHandler
+import com.tutu.myblbl.core.ui.base.BaseActivity
+import com.tutu.myblbl.core.ui.base.OnBackPressedHandler
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.feature.category.CategoryFragment
 import com.tutu.myblbl.feature.dynamic.DynamicFragment
@@ -36,7 +36,7 @@ import com.tutu.myblbl.feature.settings.SignInFragment
 import com.tutu.myblbl.ui.dialog.UserInfoDialog
 import com.tutu.myblbl.feature.player.PlayerLaunchContext
 import com.tutu.myblbl.feature.player.VideoPlayerFragment
-import com.tutu.myblbl.ui.view.TabBarView
+import com.tutu.myblbl.core.ui.navigation.TabBarView
 import com.tutu.myblbl.utils.AppLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.base
+package com.tutu.myblbl.core.ui.base
 
 import android.view.LayoutInflater
 import android.view.View
@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.tutu.myblbl.databinding.FragmentBaseListBinding
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.SpatialFocusNavigator
 

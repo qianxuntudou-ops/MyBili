@@ -7,9 +7,9 @@ import androidx.core.os.bundleOf
 import com.tutu.myblbl.databinding.FragmentLiveBaseListBinding
 import com.tutu.myblbl.model.live.LiveAreaCategory
 import com.tutu.myblbl.model.live.LiveAreaCategoryParent
-import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.base.RecyclerViewFocusRestoreHelper
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.SpatialFocusNavigator
 import com.tutu.myblbl.utils.serializableCompat

@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.databinding.CellLaneScrollableBinding
 import com.tutu.myblbl.model.live.LiveRecommendSection
 import com.tutu.myblbl.model.live.LiveRoomItem
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.utils.AppLog
 
 class LiveRecommendAdapter(

@@ -12,10 +12,10 @@ import com.tutu.myblbl.databinding.PageSearchResultBinding
 import com.tutu.myblbl.model.search.SearchCategoryItem
 import com.tutu.myblbl.model.search.SearchItemModel
 import com.tutu.myblbl.model.search.SearchType
-import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.SpatialFocusNavigator
-import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
+import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 
 class SearchResultPagerAdapter(
     private val onItemClick: (SearchResultEntry) -> Unit,
