@@ -38,7 +38,6 @@ class MeListViewModel(
     fun loadHistory(page: Int, pageSize: Int) {
         viewModelScope.launch {
             if (_loading.value) {
-                _loading.value = false
                 return@launch
             }
             _loading.value = true

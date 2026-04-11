@@ -19,7 +19,6 @@ import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.annotation.OptIn
-import androidx.core.view.GestureDetectorCompat
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
@@ -111,7 +110,7 @@ class MyPlayerView @JvmOverloads constructor(
         buffering.visibility = if (shouldShowBufferingIndicator(currentPlayer)) VISIBLE else GONE
     }
     private val gestureListener = PlayerDoubleTapGestureListener(this)
-    private val gestureDetector = GestureDetectorCompat(context, gestureListener)
+    private val gestureDetector = GestureDetector(context, gestureListener)
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     // Encapsulates danmaku config, lifecycle and data transforms so this view stays focused on UI.

@@ -83,14 +83,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
             historyAdapter = HistoryVideoAdapter(
                 onItemClick = ::onHistoryVideoClick,
                 onTopEdgeUp = {
-                    // 当在列表顶部按向上键时，先尝试触发刷新，如果已经在最顶部再切换到顶部tab
-                    if (binding.recyclerView.computeVerticalScrollOffset() == 0 && !viewModel.loading.value) {
-                        swipeRefreshLayout?.isRefreshing = true
-                        refresh()
-                        true
-                    } else {
-                        focusTopTab()
-                    }
+                    focusTopTab()
                 },
                 onItemFocused = { position -> lastFocusedHistoryPosition = position }
             )
@@ -98,14 +91,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
             videoAdapter = VideoAdapter(
                 onItemClick = ::onVideoClick,
                 onTopEdgeUp = {
-                    // 当在列表顶部按向上键时，先尝试触发刷新，如果已经在最顶部再切换到顶部tab
-                    if (binding.recyclerView.computeVerticalScrollOffset() == 0 && !viewModel.loading.value) {
-                        swipeRefreshLayout?.isRefreshing = true
-                        refresh()
-                        true
-                    } else {
-                        focusTopTab()
-                    }
+                    focusTopTab()
                 }
             ).apply {
                 setShowLoadMore(false)
@@ -182,6 +168,9 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.loading.collectLatest { loading ->
+                    if (!loading) {
+                        swipeRefreshLayout?.isRefreshing = false
+                    }
                     val hasData = hasContentItems()
                     binding.progressBar.visibility = if (loading && !hasData) View.VISIBLE else View.GONE
                     if (loading && !hasData) {
