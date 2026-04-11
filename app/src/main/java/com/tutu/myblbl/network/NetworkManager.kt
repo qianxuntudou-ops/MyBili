@@ -27,16 +27,23 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
 import java.util.Locale
 import java.security.SecureRandom
+import java.security.spec.MGF1ParameterSpec
 import java.security.spec.X509EncodedKeySpec
 import java.security.KeyFactory
+import java.security.PublicKey
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import javax.crypto.Cipher
+import javax.crypto.spec.OAEPParameterSpec
+import javax.crypto.spec.PSource
 import okhttp3.Cookie
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.FormBody
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.util.Base64
 
 object NetworkManager {
 
@@ -178,6 +185,7 @@ object NetworkManager {
             ensureWebFingerprintCookies()
             ensureBiliTicket()
             ensureBuvidActiveOncePerDay()
+            refreshCookieIfNeededOncePerDay()
 
             lastEnsureHealthyForPlayMs = System.currentTimeMillis()
             AppLog.d(TAG, "ensureHealthyForPlay done")
@@ -333,7 +341,28 @@ object NetworkManager {
         val input = mid.toString().toByteArray()
         val out = ByteArray(input.size)
         for (i in input.indices) out[i] = (input[i].toInt() xor key[i % key.size].toInt()).toByte()
-        return android.util.Base64.encodeToString(out, android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+        return Base64.encodeToString(out, Base64.NO_PADDING or Base64.NO_WRAP)
+    }
+
+    fun buildPiliWebHeaders(targetUrl: String, includeCookie: Boolean = true): Map<String, String> {
+        val midStr = _cookieManager.getCookieValue("DedeUserID")?.trim().orEmpty()
+        val mid = midStr.toLongOrNull()?.takeIf { it > 0 } ?: 0L
+        val headers = mutableMapOf(
+            "env" to "prod",
+            "app-key" to "android64",
+            "x-bili-aurora-zone" to "sh001",
+            "Referer" to "https://www.bilibili.com",
+            "X-Blbl-Skip-Origin" to "1"
+        )
+        if (mid > 0) {
+            headers["x-bili-mid"] = mid.toString()
+            genAuroraEid(mid)?.let { headers["x-bili-aurora-eid"] = it }
+        }
+        if (includeCookie) {
+            val cookie = _cookieManager.getCookieHeaderFor(targetUrl)
+            if (!cookie.isNullOrBlank()) headers["Cookie"] = cookie
+        }
+        return headers
     }
 
     private fun buildCookie(name: String, value: String, expiresAt: Long): Cookie {
@@ -510,7 +539,135 @@ object NetworkManager {
         }
     }
 
+    private var cookieRefreshCheckedDay: Long = 0L
+    private val correspondPublicKey: PublicKey by lazy {
+        val derBase64 =
+            "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDLgd2OAkcGVtoE3ThUREbio0Eg" +
+                "Uc/prcajMKXvkCKFCWhJYJcLkcM2DKKcSeFpD/j6Boy538YXnR6VhcuUJOhH2x71" +
+                "nzPjfdTcqMz7djHum0qSZA0AyCBDABUqCrfNgCiJ00Ra7GmRj+YCK1NJEuewlb40" +
+                "JNrRuoEUXpabUzGB8QIDAQAB"
+        val keyBytes = Base64.decode(derBase64, Base64.DEFAULT)
+        val spec = X509EncodedKeySpec(keyBytes)
+        KeyFactory.getInstance("RSA").generatePublic(spec)
+    }
+
+    private suspend fun refreshCookieIfNeededOncePerDay() {
+        if (!_cookieManager.hasSessionCookie()) return
+        val epochDay = System.currentTimeMillis() / 86_400_000L
+        if (cookieRefreshCheckedDay == epochDay) return
+
+        runCatching {
+            val ts = System.currentTimeMillis()
+            val correspondPath = getCorrespondPath(ts)
+            val url = "https://www.bilibili.com/correspond/1/$correspondPath"
+            val request = okhttp3.Request.Builder()
+                .url(url)
+                .header("User-Agent", currentUA)
+                .header("Referer", "https://www.bilibili.com")
+                .build()
+            val html = withContext(Dispatchers.IO) {
+                _okHttpClient.newCall(request).execute().use { resp ->
+                    resp.body?.string().orEmpty()
+                }
+            }
+            val csrfMatch = Regex("<div\\s+id=\"1-name\">\\s*([0-9a-fA-F]{16,})\\s*</div>")
+                .find(html)
+            val refreshCsrf = csrfMatch?.groupValues?.get(1)?.trim().orEmpty()
+            if (refreshCsrf.isBlank()) {
+                AppLog.w(TAG, "refreshCookie: no csrf found in correspond page")
+                cookieRefreshCheckedDay = epochDay
+                return@runCatching
+            }
+
+            val sessdata = _cookieManager.getCookieValue("SESSDATA")?.trim().orEmpty()
+            if (sessdata.isBlank()) return@runCatching
+
+            val refreshUrl = "https://passport.bilibili.com/x/passport-login/web/cookie/refresh" +
+                "?csrf=$refreshCsrf&refresh_csrf=$refreshCsrf&source=main_web&refresh_token="
+            val refreshRequest = okhttp3.Request.Builder()
+                .url(refreshUrl)
+                .header("User-Agent", currentUA)
+                .header("Referer", "https://www.bilibili.com")
+                .header("Cookie", "SESSDATA=$sessdata")
+                .post(ByteArray(0).toRequestBody("application/json".toMediaType()))
+                .build()
+            val refreshBody = withContext(Dispatchers.IO) {
+                _okHttpClient.newCall(refreshRequest).execute().use { resp ->
+                    resp.body?.string().orEmpty()
+                }
+            }
+            val refreshJson = JSONObject(refreshBody)
+            if (refreshJson.optInt("code", -1) != 0) {
+                AppLog.w(TAG, "refreshCookie failed: code=${refreshJson.optInt("code")} msg=${refreshJson.optString("message")}")
+                cookieRefreshCheckedDay = epochDay
+                return@runCatching
+            }
+            val refreshData = refreshJson.optJSONObject("data") ?: JSONObject()
+            val newSessdata = refreshData.optString("refresh_token", "").trim()
+            val newTimestamp = refreshData.optLong("timestamp", 0L)
+
+            val respCookies = mutableListOf<String>()
+            if (newSessdata.isNotBlank()) {
+                respCookies.add(
+                    encodeCookieDirect(
+                        buildCookie("SESSDATA", newSessdata, System.currentTimeMillis() + 180L * 24 * 60 * 60 * 1000)
+                    )
+                )
+            }
+            if (respCookies.isNotEmpty()) {
+                _cookieManager.saveCookies(respCookies)
+                AppLog.d(TAG, "refreshCookie success")
+            }
+            cookieRefreshCheckedDay = epochDay
+        }.onFailure {
+            AppLog.w(TAG, "refreshCookie failed: ${it.message}")
+        }
+    }
+
+    private fun getCorrespondPath(timestampMs: Long): String {
+        val plaintext = "refresh_${timestampMs}"
+        val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, correspondPublicKey, OAEPParameterSpec("SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT))
+        val encrypted = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+        return Base64.encodeToString(encrypted, Base64.NO_PADDING or Base64.NO_WRAP or Base64.URL_SAFE)
+    }
+
+    suspend fun postFormJson(url: String, form: Map<String, String>, extraHeaders: Map<String, String>? = null): JSONObject {
+        return withContext(Dispatchers.IO) {
+            val formBody = FormBody.Builder().apply {
+                form.forEach { (k, v) -> add(k, v) }
+            }.build()
+            val reqBuilder = okhttp3.Request.Builder()
+                .url(url)
+                .post(formBody)
+                .header("User-Agent", currentUA)
+                .header("Referer", "https://www.bilibili.com")
+                .header("Origin", "https://www.bilibili.com")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+            extraHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
+            _okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                JSONObject(body)
+            }
+        }
+    }
+
+    suspend fun requestJson(url: String, extraHeaders: Map<String, String>? = null): JSONObject {
+        return withContext(Dispatchers.IO) {
+            val reqBuilder = okhttp3.Request.Builder()
+                .url(url)
+                .header("User-Agent", currentUA)
+                .header("Referer", "https://www.bilibili.com")
+            extraHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
+            _okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                JSONObject(body)
+            }
+        }
+    }
+
     private fun isAuthInvalid(code: Int): Boolean {
         return code == AUTH_INVALID_CODE
     }
 }
+

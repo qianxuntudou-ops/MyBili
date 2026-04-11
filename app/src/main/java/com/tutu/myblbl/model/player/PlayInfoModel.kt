@@ -56,7 +56,10 @@ data class PlayInfoModel(
     val lastPlayTime: Long = 0,
     
     @SerializedName("last_play_cid")
-    val lastPlayCid: Long = 0
+    val lastPlayCid: Long = 0,
+
+    @SerializedName("v_voucher")
+    val vVoucher: String = ""
 )
 
 data class Dash(

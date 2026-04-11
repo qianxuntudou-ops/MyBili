@@ -62,6 +62,14 @@
             android:theme="@style/Theme.MyBLBL"
             tools:ignore="DiscouragedApi" />
 
+        <activity
+            android:name=".ui.activity.GaiaVgateActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="screenSize|orientation|keyboardHidden"
+            android:theme="@style/Theme.MyBLBL"
+            tools:ignore="DiscouragedApi" />
+
     </application>
 
 </manifest>

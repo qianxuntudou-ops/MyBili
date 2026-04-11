@@ -26,10 +26,14 @@ class VideoPlayerPlayInfoGateway(
         val code: Int,
         val message: String,
         val data: PlayInfoModel?,
-        val isTryLookBypass: Boolean = false
+        val isTryLookBypass: Boolean = false,
+        val vVoucher: String = ""
     ) {
         val isSuccess: Boolean
             get() = code == 0 && data != null
+
+        val hasVVoucher: Boolean
+            get() = vVoucher.isNotBlank()
     }
 
     suspend fun requestPlayInfo(
@@ -74,6 +78,12 @@ class VideoPlayerPlayInfoGateway(
 
         val primaryCode = primaryResult?.code ?: 0
         val primaryMessage = primaryResult?.message.orEmpty()
+        val extractedVVoucher = primaryResult?.data?.vVoucher?.trim().orEmpty()
+
+        if (extractedVVoucher.isNotBlank()) {
+            AppLog.w(logTag, "requestPlayInfo v_voucher detected: cid=$cid, qn=$qualityId, vVoucherLen=${extractedVVoucher.length}")
+        }
+
         if (isRiskControlSignal(primaryCode, primaryResult?.data, primaryMessage)) {
             AppLog.w(logTag, "requestPlayInfo risk-control detected: code=$primaryCode, falling back to try_look, cid=$cid, qn=$qualityId")
             val tryLookResult = requestTryLookPlayInfo(
@@ -86,9 +96,9 @@ class VideoPlayerPlayInfoGateway(
                 allowWbi = allowWbi
             )
             if (tryLookResult != null && hasPlayableMedia(tryLookResult.data)) {
-                return tryLookResult.copy(isTryLookBypass = true)
+                return tryLookResult.copy(isTryLookBypass = true, vVoucher = extractedVVoucher)
             }
-            return tryLookResult ?: primaryResult
+            return (tryLookResult ?: primaryResult)?.copy(vVoucher = extractedVVoucher)
         }
 
         return primaryResult
@@ -144,9 +154,20 @@ class VideoPlayerPlayInfoGateway(
             "fourk" to fourk.toString(),
             "voice_balance" to "1",
             "gaia_source" to "pre-load",
-            "isGaiaAvoided" to "true"
+            "isGaiaAvoided" to "true",
+            "web_location" to "1315873"
         )
         aid?.takeIf { it > 0L }?.let { params["avid"] = it.toString() }
+
+        val gaiaVtoken = NetworkManager.getCookieManager().getCookieValue("x-bili-gaia-vtoken")?.trim()
+        if (!gaiaVtoken.isNullOrBlank()) {
+            params["gaia_vtoken"] = gaiaVtoken
+        }
+
+        val session = genPlayUrlSession()
+        if (session != null) {
+            params["session"] = session
+        }
 
         val wbiResponse = runCatching {
             apiService.getVideoPlayInfoWbi(buildWbiParams(params))
@@ -251,9 +272,15 @@ class VideoPlayerPlayInfoGateway(
             "try_look" to "1",
             "voice_balance" to "1",
             "gaia_source" to "pre-load",
-            "isGaiaAvoided" to "true"
+            "isGaiaAvoided" to "true",
+            "web_location" to "1315873"
         )
         aid?.takeIf { it > 0L }?.let { params["avid"] = it.toString() }
+
+        val session = genPlayUrlSession()
+        if (session != null) {
+            params["session"] = session
+        }
 
         val wbiResponse = runCatching {
             apiService.getVideoPlayInfoWbiTryLook(buildWbiParams(params))
@@ -718,5 +745,15 @@ class VideoPlayerPlayInfoGateway(
         val hasDashVideo = playInfo.dash?.video.orEmpty().isNotEmpty()
         val hasDurl = playInfo.durl.orEmpty().any { it.url.isNotBlank() }
         return hasDashVideo || hasDurl
+    }
+
+    private fun genPlayUrlSession(): String? {
+        val buvid3 = NetworkManager.getCookieManager().getCookieValue("buvid3")?.trim()
+        if (buvid3.isNullOrBlank()) return null
+        val nowMs = System.currentTimeMillis()
+        val raw = "$buvid3$nowMs"
+        val md = java.security.MessageDigest.getInstance("MD5")
+        val digest = md.digest(raw.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) }
     }
 }

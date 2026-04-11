@@ -242,6 +242,28 @@ class VideoPlayerViewModel(
     private val _currentCidLive = MutableLiveData(0L)
     val currentCidLive: LiveData<Long> = _currentCidLive
 
+    private val _riskControlVVoucher = MutableLiveData<String?>(null)
+    val riskControlVVoucher: LiveData<String?> = _riskControlVVoucher
+
+    fun consumeRiskControlVVoucher(): String? {
+        val value = _riskControlVVoucher.value
+        _riskControlVVoucher.value = null
+        return value
+    }
+
+    fun onGaiaVgateResult(gaiaVtoken: String) {
+        val cookieManager = NetworkManager.getCookieManager()
+        val expiresAt = System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000
+        cookieManager.saveCookies(
+            listOf(
+                "x-bili-gaia-vtoken=$gaiaVtoken; domain=bilibili.com; path=/; secure; expires=$expiresAt"
+            )
+        )
+        AppLog.i(TAG, "gaia_vtoken saved, triggering playInfo refresh")
+        playInfoRefreshRetryCount = 0
+        loadPlayUrlWithCurrentContext(reason = "gaia_vgate_verified")
+    }
+
     private var currentAid: Long? = null
     private var currentBvid: String? = null
     private var currentCid: Long = 0L
@@ -850,9 +872,21 @@ class VideoPlayerViewModel(
             val playInfoFetch = requestPlayInfoWithQualityFallback(
                 identity = identity,
                 qualityCandidates = qualityCandidates
-            ) ?: return null
+            )
+            if (playInfoFetch == null) {
+                AppLog.e(TAG, "loadPlayUrl requestPlayInfoWithQualityFallback returned null")
+                return null
+            }
             val response = playInfoFetch.response
             if (!response.isSuccess || response.data == null) {
+                val vVoucher = response.vVoucher.trim()
+                if (vVoucher.isNotBlank()) {
+                    AppLog.w(TAG, "loadPlayUrl v_voucher detected, posting to UI: vVoucherLen=${vVoucher.length}")
+                    _riskControlVVoucher.value = vVoucher
+                    _error.value = "账号触发风控验证，正在请求人机验证…"
+                } else if (response.isTryLookBypass) {
+                    _error.value = "当前账号可能被风控，已降级为试看模式"
+                }
                 AppLog.e(
                     TAG,
                     "loadPlayUrl response failure: code=${response.code}, message=${response.message}"

@@ -1,5 +1,6 @@
 package com.tutu.myblbl.ui.fragment.player
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.Build
 import android.os.SystemClock
@@ -14,6 +15,7 @@ import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -30,6 +32,7 @@ import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.model.video.quality.AudioQuality
 import com.tutu.myblbl.model.video.quality.VideoCodecEnum
 import com.tutu.myblbl.model.video.quality.VideoQuality
+import com.tutu.myblbl.ui.activity.GaiaVgateActivity
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.ui.activity.PlayerActivity
 import com.tutu.myblbl.ui.adapter.VideoAdapter
@@ -147,6 +150,21 @@ class VideoPlayerFragment : Fragment() {
     private var didLogReadyForCurrentSession = false
     private var didLogFirstFrameForCurrentSession = false
     private var didLogFirstDanmakuForCurrentSession = false
+
+    private val gaiaVgateLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == androidx.appcompat.app.AppCompatActivity.RESULT_OK) {
+            val gaiaVtoken = result.data?.getStringExtra(GaiaVgateActivity.EXTRA_GAIA_VTOKEN)
+            if (!gaiaVtoken.isNullOrBlank()) {
+                AppLog.i(TAG, "GaiaVgate returned gaia_vtoken, len=${gaiaVtoken.length}")
+                viewModel.onGaiaVgateResult(gaiaVtoken)
+            }
+        } else {
+            AppLog.w(TAG, "GaiaVgate cancelled or failed")
+        }
+    }
+
     private val resumePlaybackRunnable = Runnable {
         resumePlaybackIfNeeded(reason = "delayed_resume")
     }
@@ -587,6 +605,16 @@ class VideoPlayerFragment : Fragment() {
     }
 
     private fun setupObservers() {
+        viewModel.riskControlVVoucher.observe(viewLifecycleOwner) { vVoucher ->
+            if (vVoucher.isNullOrBlank()) return@observe
+            viewModel.consumeRiskControlVVoucher() ?: return@observe
+            AppLog.w(TAG, "risk-control v_voucher received, launching GaiaVgateActivity")
+            val intent = Intent(requireContext(), GaiaVgateActivity::class.java).apply {
+                putExtra(GaiaVgateActivity.EXTRA_V_VOUCHER, vVoucher)
+            }
+            gaiaVgateLauncher.launch(intent)
+        }
+
         viewModel.videoInfo.observe(viewLifecycleOwner) { info ->
             latestVideoInfo = info
             sessionCoordinator.updateVideoInfo(info)

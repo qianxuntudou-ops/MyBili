@@ -80,6 +80,13 @@ class CookieManager : CookieJar {
         return findCookie(name)?.value
     }
 
+    fun getCookieHeaderFor(url: String): String? {
+        val httpUrl = url.toHttpUrlOrNull() ?: return null
+        val cookies = loadForRequest(httpUrl)
+        if (cookies.isEmpty()) return null
+        return cookies.joinToString("; ") { "${it.name}=${it.value}" }
+    }
+
     fun clearCookies() {
         cookieCache.clear()
         sharedPreferences?.edit()?.clear()?.apply()
