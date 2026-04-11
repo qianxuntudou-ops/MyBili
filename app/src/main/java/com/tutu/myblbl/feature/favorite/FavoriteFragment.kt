@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.fragment.favorite
+package com.tutu.myblbl.feature.favorite
 
 import android.view.LayoutInflater
 import android.view.KeyEvent

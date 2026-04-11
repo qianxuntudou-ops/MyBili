@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.fragment.user
+package com.tutu.myblbl.feature.user
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -18,7 +18,7 @@ import com.tutu.myblbl.model.user.FollowingModel
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.adapter.FollowUserAdapter
 import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.fragment.detail.UserSpaceFragment
+import com.tutu.myblbl.feature.detail.UserSpaceFragment
 import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
 import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
 import kotlinx.coroutines.flow.collectLatest

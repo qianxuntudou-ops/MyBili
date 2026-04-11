@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.fragment.series
+package com.tutu.myblbl.feature.series
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

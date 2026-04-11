@@ -239,7 +239,7 @@ app/src/main/java/com/tutu/myblbl/
 - [x] 新代码优先放到 `feature/*` 下
 - [x] 将 `ui/fragment/main/home` 相关逻辑逐步迁到 `feature/home`
 - [x] 将播放器相关逻辑收拢到 `feature/player`
-- [ ] 将详情、追番、收藏、用户空间等按 feature 收拢
+- [x] 将详情、追番、收藏、用户空间等按 feature 收拢
 - [ ] 将 `ui/base`、通用焦点恢复、通用视图能力放入 `core/ui`
 - [ ] 将共用 model 中真正跨 feature 的部分保留在 `core/common` 或 `core/model`
 
@@ -263,9 +263,11 @@ app/src/main/java/com/tutu/myblbl/
 - `search` 相关 Fragment / ViewModel / adapter / focus 协调对象已迁入 `feature/search`
 - `me` 相关 Fragment / ViewModel / adapter / ui state 已迁入 `feature/me`
 - `category`、`dynamic`、`settings` 已迁入对应 `feature/*` 目录
+- `detail`、`favorite`、`series`、`user` 已迁入对应 `feature/*` 目录
 - 关联的 XML 自定义 View 全限定类名、baseline profile、测试包引用已同步到新的 feature 包名
-- 主导航入口相关代码已经基本完成 feature-first 收口
-- 下一阶段更值得继续推进的是 `detail / favorite / user / series` 这类仍停留在旧目录体系中的业务块
+- 业务 feature 目录层面的首轮迁移已经基本完成
+- 下一阶段更值得继续推进的是 `ui/base`、通用焦点恢复能力、通用视图组件向 `core/ui` 的收口
+- 另一个值得继续推进的方向是跨 feature 公共 model / helper 的归属收敛
 
 ---
 

@@ -15,8 +15,8 @@ import com.tutu.myblbl.model.user.UserStatModel
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.activity.MainActivity
-import com.tutu.myblbl.ui.fragment.detail.UserSpaceFragment
-import com.tutu.myblbl.ui.fragment.user.FollowUserListFragment
+import com.tutu.myblbl.feature.detail.UserSpaceFragment
+import com.tutu.myblbl.feature.user.FollowUserListFragment
 import com.tutu.myblbl.utils.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -5,7 +5,7 @@ import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.tutu.myblbl.R
-import com.tutu.myblbl.ui.fragment.favorite.FavoriteFragment
+import com.tutu.myblbl.feature.favorite.FavoriteFragment
 
 class MeFragmentAdapter(
     fragmentManager: FragmentManager,

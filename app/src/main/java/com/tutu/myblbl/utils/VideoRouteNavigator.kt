@@ -7,8 +7,8 @@ import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.activity.LivePlayerActivity
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.ui.activity.PlayerActivity
-import com.tutu.myblbl.ui.fragment.detail.VideoDetailFragment
-import com.tutu.myblbl.ui.fragment.series.SeriesDetailFragment
+import com.tutu.myblbl.feature.detail.VideoDetailFragment
+import com.tutu.myblbl.feature.series.SeriesDetailFragment
 import java.net.URL
 
 object VideoRouteNavigator {

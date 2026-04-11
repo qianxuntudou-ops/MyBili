@@ -1,6 +1,6 @@
 @file:Suppress("SpellCheckingInspection")
 
-package com.tutu.myblbl.ui.fragment.detail
+package com.tutu.myblbl.feature.detail
 
 import android.view.LayoutInflater
 import android.view.View

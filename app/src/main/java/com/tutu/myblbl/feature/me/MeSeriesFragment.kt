@@ -20,7 +20,7 @@ import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.adapter.SeriesAdapter
 import com.tutu.myblbl.ui.base.BaseFragment
 import com.tutu.myblbl.ui.base.RecyclerViewFocusRestoreHelper
-import com.tutu.myblbl.ui.fragment.series.SeriesDetailFragment
+import com.tutu.myblbl.feature.series.SeriesDetailFragment
 import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.FileCacheManager

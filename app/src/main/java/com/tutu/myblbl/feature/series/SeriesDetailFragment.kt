@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.fragment.series
+package com.tutu.myblbl.feature.series
 
 import android.os.Bundle
 import android.view.KeyEvent

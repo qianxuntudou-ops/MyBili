@@ -30,8 +30,8 @@ import com.tutu.myblbl.model.search.SearchVideoOrder
 import com.tutu.myblbl.ui.activity.LivePlayerActivity
 import com.tutu.myblbl.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
-import com.tutu.myblbl.ui.fragment.detail.UserSpaceFragment
-import com.tutu.myblbl.ui.fragment.series.SeriesDetailFragment
+import com.tutu.myblbl.feature.detail.UserSpaceFragment
+import com.tutu.myblbl.feature.series.SeriesDetailFragment
 import com.tutu.myblbl.ui.view.keyboard.KeyboardView
 import com.tutu.myblbl.utils.SpatialFocusNavigator
 import com.tutu.myblbl.utils.ViewUtils

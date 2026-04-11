@@ -18,7 +18,7 @@ import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.ui.dialog.OwnerDetailDialog
 import com.tutu.myblbl.ui.dialog.PlayerActionDialog
 import com.tutu.myblbl.ui.dialog.VideoInfoDialog
-import com.tutu.myblbl.ui.fragment.detail.UserSpaceFragment
+import com.tutu.myblbl.feature.detail.UserSpaceFragment
 import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
 import com.tutu.myblbl.feature.player.view.MyPlayerView
 

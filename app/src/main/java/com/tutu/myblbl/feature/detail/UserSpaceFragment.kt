@@ -1,4 +1,4 @@
-package com.tutu.myblbl.ui.fragment.detail
+package com.tutu.myblbl.feature.detail
 
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -23,7 +23,7 @@ import com.tutu.myblbl.ui.adapter.UserSpaceHeaderAdapter
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.ui.base.BaseAdapter
 import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.ui.fragment.user.FollowUserListFragment
+import com.tutu.myblbl.feature.user.FollowUserListFragment
 import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
 import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
 import com.tutu.myblbl.utils.ContentFilter

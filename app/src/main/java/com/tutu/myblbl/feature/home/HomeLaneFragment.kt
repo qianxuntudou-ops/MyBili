@@ -16,8 +16,8 @@ import com.tutu.myblbl.ui.base.BaseAdapter
 import com.tutu.myblbl.ui.base.BaseListFragment
 import com.tutu.myblbl.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
-import com.tutu.myblbl.ui.fragment.series.AllSeriesFragment
-import com.tutu.myblbl.ui.fragment.series.SeriesDetailFragment
+import com.tutu.myblbl.feature.series.AllSeriesFragment
+import com.tutu.myblbl.feature.series.SeriesDetailFragment
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.SpatialFocusNavigator
 import kotlinx.coroutines.Job
