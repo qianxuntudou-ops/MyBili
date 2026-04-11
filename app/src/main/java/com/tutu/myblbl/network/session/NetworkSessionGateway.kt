@@ -15,6 +15,8 @@ interface NetworkSessionGateway {
 
     fun getWbiKeys(): Pair<String, String>
 
+    fun clearUserSession(reason: String)
+
     fun handleAuthFailureCode(code: Int, source: String)
 
     fun syncUserSession(
@@ -46,6 +48,10 @@ class NetworkManagerSessionGateway : NetworkSessionGateway {
     override fun getUserInfo(): UserDetailInfoModel? = NetworkManager.getUserInfo()
 
     override fun getWbiKeys(): Pair<String, String> = NetworkManager.getWbiKeys()
+
+    override fun clearUserSession(reason: String) {
+        NetworkManager.clearUserSession(reason = reason)
+    }
 
     override fun handleAuthFailureCode(code: Int, source: String) {
         NetworkManager.handleAuthFailureCode(code, source)

@@ -31,6 +31,7 @@
 - 引入 `NetworkSessionGateway` / `NetworkSecurityGateway`，开始把 repository 层对 `NetworkManager` 的静态访问改为显式依赖
 - `SearchRepository`、`HomeLaneRepository`、`SeriesRepository`、`FavoriteRepository`、`UserRepository`、`VideoRepository` 等已改为通过构造器声明 session / security / http 依赖
 - `ChannelVideoFragment` 已不再直接访问 `NetworkManager.apiService`，改为通过 `VideoRepository` 获取频道视频分页数据
+- `MeViewModel`、`SeriesDetailViewModel`、`UserInfoDialog`、`OwnerDetailDialog` 已开始消费 `NetworkSessionGateway`，UI 层登录态读取不再全部直连 `NetworkManager`
 - 修复了本轮重构中暴露出的编译问题和测试构造器适配问题
 - 已通过：
   - `:app:compileDebugKotlin`
@@ -175,7 +176,7 @@
 本轮新增结论：
 
 - repository 层已经不再直接依赖 `NetworkManager` 的登录态 / WBI / 预热等静态入口，而是通过显式注入的 gateway 协作
-- 仍然保留较多静态访问的区域，主要集中在 player、dialog、activity 和少量 fragment，这些应作为下一轮治理重点
+- UI 层已经开始消费同一套 gateway，但仍然保留较多静态访问的区域，主要集中在 player、activity 和少量 fragment，这些应作为下一轮治理重点
 
 ---
 

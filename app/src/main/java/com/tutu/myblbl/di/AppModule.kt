@@ -79,10 +79,10 @@ val viewModelModule = module {
     viewModel { LiveListViewModel(get()) }
     viewModel { LiveRecommendViewModel(get()) }
     viewModel { MeListViewModel(get()) }
-    viewModel { MeViewModel(get()) }
+    viewModel { MeViewModel(get(), get()) }
     viewModel { SearchViewModel(get()) }
     viewModel { LivePlayerViewModel(get()) }
-    viewModel { SeriesDetailViewModel(get()) }
+    viewModel { SeriesDetailViewModel(get(), get()) }
 }
 
 val eventModule = module {

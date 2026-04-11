@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.tutu.myblbl.model.series.EpisodeProgressModel
 import com.tutu.myblbl.model.series.EpisodesDetailModel
 import com.tutu.myblbl.model.series.FollowSeriesResult
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.R
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.SeriesRepository
 import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,7 +18,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 
 class SeriesDetailViewModel(
-    private val repository: SeriesRepository
+    private val repository: SeriesRepository,
+    private val sessionGateway: NetworkSessionGateway
 ) : ViewModel() {
 
     sealed interface UiMessage {
@@ -70,7 +71,7 @@ class SeriesDetailViewModel(
 
     fun toggleFollow() {
         if (currentSeasonId <= 0 || isFollowActionRunning) return
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             return
         }
         

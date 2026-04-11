@@ -12,7 +12,7 @@ import com.tutu.myblbl.databinding.DialogOwnerDetailBinding
 import com.tutu.myblbl.model.user.CheckRelationModel
 import com.tutu.myblbl.model.video.Owner
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.activity.PlayerActivity
 import com.tutu.myblbl.ui.adapter.VideoAdapter
@@ -39,6 +39,7 @@ class OwnerDetailDialog(
 
     private val binding = DialogOwnerDetailBinding.inflate(LayoutInflater.from(context))
     private val userRepository: UserRepository by inject()
+    private val sessionGateway: NetworkSessionGateway by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val videoAdapter = VideoAdapter()
 
@@ -84,7 +85,7 @@ class OwnerDetailDialog(
             error = R.drawable.default_avatar
         )
 
-        val isSelf = NetworkManager.getUserInfo()?.mid == owner.mid
+        val isSelf = sessionGateway.getUserInfo()?.mid == owner.mid
         binding.buttonFollow.isVisible = !isSelf
         updateFollowUi(
             labelRes = R.string.follow,
@@ -100,7 +101,7 @@ class OwnerDetailDialog(
     }
 
     private fun loadRelationState() {
-        if (!NetworkManager.isLoggedIn() || NetworkManager.getUserInfo()?.mid == owner.mid) {
+        if (!sessionGateway.isLoggedIn() || sessionGateway.getUserInfo()?.mid == owner.mid) {
             return
         }
         scope.launch {
@@ -228,7 +229,7 @@ class OwnerDetailDialog(
     }
 
     private fun checkLogin(): Boolean {
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             return false
         }
         return true
