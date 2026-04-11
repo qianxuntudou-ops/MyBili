@@ -13,7 +13,7 @@ import androidx.core.view.isVisible
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.DialogActionBinding
 import com.tutu.myblbl.model.favorite.FavoriteFolderModel
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.utils.AppLog
@@ -35,6 +35,7 @@ class PlayerActionDialog(
     private val binding = DialogActionBinding.inflate(LayoutInflater.from(context))
     private val videoRepository: VideoRepository by inject()
     private val favoriteRepository: FavoriteRepository by inject()
+    private val sessionGateway: NetworkSessionGateway by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private var isLiked = false
@@ -162,7 +163,7 @@ class PlayerActionDialog(
     }
 
     private fun refreshState() {
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             return
         }
         scope.launch {
@@ -261,7 +262,7 @@ class PlayerActionDialog(
     }
 
     private fun showFavoriteFolderDialog() {
-        val currentUserMid = NetworkManager.getUserInfo()?.mid?.takeIf { it > 0L } ?: ownerMid
+        val currentUserMid = sessionGateway.getUserInfo()?.mid?.takeIf { it > 0L } ?: ownerMid
         if (currentUserMid <= 0L) {
             toast("收藏夹信息未加载完成")
             return
@@ -337,7 +338,7 @@ class PlayerActionDialog(
     }
 
     private fun checkLogin(): Boolean {
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             toast(context.getString(R.string.need_sign_in))
             return false
         }

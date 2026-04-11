@@ -3,16 +3,23 @@ package com.tutu.myblbl.ui.fragment.player
 import com.tutu.myblbl.model.player.PlayInfoModel
 import com.tutu.myblbl.model.proto.DmProtoParser
 import com.tutu.myblbl.model.player.VideoSnapshotData
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.WbiGenerator
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.security.NetworkSecurityGateway
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.Base2Response
 import com.tutu.myblbl.network.response.PlayerInfoDataWrapper
 import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.CookieManager
+import okhttp3.OkHttpClient
 import okhttp3.Request
 
 class VideoPlayerPlayInfoGateway(
     private val apiService: ApiService,
+    private val okHttpClient: OkHttpClient,
+    private val cookieManager: CookieManager,
+    private val sessionGateway: NetworkSessionGateway,
+    private val securityGateway: NetworkSecurityGateway,
     private val logTag: String
 ) {
 
@@ -60,7 +67,7 @@ class VideoPlayerPlayInfoGateway(
 
         val resolvedBvid = bvid?.takeIf { it.isNotBlank() } ?: return null
 
-        NetworkManager.ensureHealthyForPlay()
+        securityGateway.ensureHealthyForPlay()
 
         val primaryResult = requestPrimaryPlayInfo(
             aid = aid,
@@ -159,7 +166,7 @@ class VideoPlayerPlayInfoGateway(
         )
         aid?.takeIf { it > 0L }?.let { params["avid"] = it.toString() }
 
-        val gaiaVtoken = NetworkManager.getCookieManager().getCookieValue("x-bili-gaia-vtoken")?.trim()
+        val gaiaVtoken = cookieManager.getCookieValue("x-bili-gaia-vtoken")?.trim()
         if (!gaiaVtoken.isNullOrBlank()) {
             params["gaia_vtoken"] = gaiaVtoken
         }
@@ -453,7 +460,7 @@ class VideoPlayerPlayInfoGateway(
             )
         }
 
-        NetworkManager.prewarmWebSession(forceUaRefresh = normalProbe != null)
+        securityGateway.prewarmWebSession(forceUaRefresh = normalProbe != null)
         ensureWbiKeys()
 
         if (!hasWbiKeys()) {
@@ -545,7 +552,7 @@ class VideoPlayerPlayInfoGateway(
             val request = Request.Builder()
                 .url(normalizedUrl)
                 .build()
-            NetworkManager.getOkHttpClient().newCall(request).execute().use { response ->
+            okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     return null
                 }
@@ -555,7 +562,7 @@ class VideoPlayerPlayInfoGateway(
     }
 
     fun hasWbiKeys(): Boolean {
-        val (imgKey, subKey) = NetworkManager.getWbiKeys()
+        val (imgKey, subKey) = sessionGateway.getWbiKeys()
         return imgKey.isNotBlank() && subKey.isNotBlank()
     }
 
@@ -572,7 +579,7 @@ class VideoPlayerPlayInfoGateway(
         fnval: Int,
         fourk: Int
     ): PlayInfoResult? {
-        NetworkManager.prewarmWebSession()
+        securityGateway.prewarmWebSession()
 
         val attempts = listOf(
             "primary-drm2" to buildPgcPlayParams(
@@ -628,7 +635,7 @@ class VideoPlayerPlayInfoGateway(
         var lastResponse: Base2Response<PlayInfoModel>? = null
         attempts.forEachIndexed { index, (label, params) ->
             if (index > 0) {
-                NetworkManager.prewarmWebSession(forceUaRefresh = true)
+                securityGateway.prewarmWebSession(forceUaRefresh = true)
             }
             val response = runCatching {
                 apiService.getVideoPlayPgcInfo(params)
@@ -709,7 +716,7 @@ class VideoPlayerPlayInfoGateway(
         if (hasWbiKeys()) {
             return
         }
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             AppLog.d(logTag, "ensureWbiKeys skipped: user not logged in")
             return
         }
@@ -718,7 +725,7 @@ class VideoPlayerPlayInfoGateway(
         }.onFailure { throwable ->
             AppLog.e(logTag, "ensureWbiKeys exception: ${throwable.message}", throwable)
         }.getOrNull() ?: return
-        if (NetworkManager.syncUserSession(response, source = "ensureWbiKeys") != null) {
+        if (sessionGateway.syncUserSession(response, source = "ensureWbiKeys") != null) {
             AppLog.d(logTag, "ensureWbiKeys success")
         } else {
             AppLog.e(logTag, "ensureWbiKeys failed: code=${response.code}, message=${response.errorMessage}")
@@ -726,7 +733,7 @@ class VideoPlayerPlayInfoGateway(
     }
 
     private fun buildWbiParams(params: Map<String, String>): Map<String, String> {
-        val (imgKey, subKey) = NetworkManager.getWbiKeys()
+        val (imgKey, subKey) = sessionGateway.getWbiKeys()
         return WbiGenerator.generateWbiParams(params, imgKey, subKey)
     }
 
@@ -748,7 +755,7 @@ class VideoPlayerPlayInfoGateway(
     }
 
     private fun genPlayUrlSession(): String? {
-        val buvid3 = NetworkManager.getCookieManager().getCookieValue("buvid3")?.trim()
+        val buvid3 = cookieManager.getCookieValue("buvid3")?.trim()
         if (buvid3.isNullOrBlank()) return null
         val nowMs = System.currentTimeMillis()
         val raw = "$buvid3$nowMs"

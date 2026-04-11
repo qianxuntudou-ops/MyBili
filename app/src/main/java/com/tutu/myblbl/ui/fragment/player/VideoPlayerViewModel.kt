@@ -30,10 +30,12 @@ import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.model.video.quality.AudioQuality
 import com.tutu.myblbl.model.video.quality.VideoCodecEnum
 import com.tutu.myblbl.model.video.quality.VideoQuality
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.security.NetworkSecurityGateway
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.Base2Response
 import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.CookieManager
 import com.tutu.myblbl.utils.PlayerMediaCache
 import com.tutu.myblbl.utils.PlayerSettings
 import com.tutu.myblbl.utils.PlayerSettingsStore
@@ -44,12 +46,17 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 @UnstableApi
 class VideoPlayerViewModel(
     private val apiService: ApiService,
+    private val okHttpClient: OkHttpClient,
+    private val cookieManager: CookieManager,
+    private val sessionGateway: NetworkSessionGateway,
+    private val securityGateway: NetworkSecurityGateway,
     context: Context
 ) : ViewModel() {
 
@@ -138,7 +145,7 @@ class VideoPlayerViewModel(
 
     private val gson = Gson()
     private val appContext = context.applicationContext
-    private val playerOkHttpClient = NetworkManager.getOkHttpClient().newBuilder()
+    private val playerOkHttpClient = okHttpClient.newBuilder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
@@ -166,7 +173,14 @@ class VideoPlayerViewModel(
     // Keeps episode-list construction and PGC header mapping out of playback request flow.
     private val episodeCatalogBuilder = VideoPlayerEpisodeCatalogBuilder(apiService)
     // Encapsulates PGC/UGC play-info retries and WBI-dependent requests away from UI state changes.
-    private val playInfoGateway = VideoPlayerPlayInfoGateway(apiService, TAG)
+    private val playInfoGateway = VideoPlayerPlayInfoGateway(
+        apiService = apiService,
+        okHttpClient = okHttpClient,
+        cookieManager = cookieManager,
+        sessionGateway = sessionGateway,
+        securityGateway = securityGateway,
+        logTag = TAG
+    )
 
     private val subtitleCache = mutableMapOf<String, SubtitleData>()
 
@@ -252,7 +266,6 @@ class VideoPlayerViewModel(
     }
 
     fun onGaiaVgateResult(gaiaVtoken: String) {
-        val cookieManager = NetworkManager.getCookieManager()
         val expiresAt = System.currentTimeMillis() + 365L * 24 * 60 * 60 * 1000
         cookieManager.saveCookies(
             listOf(
@@ -568,7 +581,7 @@ class VideoPlayerViewModel(
         val bvid = currentBvid
         val cid = currentCid
         val positionSec = ((_currentPosition.value ?: pendingSeekPositionMs).coerceAtLeast(0L)) / 1000L
-        val csrf = NetworkManager.getCsrfToken()
+        val csrf = sessionGateway.getCsrfToken()
         if ((aid == null || aid <= 0L) && bvid.isNullOrBlank()) {
             return
         }
@@ -595,11 +608,11 @@ class VideoPlayerViewModel(
                 aid?.takeIf { it > 0L }?.let { params["aid"] = it.toString() }
                 bvid?.takeIf { it.isNotBlank() }?.let { params["bvid"] = it }
                 params["cid"] = cid.toString()
-                NetworkManager.getUserInfo()
+                sessionGateway.getUserInfo()
                     ?.mid
                     ?.takeIf { it > 0L }
                     ?.let { params["mid"] = it.toString() }
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.playVideoHeartbeat(params),
                     source = "player.playVideoHeartbeat"
                 )
@@ -666,7 +679,7 @@ class VideoPlayerViewModel(
     private suspend fun loadPgcVideoInfo(loadGeneration: Long) {
         val seasonId = currentSeasonId
         val epId = currentEpId
-        NetworkManager.prewarmWebSession()
+        securityGateway.prewarmWebSession()
         val detailResponse = apiService.getVideoEpisodes(seasonId, epId)
         val detail = detailResponse.result
         if (!detailResponse.isSuccess || detail == null) {
@@ -1989,7 +2002,7 @@ class VideoPlayerViewModel(
                             "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
                     )
                     .build()
-                NetworkManager.getOkHttpClient().newCall(request).execute().use { response ->
+                okHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         return@use null
                     }

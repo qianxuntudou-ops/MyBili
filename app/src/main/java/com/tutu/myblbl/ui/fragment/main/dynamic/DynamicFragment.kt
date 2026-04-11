@@ -18,7 +18,7 @@ import com.tutu.myblbl.databinding.FragmentDynamicBinding
 import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.user.FollowingModel
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
 import com.tutu.myblbl.ui.fragment.main.settings.SignInFragment
@@ -46,6 +46,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
     }
 
     private val appEventHub: AppEventHub by inject()
+    private val sessionGateway: NetworkSessionGateway by inject()
     private val viewModel: DynamicViewModel by viewModel()
     private val mainNavigationViewModel: MainNavigationViewModel by activityViewModels()
     private lateinit var upAdapter: DynamicUpAdapter
@@ -74,7 +75,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
     }
 
     override fun onRetryClick() {
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             (activity as? MainActivity)?.openOverlayFragment(SignInFragment.newInstance(), "sign_in")
         } else {
             currentUpId = 0L
@@ -179,7 +180,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
     private fun loadData() {
         pendingScrollToTop = true
         lastRefreshTime = System.currentTimeMillis()
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             currentUpId = 0L
             viewModel.loadFollowingList()
             latestScreenState = viewModel.screenState.value

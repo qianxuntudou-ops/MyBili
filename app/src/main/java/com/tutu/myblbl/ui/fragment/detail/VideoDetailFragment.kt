@@ -25,7 +25,7 @@ import com.tutu.myblbl.model.video.detail.UgcEpisode
 import com.tutu.myblbl.model.video.detail.UgcSeason
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.model.video.detail.VideoView
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.ui.adapter.EpisodeListAdapter
@@ -76,6 +76,7 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
     private var bvid: String? = null
 
     private val appEventHub: AppEventHub by inject()
+    private val sessionGateway: NetworkSessionGateway by inject()
     private val videoRepository: VideoRepository by inject()
     private val favoriteRepository: FavoriteRepository by inject()
 
@@ -444,7 +445,7 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
     }
 
     private fun refreshActionState() {
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             return
         }
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return

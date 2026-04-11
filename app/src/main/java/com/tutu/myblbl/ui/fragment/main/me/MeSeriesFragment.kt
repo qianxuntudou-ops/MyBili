@@ -14,7 +14,7 @@ import com.google.gson.reflect.TypeToken
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentMeTabListBinding
 import com.tutu.myblbl.event.AppEventHub
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.SeriesRepository
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.adapter.SeriesAdapter
@@ -49,6 +49,7 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
     }
 
     private val appEventHub: AppEventHub by inject()
+    private val sessionGateway: NetworkSessionGateway by inject()
     private val repository: SeriesRepository by inject()
     private val userRepository: UserRepository by inject()
 
@@ -142,7 +143,7 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
     private fun loadData() {
         if (isLoading) return
 
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             showState(getString(R.string.need_sign_in), retryVisible = false)
             return
         }

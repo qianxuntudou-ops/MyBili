@@ -32,6 +32,11 @@
 - `SearchRepository`、`HomeLaneRepository`、`SeriesRepository`、`FavoriteRepository`、`UserRepository`、`VideoRepository` 等已改为通过构造器声明 session / security / http 依赖
 - `ChannelVideoFragment` 已不再直接访问 `NetworkManager.apiService`，改为通过 `VideoRepository` 获取频道视频分页数据
 - `MeViewModel`、`SeriesDetailViewModel`、`UserInfoDialog`、`OwnerDetailDialog` 已开始消费 `NetworkSessionGateway`，UI 层登录态读取不再全部直连 `NetworkManager`
+- `MainActivity`、`PlayerActionDialog`、`UserSpaceFragment`、`VideoDetailFragment`、`Favorite*`、`DynamicFragment`、`MeFragment`、`MeSeriesFragment`、`SignInFragment` 等界面入口已完成一轮 session/cookie 依赖收口
+- 播放器与风控链路已开始消费显式 gateway / runtime 依赖：
+  - `GaiaVgateActivity` 改为通过 `NetworkWebGateway` / `NetworkSessionGateway`
+  - `LivePlayerFragment` 改为直接注入 `OkHttpClient`
+  - `VideoPlayerViewModel` / `VideoPlayerPlayInfoGateway` 已不再直接依赖 `NetworkManager`
 - 修复了本轮重构中暴露出的编译问题和测试构造器适配问题
 - 已通过：
   - `:app:compileDebugKotlin`
@@ -176,7 +181,8 @@
 本轮新增结论：
 
 - repository 层已经不再直接依赖 `NetworkManager` 的登录态 / WBI / 预热等静态入口，而是通过显式注入的 gateway 协作
-- UI 层已经开始消费同一套 gateway，但仍然保留较多静态访问的区域，主要集中在 player、activity 和少量 fragment，这些应作为下一轮治理重点
+- UI 与播放器主链路已经开始消费同一套 gateway / runtime 依赖
+- 剩余 `NetworkManager` 静态访问已主要收缩到应用启动根节点、gateway 实现本身，以及少量不走 Koin 生命周期的 helper / view 工具
 
 ---
 
@@ -345,6 +351,8 @@ app/src/main/java/com/tutu/myblbl/
 - [x] 把 `NetworkManager` 中 session / auth / ua / security 主职责完成首轮拆分
 - [x] 将 repository 层的 `NetworkManager` 静态依赖收口为显式注入 gateway
 - [x] 清理一个 UI 层直连 `apiService` 的入口（`ChannelVideoFragment`）
+- [x] 将大部分 UI 登录态 / 当前用户 / cookie 写入逻辑迁移到 injected gateway 或 runtime dependency
+- [x] 将播放器与 Gaia 风控链路中的核心 `NetworkManager` 静态依赖迁移到 injected gateway / `OkHttpClient` / `CookieManager`
 - [ ] 为首页与播放器链路补更完整的自动化测试
 - [ ] 评估新的 `AppEventHub` / `MainNavigationViewModel` / `Network*Gateway` 组件最终目录归属
 

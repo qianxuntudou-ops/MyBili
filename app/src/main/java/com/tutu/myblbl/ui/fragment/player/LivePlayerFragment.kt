@@ -15,10 +15,11 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.tutu.myblbl.databinding.FragmentLivePlayerBinding
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.utils.AppLog
 import com.tutu.myblbl.utils.ViewUtils
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 @UnstableApi
@@ -41,6 +42,7 @@ class LivePlayerFragment : Fragment() {
     private val binding get() = _binding!!
     
     private val viewModel: LivePlayerViewModel by viewModel()
+    private val okHttpClient: OkHttpClient by inject()
     
     private var player: ExoPlayer? = null
     private var roomId: Long = 0L
@@ -92,7 +94,7 @@ class LivePlayerFragment : Fragment() {
                 "https://live.bilibili.com"
             }
         )
-        val dataSourceFactory = OkHttpDataSource.Factory(NetworkManager.getOkHttpClient())
+        val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                     "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"

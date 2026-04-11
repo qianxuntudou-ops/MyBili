@@ -6,7 +6,9 @@ import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.security.NetworkManagerSecurityGateway
+import com.tutu.myblbl.network.security.NetworkManagerWebGateway
 import com.tutu.myblbl.network.security.NetworkSecurityGateway
+import com.tutu.myblbl.network.security.NetworkWebGateway
 import com.tutu.myblbl.network.session.NetworkManagerSessionGateway
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.AllSeriesRepository
@@ -44,6 +46,7 @@ val networkModule = module {
     single<CookieManager> { NetworkManager.getCookieManager() }
     single<NetworkSessionGateway> { NetworkManagerSessionGateway() }
     single<NetworkSecurityGateway> { NetworkManagerSecurityGateway() }
+    single<NetworkWebGateway> { NetworkManagerWebGateway() }
 }
 
 @OptIn(UnstableApi::class)
@@ -72,7 +75,7 @@ val repositoryModule = module {
 val viewModelModule = module {
     viewModel { RecommendViewModel(get()) }
     viewModel { HotViewModel(get()) }
-    viewModel { VideoPlayerViewModel(get(), androidContext()) }
+    viewModel { VideoPlayerViewModel(get(), get(), get(), get(), get(), androidContext()) }
     viewModel { CategoryViewModel(get()) }
     viewModel { DynamicViewModel(get()) }
     viewModel { LiveViewModel(get()) }

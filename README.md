@@ -33,8 +33,8 @@
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect) - B 站 API 收集整理
 - [BBLL](https://github.com/xiaye13579/BBLL) - 优秀的页面设计和操作逻辑，本项目绝大部分页面和操作逻辑都是抄袭 BBLL🥰
 - [PiliPlus](https://github.com/bggRGjQaUbCoE/PiliPlus) - 部分关键功能参考了 Piliplus 的逻辑
-- [Blbl](https://github.com/cat3399/blbl?tab=readme-ov-file) - 参考部分功能
-- 开源第三方 B 站客户端
+- [Blbl](https://github.com/cat3399/blbl?tab=readme-ov-file) - 参考部分功能参考了 Blbl 的逻辑
+- 其它开源第三方 B 站客户端
 
 ## ⚠️ 免责声明
 

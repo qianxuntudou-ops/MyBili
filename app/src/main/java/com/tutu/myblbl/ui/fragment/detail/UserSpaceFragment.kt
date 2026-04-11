@@ -17,7 +17,7 @@ import com.tutu.myblbl.databinding.FragmentUserSpaceBinding
 import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.user.CheckRelationModel
 import com.tutu.myblbl.model.user.UserSpaceInfo
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.adapter.UserSpaceHeaderAdapter
 import com.tutu.myblbl.ui.adapter.VideoAdapter
@@ -57,6 +57,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
     private var userSpaceInfo: UserSpaceInfo? = null
 
     private val appEventHub: AppEventHub by inject()
+    private val sessionGateway: NetworkSessionGateway by inject()
     private val userRepository: UserRepository by inject()
     private lateinit var headerAdapter: UserSpaceHeaderAdapter
     private lateinit var videoAdapter: VideoAdapter
@@ -215,7 +216,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
                     response.data?.let { info ->
                         userSpaceInfo = info
                         updateUserInfo(info)
-                        if (NetworkManager.isLoggedIn() && NetworkManager.getUserInfo()?.mid != mid) {
+                        if (sessionGateway.isLoggedIn() && sessionGateway.getUserInfo()?.mid != mid) {
                             loadRelationState()
                         }
                     }
@@ -275,9 +276,9 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
     }
 
     private fun updateUserInfo(info: UserSpaceInfo) {
-        val isSelf = NetworkManager.getUserInfo()?.mid == mid
+        val isSelf = sessionGateway.getUserInfo()?.mid == mid
         headerAdapter.updateUserInfo(info, showFollow = !isSelf)
-        if (isSelf || !NetworkManager.isLoggedIn()) {
+        if (isSelf || !sessionGateway.isLoggedIn()) {
             relationAttribute = 0
             renderFollowButton()
         }
@@ -291,7 +292,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
 
         lifecycleScope.launch {
             try {
-                val isSelf = NetworkManager.getUserInfo()?.mid == mid
+                val isSelf = sessionGateway.getUserInfo()?.mid == mid
                 val response = if (isSelf) {
                     userRepository.getUserStat()
                 } else {
@@ -328,7 +329,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
     }
 
     private fun loadRelationState() {
-        if (!NetworkManager.isLoggedIn() || NetworkManager.getUserInfo()?.mid == mid) {
+        if (!sessionGateway.isLoggedIn() || sessionGateway.getUserInfo()?.mid == mid) {
             return
         }
         lifecycleScope.launch {
@@ -390,7 +391,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
     }
 
     private fun checkLogin(): Boolean {
-        if (!NetworkManager.isLoggedIn()) {
+        if (!sessionGateway.isLoggedIn()) {
             return false
         }
         return true

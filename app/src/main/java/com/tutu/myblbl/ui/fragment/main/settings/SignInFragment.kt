@@ -11,11 +11,11 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentSignInBinding
 import com.tutu.myblbl.event.AppEventHub
+import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.CookieManager
 import com.tutu.myblbl.repository.AuthRepository
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.base.BaseFragment
-import com.tutu.myblbl.network.NetworkManager
-import com.tutu.myblbl.utils.AppLog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -30,6 +30,7 @@ class SignInFragment : BaseFragment<FragmentSignInBinding>() {
 
     private val authRepository: AuthRepository by inject()
     private val appEventHub: AppEventHub by inject()
+    private val cookieManager: CookieManager by inject()
     private val userRepository: UserRepository by inject()
     private var qrcodeKey = ""
     private var pollingJob: Job? = null
@@ -160,7 +161,7 @@ class SignInFragment : BaseFragment<FragmentSignInBinding>() {
                     "$name=$value; domain=bilibili.com; path=/; secure"
                 }
             if (cookieStrings.isNotEmpty()) {
-                NetworkManager.getCookieManager().saveCookies(cookieStrings)
+                cookieManager.saveCookies(cookieStrings)
             }
         } catch (e: Exception) {
             AppLog.e("SignInFragment", "saveCookiesFromLoginUrl failed", e)

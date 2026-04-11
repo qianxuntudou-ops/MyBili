@@ -12,16 +12,20 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.security.NetworkWebGateway
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.android.ext.android.inject
 import org.json.JSONObject
 
 class GaiaVgateActivity : AppCompatActivity() {
 
     private lateinit var status: TextView
     private lateinit var webView: WebView
+    private val sessionGateway: NetworkSessionGateway by inject()
+    private val webGateway: NetworkWebGateway by inject()
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,7 +66,7 @@ class GaiaVgateActivity : AppCompatActivity() {
             try {
                 AppLog.i(TAG, "register start vVoucherLen=${vVoucher.length}")
                 val reg = withContext(Dispatchers.IO) {
-                    gaiaVgateRegister(vVoucher)
+                    gaiaVgateRegister(vVoucher, sessionGateway, webGateway)
                 }
                 AppLog.i(TAG, "register ok token=${reg.token.take(8)}")
                 status.text = "请完成验证…"
@@ -104,7 +108,9 @@ class GaiaVgateActivity : AppCompatActivity() {
                             token = token,
                             geetestChallenge = c,
                             validate = v,
-                            seccode = s
+                            seccode = s,
+                            sessionGateway = sessionGateway,
+                            webGateway = webGateway
                         )
                     }
                     val out = Intent().putExtra(EXTRA_GAIA_VTOKEN, grisk)
@@ -191,16 +197,20 @@ private data class GaiaVgateRegisterResult(
     val token: String
 )
 
-private suspend fun gaiaVgateRegister(vVoucher: String): GaiaVgateRegisterResult {
-    val csrf = NetworkManager.getCsrfToken()
+private suspend fun gaiaVgateRegister(
+    vVoucher: String,
+    sessionGateway: NetworkSessionGateway,
+    webGateway: NetworkWebGateway
+): GaiaVgateRegisterResult {
+    val csrf = sessionGateway.getCsrfToken()
     val baseUrl = "https://api.bilibili.com/x/gaia-vgate/v1/register"
     val url = if (csrf.isNotBlank()) "$baseUrl?csrf=$csrf" else baseUrl
 
     val form = mutableMapOf("v_voucher" to vVoucher)
     if (csrf.isNotBlank()) form["csrf"] = csrf
 
-    val headers = NetworkManager.buildPiliWebHeaders(url, includeCookie = true)
-    val json = NetworkManager.postFormJson(url, form, headers)
+    val headers = webGateway.buildPiliWebHeaders(url, includeCookie = true)
+    val json = webGateway.postFormJson(url, form, headers)
 
     val code = json.optInt("code", 0)
     if (code != 0) {
@@ -222,9 +232,11 @@ private suspend fun gaiaVgateValidate(
     token: String,
     geetestChallenge: String,
     validate: String,
-    seccode: String
+    seccode: String,
+    sessionGateway: NetworkSessionGateway,
+    webGateway: NetworkWebGateway
 ): String {
-    val csrf = NetworkManager.getCsrfToken()
+    val csrf = sessionGateway.getCsrfToken()
     val baseUrl = "https://api.bilibili.com/x/gaia-vgate/v1/validate"
     val url = if (csrf.isNotBlank()) "$baseUrl?csrf=$csrf" else baseUrl
 
@@ -236,8 +248,8 @@ private suspend fun gaiaVgateValidate(
     )
     if (csrf.isNotBlank()) form["csrf"] = csrf
 
-    val headers = NetworkManager.buildPiliWebHeaders(url, includeCookie = true)
-    val json = NetworkManager.postFormJson(url, form, headers)
+    val headers = webGateway.buildPiliWebHeaders(url, includeCookie = true)
+    val json = webGateway.postFormJson(url, form, headers)
 
     val code = json.optInt("code", 0)
     if (code != 0) {
