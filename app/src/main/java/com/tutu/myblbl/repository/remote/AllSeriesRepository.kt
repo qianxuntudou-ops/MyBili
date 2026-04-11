@@ -3,7 +3,7 @@ package com.tutu.myblbl.repository.remote
 import com.tutu.myblbl.model.lane.LaneItemModel
 import com.tutu.myblbl.model.series.AllSeriesFilterModel
 import com.tutu.myblbl.model.series.SeriesModel
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.api.ApiService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -12,9 +12,9 @@ data class AllSeriesPage(
     val hasMore: Boolean = false
 )
 
-class AllSeriesRepository {
-
-    private val apiService = NetworkManager.apiService
+class AllSeriesRepository(
+    private val apiService: ApiService
+) {
 
     suspend fun getAllSeries(
         type: Int,

@@ -5,19 +5,27 @@ import com.tutu.myblbl.model.common.CheckGiveCoinModel
 import com.tutu.myblbl.model.common.GiveCoinResultModel
 import com.tutu.myblbl.model.common.TripleActionResultModel
 import com.tutu.myblbl.model.recommend.RecommendListDataModel
+import com.tutu.myblbl.model.video.GetVideoByChannelWrapper
 import com.tutu.myblbl.model.video.RegionVideoListWrapper
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.model.video.VideoPvModel
 import com.tutu.myblbl.model.player.PlayInfoModel
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.security.NetworkSecurityGateway
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.ListDataModel
 import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.utils.CookieManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class VideoRepository(private val apiService: ApiService = NetworkManager.apiService) {
+class VideoRepository(
+    private val apiService: ApiService,
+    private val sessionGateway: NetworkSessionGateway,
+    private val securityGateway: NetworkSecurityGateway,
+    private val cookieManager: CookieManager
+) {
 
     companion object {
         private const val TAG = "VideoRepository"
@@ -46,7 +54,7 @@ class VideoRepository(private val apiService: ApiService = NetworkManager.apiSer
             val firstResponse = apiService.getRanking(rid)
             if (firstResponse.code == -352) {
                 AppLog.e(TAG, "getRanking first attempt hit risk control: rid=$rid")
-                NetworkManager.prewarmWebSession(forceUaRefresh = true)
+                securityGateway.prewarmWebSession(forceUaRefresh = true)
                 apiService.getRanking(rid).mapListData()
             } else {
                 firstResponse.mapListData()
@@ -61,6 +69,20 @@ class VideoRepository(private val apiService: ApiService = NetworkManager.apiSer
     ): Result<BaseResponse<RegionVideoListWrapper>> = withContext(Dispatchers.IO) {
         runCatching {
             apiService.getRegionLatestVideos(rid = rid, page = page, pageSize = pageSize)
+        }
+    }
+
+    suspend fun getVideoByChannel(
+        channelId: Long,
+        offset: String,
+        pageSize: Int = 30
+    ): Result<BaseResponse<GetVideoByChannelWrapper>> = withContext(Dispatchers.IO) {
+        runCatching {
+            apiService.getVideoByChannel(
+                channelId = channelId,
+                offset = offset,
+                pageSize = pageSize
+            )
         }
     }
 
@@ -90,7 +112,7 @@ class VideoRepository(private val apiService: ApiService = NetworkManager.apiSer
 
     suspend fun like(avid: Long?, bvid: String?, like: Int, csrf: String): Result<BaseResponse<Int>> = withContext(Dispatchers.IO) {
         runCatching {
-            NetworkManager.syncAuthState(
+            sessionGateway.syncAuthState(
                 apiService.like(avid, bvid, like, csrf),
                 source = "video.like"
             )
@@ -99,7 +121,7 @@ class VideoRepository(private val apiService: ApiService = NetworkManager.apiSer
 
     suspend fun hasLike(avid: Long?, bvid: String?): Result<BaseResponse<Int>> = withContext(Dispatchers.IO) {
         runCatching {
-            NetworkManager.syncAuthState(
+            sessionGateway.syncAuthState(
                 apiService.hasLike(avid, bvid),
                 source = "video.hasLike"
             )
@@ -108,7 +130,7 @@ class VideoRepository(private val apiService: ApiService = NetworkManager.apiSer
 
     suspend fun giveCoin(avid: Long?, bvid: String?, multiply: Int, selectLike: Int, csrf: String): Result<BaseResponse<GiveCoinResultModel>> = withContext(Dispatchers.IO) {
         runCatching {
-            NetworkManager.syncAuthState(
+            sessionGateway.syncAuthState(
                 apiService.giveCoin(avid, bvid, multiply, selectLike, csrf),
                 source = "video.giveCoin"
             )
@@ -117,7 +139,7 @@ class VideoRepository(private val apiService: ApiService = NetworkManager.apiSer
 
     suspend fun hasGiveCoin(avid: Long?, bvid: String?): Result<BaseResponse<CheckGiveCoinModel>> = withContext(Dispatchers.IO) {
         runCatching {
-            NetworkManager.syncAuthState(
+            sessionGateway.syncAuthState(
                 apiService.hasGiveCoin(avid, bvid),
                 source = "video.hasGiveCoin"
             )
@@ -126,23 +148,22 @@ class VideoRepository(private val apiService: ApiService = NetworkManager.apiSer
 
     suspend fun tripleAction(avid: Long?, bvid: String?, csrf: String): Result<BaseResponse<TripleActionResultModel>> = withContext(Dispatchers.IO) {
         runCatching {
-            val cookieManager = NetworkManager.getCookieManager()
             val hasSessdata = cookieManager.getCookieValue("SESSDATA")?.isNotBlank() ?: false
             val hasBuvid3 = cookieManager.getCookieValue("buvid3")?.isNotBlank() ?: false
             val hasBuvid4 = cookieManager.getCookieValue("buvid4")?.isNotBlank() ?: false
             AppLog.d(TAG, "tripleAction called: aid=$avid, bvid=$bvid, csrf=${if (csrf.isBlank()) "EMPTY" else "HAS_VALUE"}")
             AppLog.d(TAG, "Cookie check: SESSDATA=${hasSessdata}, buvid3=${hasBuvid3}, buvid4=${hasBuvid4}")
             
-            NetworkManager.prewarmWebSession()
-            val firstResponse = NetworkManager.syncAuthState(
+            securityGateway.prewarmWebSession()
+            val firstResponse = sessionGateway.syncAuthState(
                 apiService.tripleAction(avid, bvid, csrf),
                 source = "video.tripleAction.first"
             )
             AppLog.d(TAG, "tripleAction first response: code=${firstResponse.code}, message=${firstResponse.message}, msg=${firstResponse.msg}")
             if (firstResponse.code == -352 || firstResponse.code == -401) {
                 AppLog.e(TAG, "tripleAction first attempt hit risk control/401: aid=$avid, bvid=$bvid, code=${firstResponse.code}")
-                NetworkManager.prewarmWebSession(forceUaRefresh = true)
-                val secondResponse = NetworkManager.syncAuthState(
+                securityGateway.prewarmWebSession(forceUaRefresh = true)
+                val secondResponse = sessionGateway.syncAuthState(
                     apiService.tripleAction(avid, bvid, csrf),
                     source = "video.tripleAction.second"
                 )

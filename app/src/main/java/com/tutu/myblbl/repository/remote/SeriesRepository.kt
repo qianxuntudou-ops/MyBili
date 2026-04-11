@@ -4,14 +4,15 @@ import com.tutu.myblbl.model.series.EpisodesDetailModel
 import com.tutu.myblbl.model.series.FollowSeriesResult
 import com.tutu.myblbl.model.series.MyFollowingResponseWrapper
 import com.tutu.myblbl.model.series.timeline.TimeLineADayModel
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SeriesRepository {
-    
-    private val apiService: ApiService = NetworkManager.apiService
+class SeriesRepository(
+    private val apiService: ApiService,
+    private val sessionGateway: NetworkSessionGateway
+) {
 
     suspend fun getSeriesDetail(seasonId: Long, epId: Long = 0): Result<EpisodesDetailModel> {
         return withContext(Dispatchers.IO) {
@@ -20,14 +21,14 @@ class SeriesRepository {
                     if (seasonId > 0) seasonId else null,
                     if (epId > 0) epId else null
                 ).let {
-                    NetworkManager.syncAuthState(it, source = "series.getSeriesDetail")
+                    sessionGateway.syncAuthState(it, source = "series.getSeriesDetail")
                 }
                 val detail = response.result
                 if (response.isSuccess && detail != null) {
                     val resolvedSeasonId = detail.seasonId.takeIf { it > 0 } ?: seasonId
                     val sectionResult = if (resolvedSeasonId > 0) {
                         apiService.getVideoEpisodeSections(resolvedSeasonId)
-                            .let { NetworkManager.syncAuthState(it, source = "series.getVideoEpisodeSections") }
+                            .let { sessionGateway.syncAuthState(it, source = "series.getVideoEpisodeSections") }
                             .result
                     } else {
                         null
@@ -50,8 +51,8 @@ class SeriesRepository {
     suspend fun followSeries(seasonId: Long): Result<FollowSeriesResult> {
         return withContext(Dispatchers.IO) {
             try {
-                val csrf = NetworkManager.getCsrfToken()
-                val response = NetworkManager.syncAuthState(
+                val csrf = sessionGateway.getCsrfToken()
+                val response = sessionGateway.syncAuthState(
                     apiService.followSeries(seasonId, csrf),
                     source = "series.followSeries"
                 )
@@ -75,8 +76,8 @@ class SeriesRepository {
     suspend fun cancelFollowSeries(seasonId: Long): Result<FollowSeriesResult> {
         return withContext(Dispatchers.IO) {
             try {
-                val csrf = NetworkManager.getCsrfToken()
-                val response = NetworkManager.syncAuthState(
+                val csrf = sessionGateway.getCsrfToken()
+                val response = sessionGateway.syncAuthState(
                     apiService.cancelFollowSeries(seasonId, csrf),
                     source = "series.cancelFollowSeries"
                 )
@@ -112,7 +113,7 @@ class SeriesRepository {
                     vmid = vmid,
                     ts = System.currentTimeMillis()
                 ).let {
-                    NetworkManager.syncAuthState(it, source = "series.getMyFollowingSeries")
+                    sessionGateway.syncAuthState(it, source = "series.getMyFollowingSeries")
                 }
                 if (response.code == 0 && response.data != null) {
                     Result.success(response.data)

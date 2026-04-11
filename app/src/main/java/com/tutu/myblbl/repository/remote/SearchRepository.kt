@@ -11,12 +11,13 @@ import com.tutu.myblbl.model.search.SearchVideoOrder
 import com.tutu.myblbl.model.video.Owner
 import com.tutu.myblbl.model.video.Stat
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.WbiGenerator
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.HotWordWrapper
 import com.tutu.myblbl.network.response.SearchSuggestWrapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
@@ -66,11 +67,14 @@ private interface SearchApiService {
     ): SearchSuggestWrapper
 }
 
-class SearchRepository {
+class SearchRepository(
+    private val okHttpClient: OkHttpClient,
+    private val sessionGateway: NetworkSessionGateway
+) {
     private val searchApiService: SearchApiService by lazy {
         Retrofit.Builder()
             .baseUrl("https://api.bilibili.com/")
-            .client(NetworkManager.getOkHttpClient())
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(SearchApiService::class.java)
@@ -209,12 +213,12 @@ class SearchRepository {
     }
 
     private fun buildWbiParams(params: Map<String, String>): Map<String, String> {
-        val (imgKey, subKey) = NetworkManager.getWbiKeys()
+        val (imgKey, subKey) = sessionGateway.getWbiKeys()
         return WbiGenerator.generateWbiParams(params, imgKey, subKey)
     }
 
     private fun hasWbiKeys(): Boolean {
-        val (imgKey, subKey) = NetworkManager.getWbiKeys()
+        val (imgKey, subKey) = sessionGateway.getWbiKeys()
         return imgKey.isNotBlank() && subKey.isNotBlank()
     }
 

@@ -9,8 +9,8 @@ import com.tutu.myblbl.model.live.LiveQualityModel
 import com.tutu.myblbl.model.live.LiveRoomItem
 import com.tutu.myblbl.model.live.LiveAreaCategoryParent
 import com.tutu.myblbl.model.live.LiveListWrapper
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.utils.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,14 +20,15 @@ data class LiveRoomPage(
     val hasMore: Boolean = false
 )
 
-class LiveRepository {
+class LiveRepository(
+    private val apiService: ApiService,
+    private val sessionGateway: NetworkSessionGateway
+) {
 
     companion object {
         private const val TAG = "LiveRepository"
         private const val DEFAULT_LIVE_QN = 10000
     }
-    
-    private val apiService: ApiService = NetworkManager.apiService
 
     suspend fun getLivePlayInfo(roomId: Long, quality: Int = DEFAULT_LIVE_QN): Result<LivePlayUrlDataModel> {
         return withContext(Dispatchers.IO) {
@@ -360,7 +361,7 @@ class LiveRepository {
     )
 
     private fun buildWbiParams(params: Map<String, String>): Map<String, String> {
-        val (imgKey, subKey) = NetworkManager.getWbiKeys()
+        val (imgKey, subKey) = sessionGateway.getWbiKeys()
         AppLog.d(TAG, "buildWbiParams: imgKey=${imgKey.take(8)}..., subKey=${subKey.take(8)}..., params=$params")
         val result = com.tutu.myblbl.network.WbiGenerator.generateWbiParams(params, imgKey, subKey)
         AppLog.d(TAG, "buildWbiParams result: w_rid=${result["w_rid"]}, wts=${result["wts"]}")

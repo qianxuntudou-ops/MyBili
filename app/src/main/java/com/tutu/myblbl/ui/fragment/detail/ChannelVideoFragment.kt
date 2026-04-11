@@ -7,7 +7,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentBaseListBinding
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.ui.base.BaseFragment
 import com.tutu.myblbl.ui.view.WrapContentGridLayoutManager
@@ -15,6 +15,7 @@ import com.tutu.myblbl.ui.widget.GridSpacingItemDecoration
 import com.tutu.myblbl.utils.ContentFilter
 import com.tutu.myblbl.utils.VideoRouteNavigator
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 
 class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
 
@@ -39,6 +40,7 @@ class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
     private var isLoading = false
     private var recyclerView: RecyclerView? = null
     private val videoAdapter = VideoAdapter()
+    private val videoRepository: VideoRepository by inject()
 
     override fun initArguments() {
         title = arguments?.getString(ARG_TITLE).orEmpty()
@@ -94,35 +96,30 @@ class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
         isLoading = true
         showLoading(true)
         lifecycleScope.launch {
-            runCatching {
-                NetworkManager.apiService.getVideoByChannel(
-                    channelId = tagId,
-                    offset = offset,
-                    pageSize = 30
-                )
-            }.onSuccess { response ->
+            videoRepository.getChannelVideos(
+                channelId = tagId,
+                offset = offset,
+                pageSize = 30
+            ).onSuccess { page ->
                 showLoading(false)
                 isLoading = false
-                if (response.isSuccess) {
-                    val data = response.data
-                    val list = data?.list ?: emptyList()
-                    hasMore = data?.hasMore ?: false
-                    offset = data?.offset ?: ""
-                    videoAdapter.setShowLoadMore(hasMore)
-                    val hasExistingItems = videoAdapter.getItem(0) != null
-                    if (list.isEmpty() && !hasExistingItems) {
-                        showEmpty()
-                    } else {
-                        showContent()
-                        val videos = ContentFilter.filterVideos(requireContext(), list.map { it.toVideoModel() })
-                        if (!hasExistingItems) {
-                            videoAdapter.setData(videos)
-                        } else {
-                            videoAdapter.addData(videos)
-                        }
-                    }
+                hasMore = page.hasMore
+                offset = page.offset
+                videoAdapter.setShowLoadMore(hasMore)
+                val hasExistingItems = videoAdapter.getItem(0) != null
+                if (page.videos.isEmpty() && !hasExistingItems) {
+                    showEmpty()
                 } else {
-                    showError(response.message)
+                    showContent()
+                    val videos = ContentFilter.filterVideos(
+                        requireContext(),
+                        page.videos
+                    )
+                    if (!hasExistingItems) {
+                        videoAdapter.setData(videos)
+                    } else {
+                        videoAdapter.addData(videos)
+                    }
                 }
             }.onFailure {
                 showLoading(false)

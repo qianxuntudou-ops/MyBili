@@ -7,11 +7,18 @@ import com.tutu.myblbl.model.common.TripleActionResultModel
 import com.tutu.myblbl.model.recommend.RecommendListDataModel
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
-import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.remote.VideoRepository as NetworkVideoRepository
 
+data class ChannelVideoPage(
+    val videos: List<VideoModel> = emptyList(),
+    val offset: String = "",
+    val hasMore: Boolean = false
+)
+
 class VideoRepository(
-    private val delegate: NetworkVideoRepository
+    private val delegate: NetworkVideoRepository,
+    private val sessionGateway: NetworkSessionGateway
 ) {
 
     suspend fun getRecommendList(
@@ -34,7 +41,7 @@ class VideoRepository(
     }
 
     suspend fun like(avid: Long?, bvid: String?, like: Int): BaseResponse<Int> {
-        val csrf = NetworkManager.getCsrfToken()
+        val csrf = sessionGateway.getCsrfToken()
         return delegate.like(avid, bvid, like, csrf).getOrThrow()
     }
 
@@ -48,7 +55,7 @@ class VideoRepository(
         multiply: Int,
         selectLike: Int = 0
     ): BaseResponse<GiveCoinResultModel> {
-        val csrf = NetworkManager.getCsrfToken()
+        val csrf = sessionGateway.getCsrfToken()
         return delegate.giveCoin(avid, bvid, multiply, selectLike, csrf).getOrThrow()
     }
 
@@ -57,7 +64,22 @@ class VideoRepository(
     }
 
     suspend fun tripleAction(avid: Long?, bvid: String?): BaseResponse<TripleActionResultModel> {
-        val csrf = NetworkManager.getCsrfToken()
+        val csrf = sessionGateway.getCsrfToken()
         return delegate.tripleAction(avid, bvid, csrf).getOrThrow()
+    }
+
+    suspend fun getChannelVideos(
+        channelId: Long,
+        offset: String,
+        pageSize: Int = 30
+    ): Result<ChannelVideoPage> {
+        return delegate.getVideoByChannel(channelId, offset, pageSize).map { response ->
+            val data = response.data
+            ChannelVideoPage(
+                videos = data?.list.orEmpty().map { it.toVideoModel() },
+                offset = data?.offset.orEmpty(),
+                hasMore = data?.hasMore == true
+            )
+        }
     }
 }

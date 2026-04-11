@@ -5,6 +5,10 @@ import androidx.media3.common.util.UnstableApi
 import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.security.NetworkManagerSecurityGateway
+import com.tutu.myblbl.network.security.NetworkSecurityGateway
+import com.tutu.myblbl.network.session.NetworkManagerSessionGateway
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.AllSeriesRepository
 import com.tutu.myblbl.repository.AuthRepository
 import com.tutu.myblbl.repository.FavoriteRepository
@@ -27,6 +31,8 @@ import com.tutu.myblbl.ui.fragment.main.search.SearchViewModel
 import com.tutu.myblbl.ui.fragment.player.LivePlayerViewModel
 import com.tutu.myblbl.ui.fragment.player.VideoPlayerViewModel
 import com.tutu.myblbl.ui.fragment.series.SeriesDetailViewModel
+import com.tutu.myblbl.utils.CookieManager
+import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -34,18 +40,23 @@ import org.koin.dsl.module
 @OptIn(UnstableApi::class)
 val networkModule = module {
     single<ApiService> { NetworkManager.apiService }
+    single<OkHttpClient> { NetworkManager.getOkHttpClient() }
+    single<CookieManager> { NetworkManager.getCookieManager() }
+    single<NetworkSessionGateway> { NetworkManagerSessionGateway() }
+    single<NetworkSecurityGateway> { NetworkManagerSecurityGateway() }
 }
 
 @OptIn(UnstableApi::class)
 val repositoryModule = module {
-    single { com.tutu.myblbl.repository.remote.AllSeriesRepository() }
-    single { com.tutu.myblbl.repository.remote.AuthRepository(get()) }
-    single { com.tutu.myblbl.repository.remote.FavoriteRepository(get()) }
-    single { com.tutu.myblbl.repository.remote.HomeLaneRepository(get(), get(), get()) }
-    single { com.tutu.myblbl.repository.remote.LiveRepository() }
-    single { com.tutu.myblbl.repository.remote.SearchRepository() }
-    single { com.tutu.myblbl.repository.remote.SeriesRepository() }
-    single { com.tutu.myblbl.repository.remote.VideoRepository(get()) }
+    single { com.tutu.myblbl.repository.remote.AllSeriesRepository(get()) }
+    single { com.tutu.myblbl.repository.remote.AuthRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.FavoriteRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.HomeLaneRepository(get(), get(), get(), get()) }
+    single { com.tutu.myblbl.repository.remote.LiveRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.SearchRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.SeriesRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.UserRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.VideoRepository(get(), get(), get(), get()) }
     single { AllSeriesRepository(get()) }
     single { AuthRepository(get()) }
     single { FavoriteRepository(get()) }
@@ -53,8 +64,8 @@ val repositoryModule = module {
     single { LiveRepository(get()) }
     single { SearchRepository(get()) }
     single { SeriesRepository(get()) }
-    single { VideoRepository(get()) }
-    single { UserRepository() }
+    single { VideoRepository(get(), get()) }
+    single { UserRepository(get(), get()) }
 }
 
 @OptIn(UnstableApi::class)

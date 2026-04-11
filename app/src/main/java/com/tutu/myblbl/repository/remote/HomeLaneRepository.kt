@@ -15,16 +15,17 @@ import com.tutu.myblbl.model.series.SeriesModel
 import com.tutu.myblbl.model.series.SeriesType
 import com.tutu.myblbl.model.series.timeline.SeriesTimeLineModel
 import com.tutu.myblbl.model.series.timeline.TimeLineADayModel
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.utils.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import okhttp3.Request
 
 class HomeLaneRepository(
     private val apiService: ApiService,
+    private val okHttpClient: OkHttpClient,
     private val seriesRepository: SeriesRepository,
     private val userRepository: UserRepository
 ) {
@@ -412,7 +413,7 @@ class HomeLaneRepository(
                 "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
             )
             .build()
-        val response = NetworkManager.getOkHttpClient().newCall(request).execute()
+        val response = okHttpClient.newCall(request).execute()
         response.use { call ->
             if (!call.isSuccessful) {
                 throw IllegalStateException("Failed to load page: $url")

@@ -1,6 +1,8 @@
 package com.tutu.myblbl
 
 import com.tutu.myblbl.network.NetworkManager
+import com.tutu.myblbl.network.security.NetworkManagerSecurityGateway
+import com.tutu.myblbl.network.session.NetworkManagerSessionGateway
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.repository.remote.HomeLaneRepository
@@ -12,8 +14,16 @@ class HomeDataProbeTest {
 
     @Test
     fun probeRecommendAndAnimeHomeData() {
+        val sessionGateway = NetworkManagerSessionGateway()
+        val securityGateway = NetworkManagerSecurityGateway()
         val videoRepository = VideoRepository(
-            RemoteVideoRepository(NetworkManager.apiService)
+            RemoteVideoRepository(
+                NetworkManager.apiService,
+                sessionGateway,
+                securityGateway,
+                NetworkManager.getCookieManager()
+            ),
+            sessionGateway
         )
         runCatching {
             kotlinx.coroutines.runBlocking {
@@ -32,8 +42,9 @@ class HomeDataProbeTest {
 
         val homeLaneRepository = HomeLaneRepository(
             apiService = NetworkManager.apiService,
-            seriesRepository = RemoteSeriesRepository(),
-            userRepository = UserRepository()
+            okHttpClient = NetworkManager.getOkHttpClient(),
+            seriesRepository = RemoteSeriesRepository(NetworkManager.apiService, sessionGateway),
+            userRepository = UserRepository(NetworkManager.apiService, sessionGateway)
         )
         val anime = kotlinx.coroutines.runBlocking {
             homeLaneRepository.getHomeLanes(

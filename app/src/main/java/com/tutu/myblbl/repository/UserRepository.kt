@@ -11,25 +11,27 @@ import com.tutu.myblbl.model.video.HistoryListResponse
 import com.tutu.myblbl.model.video.LaterWatchWrapper
 import com.tutu.myblbl.model.video.UserDynamicResponse
 import com.tutu.myblbl.model.video.AllDynamicResponse
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.WbiGenerator
+import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.BaseBaseResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class UserRepository {
-    
-    private val apiService = NetworkManager.apiService
+class UserRepository(
+    private val apiService: ApiService,
+    private val sessionGateway: NetworkSessionGateway
+) {
     
     suspend fun getUserDetailInfo(): BaseResponse<UserDetailInfoModel> {
         return apiService.getUserDetailInfo().also { response ->
-            NetworkManager.syncUserSession(response, source = "getUserDetailInfo")
+            sessionGateway.syncUserSession(response, source = "getUserDetailInfo")
         }
     }
     
     suspend fun getUserStat(): BaseResponse<UserStatModel> {
         return apiService.getUserStat().also { response ->
-            NetworkManager.handleAuthFailureCode(response.code, source = "getUserStat")
+            sessionGateway.handleAuthFailureCode(response.code, source = "getUserStat")
         }
     }
 
@@ -39,22 +41,22 @@ class UserRepository {
     
     suspend fun getUserSpace(mid: Long): BaseResponse<UserSpaceInfo> {
         val params = mapOf("mid" to mid.toString())
-        val wbiKeys = NetworkManager.getWbiKeys()
+        val wbiKeys = sessionGateway.getWbiKeys()
         val signedParams = WbiGenerator.generateWbiParams(params, wbiKeys.first, wbiKeys.second)
-        return NetworkManager.syncAuthState(
+        return sessionGateway.syncAuthState(
             apiService.getUserSpace(signedParams),
             source = "getUserSpace"
         )
     }
     
     fun isLoggedIn(): Boolean {
-        return NetworkManager.isLoggedIn()
+        return sessionGateway.isLoggedIn()
     }
     
     suspend fun getHistory(viewAt: Long, pageSize: Int): Result<BaseResponse<HistoryListResponse>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.getHistory(viewAt, pageSize),
                     source = "getHistory"
                 )
@@ -64,7 +66,7 @@ class UserRepository {
     suspend fun getLaterWatch(): Result<BaseResponse<LaterWatchWrapper>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.getLaterWatch(),
                     source = "getLaterWatch"
                 )
@@ -78,7 +80,7 @@ class UserRepository {
     ): Result<BaseResponse<GetFollowUserWrapper>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.getFollowing(mid, page, pageSize),
                     source = "getFollowing"
                 )
@@ -92,7 +94,7 @@ class UserRepository {
     ): Result<BaseResponse<GetFollowUserWrapper>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.getFollower(mid, page, pageSize),
                     source = "getFollower"
                 )
@@ -104,7 +106,7 @@ class UserRepository {
     ): Result<BaseResponse<CheckRelationModel>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.checkUserRelation(mid.toString()),
                     source = "checkUserRelation"
                 )
@@ -120,9 +122,9 @@ class UserRepository {
                 val params = mapOf(
                     "fid" to fid.toString(),
                     "act" to action.toString(),
-                    "csrf" to NetworkManager.getCsrfToken()
+                    "csrf" to sessionGateway.getCsrfToken()
                 )
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.userRelationModify(params),
                     source = "modifyRelation"
                 )
@@ -136,7 +138,7 @@ class UserRepository {
     ): Result<BaseResponse<UserDynamicResponse>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.getUserDynamic(mid, page, pageSize),
                     source = "getUserDynamic"
                 )
@@ -149,7 +151,7 @@ class UserRepository {
     ): Result<BaseResponse<AllDynamicResponse>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.syncAuthState(
+                sessionGateway.syncAuthState(
                     apiService.getAllDynamic(page, offset),
                     source = "getAllDynamic"
                 )
@@ -160,7 +162,7 @@ class UserRepository {
         withContext(Dispatchers.IO) {
             runCatching {
                 val response = apiService.getUserDetailInfo()
-                val info = NetworkManager.syncUserSession(
+                val info = sessionGateway.syncUserSession(
                     response,
                     source = "refreshCurrentUserInfo"
                 )
@@ -174,7 +176,7 @@ class UserRepository {
     suspend fun resolveCurrentUserMid(): Result<Long> =
         withContext(Dispatchers.IO) {
             runCatching {
-                NetworkManager.getUserInfo()?.mid
+                sessionGateway.getUserInfo()?.mid
                     ?.takeIf { it > 0L }
                     ?: refreshCurrentUserInfo().getOrThrow().mid.takeIf { it > 0L }
                     ?: throw IllegalStateException("未获取到当前用户信息")

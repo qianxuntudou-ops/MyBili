@@ -6,25 +6,28 @@ import com.tutu.myblbl.model.user.UserDetailInfoModel
 import com.tutu.myblbl.model.user.UserStatModel
 import com.tutu.myblbl.model.recommend.RecommendListDataModel
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.BaseBaseResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class UserRepository(private val apiService: ApiService = NetworkManager.apiService) {
+class UserRepository(
+    private val apiService: ApiService,
+    private val sessionGateway: NetworkSessionGateway
+) {
 
     suspend fun getUserDetailInfo(): Result<BaseResponse<UserDetailInfoModel>> = withContext(Dispatchers.IO) {
         runCatching {
             val response = apiService.getUserDetailInfo()
-            NetworkManager.syncUserSession(response, source = "remoteUserRepository.getUserDetailInfo")
+            sessionGateway.syncUserSession(response, source = "remoteUserRepository.getUserDetailInfo")
             response
         }
     }
 
     suspend fun getUserStat(): Result<BaseResponse<UserStatModel>> = withContext(Dispatchers.IO) {
         runCatching {
-            NetworkManager.syncAuthState(
+            sessionGateway.syncAuthState(
                 apiService.getUserStat(),
                 source = "remoteUserRepository.getUserStat"
             )
@@ -33,7 +36,7 @@ class UserRepository(private val apiService: ApiService = NetworkManager.apiServ
 
     suspend fun getUserSpace(params: Map<String, String>): Result<BaseResponse<UserSpaceInfo>> = withContext(Dispatchers.IO) {
         runCatching {
-            NetworkManager.syncAuthState(
+            sessionGateway.syncAuthState(
                 apiService.getUserSpace(params),
                 source = "remoteUserRepository.getUserSpace"
             )
@@ -55,9 +58,9 @@ class UserRepository(private val apiService: ApiService = NetworkManager.apiServ
             val params = mapOf(
                 "fid" to fid.toString(),
                 "act" to action.toString(),
-                "csrf" to NetworkManager.getCsrfToken()
+                "csrf" to sessionGateway.getCsrfToken()
             )
-            NetworkManager.syncAuthState(
+            sessionGateway.syncAuthState(
                 apiService.userRelationModify(params),
                 source = "remoteUserRepository.modifyRelation"
             )

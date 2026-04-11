@@ -22,6 +22,15 @@
 - 引入 `MainNavigationViewModel`，将主 Tab / 子 Tab / 返回 / 菜单等高频导航事件迁出字符串广播
 - 引入 `AppEventHub`，将登录态刷新与播放进度同步改为显式 typed event
 - 已移除项目中的 `EventBus` 代码依赖与 Gradle 依赖
+- 将 `NetworkManager` 重构为兼容 facade，并拆出：
+  - `network/session/NetworkSessionStore`
+  - `network/ua/DesktopUserAgentStore`
+  - `network/http/NetworkClientFactory`
+  - `network/security/BiliSecurityCoordinator`
+- 当前 `NetworkManager` 已从实现堆叠型大类压缩为以委托为主的统一入口
+- 引入 `NetworkSessionGateway` / `NetworkSecurityGateway`，开始把 repository 层对 `NetworkManager` 的静态访问改为显式依赖
+- `SearchRepository`、`HomeLaneRepository`、`SeriesRepository`、`FavoriteRepository`、`UserRepository`、`VideoRepository` 等已改为通过构造器声明 session / security / http 依赖
+- `ChannelVideoFragment` 已不再直接访问 `NetworkManager.apiService`，改为通过 `VideoRepository` 获取频道视频分页数据
 - 修复了本轮重构中暴露出的编译问题和测试构造器适配问题
 - 已通过：
   - `:app:compileDebugKotlin`
@@ -129,13 +138,15 @@
 
 ### 需要做的事
 
-- [ ] 拆出 `SessionManager`
-- [ ] 拆出 `AuthStateSynchronizer`
-- [ ] 拆出 `UserAgentProvider`
-- [ ] 拆出 `BiliSecurityService` 或等价命名组件
-- [ ] 拆出 `NetworkClientFactory`
-- [ ] 保留一个轻量 facade，避免一次性改太多调用点
+- [x] 拆出 `SessionManager`
+- [x] 拆出 `AuthStateSynchronizer`
+- [x] 拆出 `UserAgentProvider`
+- [x] 拆出 `BiliSecurityService` 或等价命名组件
+- [x] 拆出 `NetworkClientFactory`
+- [x] 保留一个轻量 facade，避免一次性改太多调用点
 - [ ] 新代码禁止继续直接往 `NetworkManager` 塞新职责
+- [x] 将 repository 层对 `NetworkManager` 的静态访问收口到更明确的 provider / gateway
+- [ ] 将 player / dialog / activity 层对 `NetworkManager` 的静态访问继续收口到更明确的 provider / gateway
 
 ### 推荐拆分方向
 
@@ -150,6 +161,21 @@
 - `NetworkManager` 行数和职责明显下降
 - repository 不再直接依赖过多 static 全局入口
 - 登录态失效、cookie 预热、播放前健康检查行为不回退
+
+### 当前阶段结论
+
+这一阶段已经完成第一轮目标：
+
+- `NetworkManager` 仍保留兼容 API，避免大面积改调用点
+- 实现细节已迁出到 `session / ua / http / security` 子职责
+- 已补基础单测覆盖 `NetworkSessionStore`
+
+下一步不再建议继续往 `NetworkManager` 本体加代码，而应开始逐步减少业务代码对这个 facade 的静态依赖
+
+本轮新增结论：
+
+- repository 层已经不再直接依赖 `NetworkManager` 的登录态 / WBI / 预热等静态入口，而是通过显式注入的 gateway 协作
+- 仍然保留较多静态访问的区域，主要集中在 player、dialog、activity 和少量 fragment，这些应作为下一轮治理重点
 
 ---
 
@@ -315,9 +341,11 @@ app/src/main/java/com/tutu/myblbl/
 - [x] 建立事件迁移状态文档
 - [x] 为 `MainActivity` 增加共享 `MainSharedViewModel`
 - [x] 迁移 `Home` / `Me` / `Category` / `Dynamic` / `Live` 的导航事件
-- [ ] 把 `NetworkManager` 中 session / auth 相关逻辑列出拆分清单
+- [x] 把 `NetworkManager` 中 session / auth / ua / security 主职责完成首轮拆分
+- [x] 将 repository 层的 `NetworkManager` 静态依赖收口为显式注入 gateway
+- [x] 清理一个 UI 层直连 `apiService` 的入口（`ChannelVideoFragment`）
 - [ ] 为首页与播放器链路补更完整的自动化测试
-- [ ] 评估新的 `AppEventHub` / `MainNavigationViewModel` 最终目录归属
+- [ ] 评估新的 `AppEventHub` / `MainNavigationViewModel` / `Network*Gateway` 组件最终目录归属
 
 ## 最终判断
 
