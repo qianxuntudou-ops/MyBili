@@ -10,7 +10,7 @@ import com.tutu.myblbl.databinding.CellLaneScrollableBinding
 import com.tutu.myblbl.model.live.LiveRecommendSection
 import com.tutu.myblbl.model.live.LiveRoomItem
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 
 class LiveRecommendAdapter(
     private val onRoomClick: (LiveRoomItem) -> Unit,

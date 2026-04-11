@@ -10,8 +10,8 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.tutu.myblbl.databinding.FragmentBaseListBinding
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.SpatialFocusNavigator
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 
 abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>() {
 

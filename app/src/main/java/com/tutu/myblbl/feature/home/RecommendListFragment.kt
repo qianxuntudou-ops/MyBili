@@ -13,9 +13,9 @@ import com.tutu.myblbl.repository.cache.HomeCacheStore
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseListFragment
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.ContentFilter
-import com.tutu.myblbl.utils.VideoRouteNavigator
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch

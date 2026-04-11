@@ -1,7 +1,7 @@
 package com.tutu.myblbl.feature.player.view
 
 import android.content.Context
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import android.graphics.drawable.ColorDrawable
 import android.os.Handler
 import android.os.Looper

@@ -17,7 +17,7 @@ import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.feature.detail.UserSpaceFragment
 import com.tutu.myblbl.feature.user.FollowUserListFragment
-import com.tutu.myblbl.utils.ImageLoader
+import com.tutu.myblbl.core.ui.image.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

@@ -3,7 +3,7 @@ package com.tutu.myblbl.core.ui.layout
 import android.content.Context
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 
 open class WrapContentGridLayoutManager(
     context: Context,

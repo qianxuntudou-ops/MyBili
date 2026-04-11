@@ -9,7 +9,7 @@ import androidx.appcompat.widget.AppCompatTextView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellFavoriteFolderBinding
 import com.tutu.myblbl.model.favorite.FavoriteFolderModel
-import com.tutu.myblbl.utils.ImageLoader
+import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.utils.VideoCardFocusHelper
 
 class FavoriteFolderAdapter(

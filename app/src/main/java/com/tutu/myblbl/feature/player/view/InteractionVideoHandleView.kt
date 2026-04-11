@@ -11,7 +11,7 @@ import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.widget.AppCompatTextView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.model.interaction.*
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import java.util.regex.Pattern
 
 class InteractionVideoHandleView @JvmOverloads constructor(

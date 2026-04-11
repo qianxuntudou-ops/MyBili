@@ -2,6 +2,7 @@ package com.tutu.myblbl.utils
 
 import com.google.gson.Gson
 import com.tutu.myblbl.MyBLBLApplication
+import com.tutu.myblbl.core.common.log.AppLog
 import java.io.File
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger

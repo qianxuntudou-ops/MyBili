@@ -10,8 +10,8 @@ import com.tutu.myblbl.model.live.LiveAreaCategoryParent
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.SpatialFocusNavigator
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.utils.serializableCompat
 import androidx.recyclerview.widget.RecyclerView
 

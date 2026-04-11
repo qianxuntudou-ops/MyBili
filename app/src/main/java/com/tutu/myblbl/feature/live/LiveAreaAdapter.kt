@@ -9,7 +9,7 @@ import com.bumptech.glide.Glide
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellUserBinding
 import com.tutu.myblbl.model.live.LiveAreaCategory
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.utils.VideoCardFocusHelper
 
 class LiveAreaAdapter(

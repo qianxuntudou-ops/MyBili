@@ -15,7 +15,7 @@ import com.tutu.myblbl.databinding.ActivityPlayerBinding
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.feature.player.PlayerLaunchContext
 import com.tutu.myblbl.feature.player.VideoPlayerFragment
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import java.io.Serializable
 
 @OptIn(UnstableApi::class)

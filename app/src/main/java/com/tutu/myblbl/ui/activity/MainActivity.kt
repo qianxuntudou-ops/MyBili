@@ -37,7 +37,7 @@ import com.tutu.myblbl.ui.dialog.UserInfoDialog
 import com.tutu.myblbl.feature.player.PlayerLaunchContext
 import com.tutu.myblbl.feature.player.VideoPlayerFragment
 import com.tutu.myblbl.core.ui.navigation.TabBarView
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject

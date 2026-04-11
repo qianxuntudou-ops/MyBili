@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellSeriesFilterBinding
 import com.tutu.myblbl.model.series.AllSeriesFilterModel
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 
 class AllSeriesFilterAdapter(
     private val onItemClick: (Int) -> Unit,

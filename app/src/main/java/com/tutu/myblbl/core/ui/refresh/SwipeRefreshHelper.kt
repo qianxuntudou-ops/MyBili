@@ -1,4 +1,4 @@
-package com.tutu.myblbl.utils
+package com.tutu.myblbl.core.ui.refresh
 
 import android.view.ViewGroup
 import android.widget.FrameLayout

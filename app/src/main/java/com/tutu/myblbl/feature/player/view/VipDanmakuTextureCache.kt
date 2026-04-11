@@ -6,7 +6,7 @@ import android.graphics.Color
 import android.util.LruCache
 import com.kuaishou.akdanmaku.data.DanmakuVipGradientStyle
 import com.tutu.myblbl.network.NetworkManager
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import java.util.concurrent.ConcurrentHashMap
 import okhttp3.Request
 

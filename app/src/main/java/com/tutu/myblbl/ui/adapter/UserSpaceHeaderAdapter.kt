@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellUserSpaceHeaderBinding
 import com.tutu.myblbl.model.user.UserSpaceInfo
-import com.tutu.myblbl.utils.ImageLoader
+import com.tutu.myblbl.core.ui.image.ImageLoader
 
 class UserSpaceHeaderAdapter(
     private val onFollowClick: () -> Unit,

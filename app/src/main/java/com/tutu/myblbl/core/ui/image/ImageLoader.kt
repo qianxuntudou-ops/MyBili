@@ -1,4 +1,4 @@
-package com.tutu.myblbl.utils
+package com.tutu.myblbl.core.ui.image
 
 import android.content.Context
 import android.content.SharedPreferences

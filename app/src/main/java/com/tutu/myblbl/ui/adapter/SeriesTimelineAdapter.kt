@@ -8,7 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellMovieBinding
 import com.tutu.myblbl.model.series.timeline.SeriesTimeLineModel
-import com.tutu.myblbl.utils.ImageLoader
+import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.utils.VideoCardFocusHelper
 
 class SeriesTimelineAdapter(

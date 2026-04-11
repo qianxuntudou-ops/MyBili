@@ -11,7 +11,7 @@ import com.tutu.myblbl.model.live.LiveAreaCategoryParent
 import com.tutu.myblbl.model.live.LiveListWrapper
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.session.NetworkSessionGateway
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

@@ -11,7 +11,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.network.security.NetworkWebGateway
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import kotlinx.coroutines.Dispatchers

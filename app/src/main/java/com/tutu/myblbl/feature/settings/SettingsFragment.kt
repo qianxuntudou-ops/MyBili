@@ -16,9 +16,9 @@ import com.tutu.myblbl.ui.adapter.SettingAdapter
 import com.tutu.myblbl.ui.adapter.SettingSelectionDialogAdapter
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.decoration.LinearSpacingItemDecoration
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.utils.FileCacheManager
-import com.tutu.myblbl.utils.ImageLoader
+import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.utils.PlayerMediaCache
 import com.tutu.myblbl.utils.normalizeDanmakuSmartFilterValue
 import java.util.Locale

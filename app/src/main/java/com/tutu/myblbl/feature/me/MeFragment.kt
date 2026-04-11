@@ -20,10 +20,10 @@ import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
 import com.tutu.myblbl.ui.dialog.UserInfoDialog
 import com.tutu.myblbl.feature.settings.SignInFragment
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.ImageLoader
-import com.tutu.myblbl.utils.enableTouchNavigation
-import com.tutu.myblbl.utils.focusNearestTabTo
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.ui.image.ImageLoader
+import com.tutu.myblbl.core.ui.tab.enableTouchNavigation
+import com.tutu.myblbl.core.ui.tab.focusNearestTabTo
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject

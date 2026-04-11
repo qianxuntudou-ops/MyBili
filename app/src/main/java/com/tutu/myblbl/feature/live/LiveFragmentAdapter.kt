@@ -6,7 +6,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.DiffUtil
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.tutu.myblbl.model.live.LiveAreaCategoryParent
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 
 class LiveFragmentAdapter(
     fragmentManager: FragmentManager,

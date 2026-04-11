@@ -4,7 +4,7 @@ import android.os.Handler
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 
 /**
  * Centralizes focus routing and focus restoration for the controller chrome.

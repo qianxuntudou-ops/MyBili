@@ -6,7 +6,7 @@ import android.view.Window
 import androidx.appcompat.app.AppCompatDialog
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.DialogVideoInfoBinding
-import com.tutu.myblbl.utils.ImageLoader
+import com.tutu.myblbl.core.ui.image.ImageLoader
 
 class VideoInfoDialog(
     context: Context,

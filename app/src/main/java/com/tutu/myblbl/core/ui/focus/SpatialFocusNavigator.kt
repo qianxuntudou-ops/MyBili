@@ -1,4 +1,4 @@
-package com.tutu.myblbl.utils
+package com.tutu.myblbl.core.ui.focus
 
 import android.graphics.Rect
 import android.view.View

@@ -41,12 +41,12 @@ import com.tutu.myblbl.feature.player.view.InteractionVideoHandleView
 import com.tutu.myblbl.feature.player.view.MyPlayerView
 import com.tutu.myblbl.feature.player.view.OnPlayerSettingChange
 import com.tutu.myblbl.feature.player.view.OnVideoSettingChangeListener
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.ContentFilter
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.utils.PlayerSettings
 import com.tutu.myblbl.utils.PlayerSettingsStore
 import com.tutu.myblbl.utils.TimeUtils
-import com.tutu.myblbl.utils.ViewUtils
+import com.tutu.myblbl.core.ui.system.ViewUtils
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.util.Locale

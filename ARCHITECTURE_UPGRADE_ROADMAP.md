@@ -266,10 +266,11 @@ app/src/main/java/com/tutu/myblbl/
 - `detail`、`favorite`、`series`、`user` 已迁入对应 `feature/*` 目录
 - `BaseActivity`、`BaseFragment`、`BaseListFragment`、`BaseAdapter`、焦点恢复 helper、通用 layout manager / decoration 已迁入 `core/ui`
 - 主导航 `TabBarView` 已迁入 `core/ui/navigation`，搜索键盘 `KeyboardView` 已回收到 `feature/search/view`
+- `AppLog`、`ContentFilter`、`ImageLoader`、`SpatialFocusNavigator`、`SwipeRefreshHelper`、`TabLayoutExtensions`、`ViewUtils`、`VideoRouteNavigator` 已完成首轮边界收口
 - 关联的 XML 自定义 View 全限定类名、baseline profile、测试包引用已同步到新的 feature 包名
 - 业务 feature 目录层面的首轮迁移已经基本完成
 - `core/ui` 的首轮边界已经建立，后续可继续按需把零散公共 UI 能力收口进去
-- 下一阶段更值得继续推进的是跨 feature 公共 model / helper 的归属收敛
+- 下一阶段更值得继续推进的是剩余运行时工具、公共 model、缓存与设置类的归属收敛
 
 ---
 

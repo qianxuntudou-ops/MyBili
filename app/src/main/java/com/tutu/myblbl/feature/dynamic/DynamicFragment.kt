@@ -26,11 +26,11 @@ import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.ContentFilter
-import com.tutu.myblbl.utils.SpatialFocusNavigator
-import com.tutu.myblbl.utils.SwipeRefreshHelper
-import com.tutu.myblbl.utils.VideoRouteNavigator
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
+import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
+import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject

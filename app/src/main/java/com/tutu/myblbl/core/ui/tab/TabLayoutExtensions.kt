@@ -1,4 +1,6 @@
-package com.tutu.myblbl.utils
+package com.tutu.myblbl.core.ui.tab
+
+import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 
 import android.view.KeyEvent
 import android.view.View

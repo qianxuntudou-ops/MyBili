@@ -34,7 +34,7 @@ import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.security.NetworkSecurityGateway
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.Base2Response
-import com.tutu.myblbl.utils.AppLog
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.utils.CookieManager
 import com.tutu.myblbl.utils.PlayerMediaCache
 import com.tutu.myblbl.utils.PlayerSettings

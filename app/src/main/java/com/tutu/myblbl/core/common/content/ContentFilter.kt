@@ -1,4 +1,4 @@
-package com.tutu.myblbl.utils
+package com.tutu.myblbl.core.common.content
 
 import android.content.Context
 import com.tutu.myblbl.model.live.LiveRoomItem

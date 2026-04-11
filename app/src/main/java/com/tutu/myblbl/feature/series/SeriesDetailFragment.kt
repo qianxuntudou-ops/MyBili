@@ -23,8 +23,8 @@ import com.tutu.myblbl.model.series.SeriesModel
 import com.tutu.myblbl.model.series.SeriesUserState
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.SeriesDetailContentAdapter
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.VideoRouteNavigator
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject

@@ -12,8 +12,8 @@ import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
-import com.tutu.myblbl.utils.ContentFilter
-import com.tutu.myblbl.utils.VideoRouteNavigator
+import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 

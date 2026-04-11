@@ -1,4 +1,4 @@
-package com.tutu.myblbl.utils
+package com.tutu.myblbl.core.navigation
 
 import android.content.Context
 import android.content.ContextWrapper
@@ -9,6 +9,7 @@ import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.ui.activity.PlayerActivity
 import com.tutu.myblbl.feature.detail.VideoDetailFragment
 import com.tutu.myblbl.feature.series.SeriesDetailFragment
+import com.tutu.myblbl.utils.isOpenDetailFirstEnabled
 import java.net.URL
 
 object VideoRouteNavigator {

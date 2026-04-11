@@ -16,9 +16,9 @@ import com.tutu.myblbl.databinding.FragmentHomeBinding
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.enableTouchNavigation
-import com.tutu.myblbl.utils.focusNearestTabTo
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.ui.tab.enableTouchNavigation
+import com.tutu.myblbl.core.ui.tab.focusNearestTabTo
 import com.tutu.myblbl.utils.getHomeDefaultStartPageIndex
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch

@@ -10,9 +10,9 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.appcompat.widget.AppCompatImageView
 import com.tutu.myblbl.R
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.ImageLoader
-import com.tutu.myblbl.utils.SpatialFocusNavigator
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.ui.image.ImageLoader
+import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 
 class TabBarView @JvmOverloads constructor(
     context: Context,

@@ -14,9 +14,9 @@ import com.tutu.myblbl.model.live.LiveRoomItem
 import com.tutu.myblbl.ui.activity.LivePlayerActivity
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
-import com.tutu.myblbl.utils.AppLog
-import com.tutu.myblbl.utils.ContentFilter
-import com.tutu.myblbl.utils.SwipeRefreshHelper
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
 import com.tutu.myblbl.utils.toast
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -102,7 +102,7 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
     }
 
     override fun initData() {
-        com.tutu.myblbl.utils.AppLog.d("LiveListFragment", "initData: parentAreaId=$parentAreaId, areaId=$areaId, title=$title")
+        com.tutu.myblbl.core.common.log.AppLog.d("LiveListFragment", "initData: parentAreaId=$parentAreaId, areaId=$areaId, title=$title")
         viewModel.startArea(parentAreaId, areaId)
     }
 

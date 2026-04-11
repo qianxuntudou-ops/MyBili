@@ -1,4 +1,4 @@
-package com.tutu.myblbl.utils
+package com.tutu.myblbl.core.common.log
 
 import android.util.Log
 import com.tutu.myblbl.BuildConfig
