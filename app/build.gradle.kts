@@ -178,8 +178,8 @@ dependencies {
     implementation("com.google.protobuf:protobuf-javalite:3.24.0")
 
     // AkDanmaku 官方弹幕引擎（源码内嵌，见 com.kuaishou.akdanmaku）
+    // Keep gdx core for utility classes used by AkDanmaku (Array/Pool/MathUtils).
     implementation("com.badlogicgames.gdx:gdx:1.10.0")
-    implementation("com.badlogicgames.gdx:gdx-backend-android:1.10.0")
     implementation("com.badlogicgames.ashley:ashley:1.7.3")
 
     // ZXing 二维码
