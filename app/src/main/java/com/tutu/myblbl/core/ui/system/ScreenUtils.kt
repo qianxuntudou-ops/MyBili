@@ -2,15 +2,11 @@ package com.tutu.myblbl.core.ui.system
 
 import android.content.Context
 import android.content.ContextWrapper
-import android.view.WindowMetrics
+import android.os.Build
+import android.util.DisplayMetrics
 import androidx.appcompat.app.AppCompatActivity
 
 object ScreenUtils {
-
-    private fun getWindowMetrics(context: Context): WindowMetrics {
-        val activity = findActivity(context)
-        return activity.windowManager.currentWindowMetrics
-    }
 
     private fun findActivity(context: Context): AppCompatActivity {
         var ctx = context
@@ -22,11 +18,29 @@ object ScreenUtils {
     }
 
     fun getScreenWidth(context: Context): Int {
-        return getWindowMetrics(context).bounds.width()
+        val activity = findActivity(context)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            activity.windowManager.currentWindowMetrics.bounds.width()
+        } else {
+            @Suppress("DEPRECATION")
+            val displayMetrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            activity.windowManager.defaultDisplay.getMetrics(displayMetrics)
+            displayMetrics.widthPixels
+        }
     }
 
     fun getScreenHeight(context: Context): Int {
-        return getWindowMetrics(context).bounds.height()
+        val activity = findActivity(context)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            activity.windowManager.currentWindowMetrics.bounds.height()
+        } else {
+            @Suppress("DEPRECATION")
+            val displayMetrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            activity.windowManager.defaultDisplay.getMetrics(displayMetrics)
+            displayMetrics.heightPixels
+        }
     }
 
     fun getScreenDensity(context: Context): Float {

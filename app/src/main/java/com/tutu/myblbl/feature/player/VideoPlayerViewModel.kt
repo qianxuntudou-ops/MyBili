@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.MediaSource
 import com.google.gson.Gson
+import com.tutu.myblbl.core.common.media.VideoCodecSupport
 import com.tutu.myblbl.model.dm.AdvancedDanmakuParser
 import com.tutu.myblbl.model.dm.DmColorfulStyleParser
 import com.tutu.myblbl.model.dm.DmModel
@@ -309,11 +310,9 @@ class VideoPlayerViewModel(
     private var fallbackAttemptCount: Int = 0
     private val attemptedFallbackSignatures = linkedSetOf<String>()
     private var lastPlaybackPositionMs: Long = 0L
-    private val fallbackCodecPriorityOrder = listOf(
-        VideoCodecEnum.AV1,
-        VideoCodecEnum.HEVC,
-        VideoCodecEnum.AVC
-    )
+    private val hardwareSupportedVideoCodecs by lazy(LazyThreadSafetyMode.NONE) {
+        VideoCodecSupport.getHardwareSupportedCodecs()
+    }
 
     fun loadVideoInfo(
         aid: Long? = null,
@@ -908,7 +907,8 @@ class VideoPlayerViewModel(
             playInfo = initialPlayInfo,
             preferredQualityId = resolvedQualityId,
             preferredAudioId = selectedAudioId,
-            preferredCodec = selectedCodec
+            preferredCodec = selectedCodec,
+            hardwareSupportedCodecs = hardwareSupportedVideoCodecs
         )
         if (selectionSnapshot.selectedQualityId != resolvedQualityId) {
             selectionSnapshot = selectionSnapshot.copy(selectedQualityId = resolvedQualityId)
@@ -1212,7 +1212,7 @@ class VideoPlayerViewModel(
             lockedQualityId = lockedQualityId,
             selectedAudioId = selectedAudioId,
             preferredCodec = preferredCodec,
-            codecPriorityOrder = fallbackCodecPriorityOrder
+            hardwareSupportedCodecs = hardwareSupportedVideoCodecs
         )
         fallbackRouteIndex = currentStreamFallbackPlan
             ?.routes

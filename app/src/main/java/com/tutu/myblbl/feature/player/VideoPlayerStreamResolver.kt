@@ -9,6 +9,7 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
+import com.tutu.myblbl.core.common.media.VideoCodecSupport
 import com.tutu.myblbl.model.player.DashAudio
 import com.tutu.myblbl.model.player.DashVideo
 import com.tutu.myblbl.model.player.PlayInfoModel
@@ -70,14 +71,20 @@ internal class VideoPlayerStreamResolver(
         playInfo: PlayInfoModel,
         preferredQualityId: Int?,
         preferredAudioId: Int?,
-        preferredCodec: VideoCodecEnum?
+        preferredCodec: VideoCodecEnum?,
+        hardwareSupportedCodecs: Collection<VideoCodecEnum> = emptySet()
     ): SelectionSnapshot {
         val qualities = buildQualityList(playInfo)
         val resolvedQualityId = resolveQualityId(playInfo, qualities, preferredQualityId)
         val audios = buildAudioList(playInfo)
         val resolvedAudioId = resolveAudioId(audios, preferredAudioId)
-        val codecs = buildCodecList(playInfo, resolvedQualityId)
-        val resolvedCodec = preferredCodec.takeIf { it in codecs } ?: codecs.firstOrNull()
+        val codecs = buildCodecList(
+            playInfo = playInfo,
+            qualityId = resolvedQualityId,
+            preferredCodec = preferredCodec,
+            hardwareSupportedCodecs = hardwareSupportedCodecs
+        )
+        val resolvedCodec = codecs.firstOrNull()
         return SelectionSnapshot(
             qualities = qualities,
             selectedQualityId = resolvedQualityId,
@@ -154,16 +161,22 @@ internal class VideoPlayerStreamResolver(
 
     fun buildCodecList(
         playInfo: PlayInfoModel,
-        qualityId: Int?
+        qualityId: Int?,
+        preferredCodec: VideoCodecEnum? = null,
+        hardwareSupportedCodecs: Collection<VideoCodecEnum> = emptySet()
     ): List<VideoCodecEnum> {
         val videos = playInfo.dash?.video.orEmpty()
         val filteredVideos = videos
             .filter { qualityId == null || it.id == qualityId }
             .ifEmpty { videos }
-        return filteredVideos
+        val availableCodecs = filteredVideos
             .map { VideoCodecEnum.fromId(it.codecId) }
             .distinct()
-            .sortedWith(compareBy(::codecPriority))
+        return VideoCodecSupport.orderCandidates(
+            availableCodecs = availableCodecs,
+            preferredCodec = preferredCodec,
+            hardwareSupportedCodecs = hardwareSupportedCodecs
+        )
     }
 
     fun buildMediaSource(
@@ -291,7 +304,7 @@ internal class VideoPlayerStreamResolver(
         lockedQualityId: Int,
         selectedAudioId: Int?,
         preferredCodec: VideoCodecEnum?,
-        codecPriorityOrder: List<VideoCodecEnum>
+        hardwareSupportedCodecs: Collection<VideoCodecEnum>
     ): StreamFallbackPlan? {
         val dash = playInfo.dash ?: return null
         val videosAtQuality = dash.video.orEmpty()
@@ -312,7 +325,7 @@ internal class VideoPlayerStreamResolver(
         val codecOrder = orderCodecs(
             available = videosByCodec.keys,
             preferredCodec = preferredCodec,
-            codecPriorityOrder = codecPriorityOrder
+            hardwareSupportedCodecs = hardwareSupportedCodecs
         )
         val routes = codecOrder.mapNotNull { codec ->
             val selectedVideo = videosByCodec[codec]
@@ -379,21 +392,13 @@ internal class VideoPlayerStreamResolver(
     private fun orderCodecs(
         available: Collection<VideoCodecEnum>,
         preferredCodec: VideoCodecEnum?,
-        codecPriorityOrder: List<VideoCodecEnum>
+        hardwareSupportedCodecs: Collection<VideoCodecEnum>
     ): List<VideoCodecEnum> {
-        val uniqueAvailable = available.toSet()
-        return buildList {
-            preferredCodec
-                ?.takeIf { it in uniqueAvailable }
-                ?.let(::add)
-            codecPriorityOrder
-                .filter { it in uniqueAvailable && it !in this }
-                .forEach(::add)
-            uniqueAvailable
-                .filter { it !in this }
-                .sortedBy(::codecPriority)
-                .forEach(::add)
-        }
+        return VideoCodecSupport.orderCandidates(
+            availableCodecs = available,
+            preferredCodec = preferredCodec,
+            hardwareSupportedCodecs = hardwareSupportedCodecs
+        )
     }
 
     private fun buildDistinctUrls(primaryUrl: String, backupUrls: List<String>?): List<String> {
@@ -434,14 +439,6 @@ internal class VideoPlayerStreamResolver(
             baseUrl = baseUrl,
             backupUrls = backupUrls
         )
-    }
-
-    private fun codecPriority(codec: VideoCodecEnum): Int {
-        return when (codec) {
-            VideoCodecEnum.AV1 -> 0
-            VideoCodecEnum.HEVC -> 1
-            VideoCodecEnum.AVC -> 2
-        }
     }
 
     private val loadErrorPolicy = object : LoadErrorHandlingPolicy {
