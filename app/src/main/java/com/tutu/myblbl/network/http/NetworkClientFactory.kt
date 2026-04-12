@@ -8,7 +8,9 @@ import com.tutu.myblbl.model.adapter.FlexibleLongAdapter
 import com.tutu.myblbl.network.interceptor.HeaderInterceptor
 import com.tutu.myblbl.network.interceptor.HttpCacheInterceptor
 import com.tutu.myblbl.network.cookie.CookieManager
+import java.io.File
 import java.util.concurrent.TimeUnit
+import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -16,12 +18,15 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object NetworkClientFactory {
 
+    private const val HTTP_CACHE_SIZE = 64L * 1024 * 1024
+
     fun createOkHttpClient(
         cookieManager: CookieManager,
         userAgentProvider: () -> String,
-        acceptLanguageProvider: () -> String
+        acceptLanguageProvider: () -> String,
+        cacheDir: File? = null
     ): OkHttpClient {
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .cookieJar(cookieManager)
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = if (BuildConfig.DEBUG) {
@@ -41,7 +46,13 @@ object NetworkClientFactory {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .build()
+
+        if (cacheDir != null) {
+            val httpCacheDir = File(cacheDir, "http_cache")
+            builder.cache(Cache(httpCacheDir, HTTP_CACHE_SIZE))
+        }
+
+        return builder.build()
     }
 
     fun createGson(): Gson {

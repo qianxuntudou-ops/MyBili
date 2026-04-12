@@ -46,7 +46,8 @@ object NetworkManager {
         NetworkClientFactory.createOkHttpClient(
             cookieManager = internalCookieManager,
             userAgentProvider = { currentUserAgentValue },
-            acceptLanguageProvider = { getAcceptLanguage() }
+            acceptLanguageProvider = { getAcceptLanguage() },
+            cacheDir = appContext?.cacheDir
         )
     }
 

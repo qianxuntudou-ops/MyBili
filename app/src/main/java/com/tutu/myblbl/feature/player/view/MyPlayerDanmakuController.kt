@@ -488,7 +488,7 @@ class MyPlayerDanmakuController(
             android.util.Log.d("DM_SETTING", "updateConfig: SKIPPED (equal), screenPart=${danmakuConfig.screenPart}")
             return
         }
-        android.util.Log.d("DM_SETTING", "updateConfig: APPLYING screenPart ${danmakuConfig.screenPart} -> ${newConfig.screenPart}")
+        android.util.Log.d("DM_SETTING", "updateConfig: APPLYING screenPart ${danmakuConfig.screenPart} -> ${newConfig.screenPart}, retainerGen ${danmakuConfig.retainerGeneration}->${newConfig.retainerGeneration}, layoutGen ${danmakuConfig.layoutGeneration}->${newConfig.layoutGeneration}")
         danmakuConfig = newConfig
         danmakuPlayer?.updateConfig(newConfig)
     }
