@@ -108,6 +108,7 @@ internal class AkTopRetainer(
   }
 
   override fun update(start: Int, end: Int) {
+    com.kuaishou.akdanmaku.ext.AkLog.w("DanmakuEngine", "[AkTopRetainer] update: start=$start, end=$end, startRatio=$startRatio, endRatio=$endRatio -> effective [${(start * startRatio).toInt()}, ${(end * endRatio).toInt()}]")
     ranges.update((start * startRatio).toInt(), (end * endRatio).toInt())
   }
 }

@@ -158,10 +158,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.9.3")
     implementation("androidx.media3:media3-ui:1.9.3")
     implementation("androidx.media3:media3-common:1.9.3")
-    implementation("androidx.media3:media3-session:1.9.3")
     implementation("androidx.media3:media3-datasource:1.9.3")
     implementation("androidx.media3:media3-datasource-okhttp:1.9.3")
-    implementation("androidx.media3:media3-exoplayer-dash:1.9.3")
     implementation("androidx.media3:media3-database:1.9.3")
 
     implementation("com.github.bumptech.glide:glide:4.16.0")

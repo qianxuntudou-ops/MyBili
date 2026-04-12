@@ -309,6 +309,7 @@ class DanmakuPlayer(renderer: DanmakuRenderer, dataSource: DataSource? = null) {
 
   fun updateConfig(danmakuConfig: DanmakuConfig?) {
     config = danmakuConfig
+    Log.d(DanmakuEngine.TAG, "[DanmakuPlayer] updateConfig: screenPart=${danmakuConfig?.screenPart}, retainerGen=${danmakuConfig?.retainerGeneration}, layoutGen=${danmakuConfig?.layoutGeneration}")
     engine.updateConfig(danmakuConfig ?: return)
   }
 

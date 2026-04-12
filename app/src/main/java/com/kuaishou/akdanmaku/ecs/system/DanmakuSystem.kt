@@ -80,6 +80,7 @@ internal class DanmakuSystem(context: DanmakuContext) : DanmakuEntitySystem(cont
 
       if (currentConfig.screenPart != config.screenPart ||
         currentConfig.allowOverlap != config.allowOverlap) {
+        Log.w(DanmakuEngine.TAG, "[Config] screenPart change from ${currentConfig.screenPart} to ${config.screenPart}, allowOverlap from ${currentConfig.allowOverlap} to ${config.allowOverlap}")
         config.updateLayout()
         config.updateVisibility()
         config.updateRetainer()

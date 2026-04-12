@@ -76,7 +76,9 @@ internal class LayoutSystem(
     }
     if (retainerGeneration != config.retainerGeneration) {
       Log.v(DanmakuEngine.TAG, "[Layout] RetainerGeneration change, clear retainer.")
-      layouter.updateScreenPart(0, (displayer.height * config.screenPart).toInt())
+      val endTop = (displayer.height * config.screenPart).toInt()
+      Log.w(DanmakuEngine.TAG, "[Layout] updateScreenPart: displayer.height=${displayer.height}, screenPart=${config.screenPart}, endTop=$endTop")
+      layouter.updateScreenPart(0, endTop)
       layouter.clear()
       retainerGeneration = config.retainerGeneration
     }
