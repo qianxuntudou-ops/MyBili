@@ -77,7 +77,7 @@ internal class LayoutSystem(
     if (retainerGeneration != config.retainerGeneration) {
       Log.v(DanmakuEngine.TAG, "[Layout] RetainerGeneration change, clear retainer.")
       val endTop = (displayer.height * config.screenPart).toInt()
-      Log.w(DanmakuEngine.TAG, "[Layout] updateScreenPart: displayer.height=${displayer.height}, screenPart=${config.screenPart}, endTop=$endTop")
+      android.util.Log.d("DM_SETTING", "[LayoutSystem] retainerGen changed: $retainerGeneration -> ${config.retainerGeneration}, screenPart=${config.screenPart}, displayerH=${displayer.height}, endTop=$endTop")
       layouter.updateScreenPart(0, endTop)
       layouter.clear()
       retainerGeneration = config.retainerGeneration
@@ -88,6 +88,9 @@ internal class LayoutSystem(
     }
     val currentTimeMills = currentTimeMs
     var needSync = false
+    var relayoutCount = 0
+    var skipRelayoutCount = 0
+    var hiddenCount = 0
 
     getEntities()
       .filter { entity ->
@@ -119,8 +122,12 @@ internal class LayoutSystem(
         val layout = entity.layout ?: createComponent(LayoutComponent::class.java, entity, item) ?: return@forEach
         val needRelayout = drawState.layoutGeneration != config.layoutGeneration
         if (needRelayout) {
+          relayoutCount++
           drawState.visibility = false
           layout.visibility = layouter.preLayout(item, currentTimeMills, displayer, config)
+          if (!layout.visibility) hiddenCount++
+        } else {
+          skipRelayoutCount++
         }
         if (layout.visibility) {
           synchronized(item.state) {
@@ -135,6 +142,9 @@ internal class LayoutSystem(
         }
         layout.position.set(drawState.positionX, drawState.positionY)
       }
+    if (relayoutCount > 0 || forceUpdate) {
+      android.util.Log.d("DM_SETTING", "[LayoutSystem] layout pass: relayout=$relayoutCount, skipped=$skipRelayoutCount, hidden=$hiddenCount, layoutGen=${config.layoutGeneration}, retainerGen=${config.retainerGeneration}")
+    }
     if (isPaused) {
       if (needSync) {
         cacheManager.requestBuildSign()

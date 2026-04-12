@@ -4,10 +4,15 @@ import android.content.Context
 import com.bumptech.glide.Glide
 import com.bumptech.glide.GlideBuilder
 import com.bumptech.glide.annotation.GlideModule
+import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.engine.cache.LruResourceCache
 import com.bumptech.glide.load.engine.cache.DiskLruCacheFactory
 import com.bumptech.glide.module.AppGlideModule
+import com.bumptech.glide.integration.okhttp3.OkHttpUrlLoader
+import com.bumptech.glide.Registry
+import com.tutu.myblbl.network.NetworkManager
 import java.io.File
+import java.io.InputStream
 
 @GlideModule
 class MyBLBLGlideModule : AppGlideModule() {
@@ -16,6 +21,18 @@ class MyBLBLGlideModule : AppGlideModule() {
         builder.setMemoryCache(LruResourceCache(256L * 1024 * 1024))
         val cacheDir = File(context.externalCacheDir ?: context.cacheDir, "glide_cache")
         builder.setDiskCache(DiskLruCacheFactory(cacheDir.absolutePath, 512L * 1024 * 1024))
+    }
+
+    override fun registerComponents(
+        context: Context,
+        glide: Glide,
+        registry: Registry
+    ) {
+        registry.replace(
+            GlideUrl::class.java,
+            InputStream::class.java,
+            OkHttpUrlLoader.Factory(NetworkManager.getOkHttpClient())
+        )
     }
 
     override fun isManifestParsingEnabled(): Boolean = false
