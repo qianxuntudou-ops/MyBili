@@ -151,6 +151,15 @@ data class VideoModel(
             else -> parseBangumiSeasonIdFromRedirectUrl()
         }
 
+    val playbackEpId: Long
+        get() = when {
+            epid > 0L -> epid
+            else -> parseBangumiEpIdFromRedirectUrl()
+        }
+
+    val isPgc: Boolean
+        get() = playbackEpId > 0L || playbackSeasonId > 0L
+
     private fun parseDuration(value: String): Long {
         val parts = value.split(":").mapNotNull { it.toLongOrNull() }
         if (parts.isEmpty()) {
@@ -171,6 +180,16 @@ data class VideoModel(
         val seasonId = url.substringAfter("/bangumi/play/ss", "")
             .takeWhile { it.isDigit() }
         return seasonId.toLongOrNull() ?: 0L
+    }
+
+    private fun parseBangumiEpIdFromRedirectUrl(): Long {
+        val url = redirectUrl
+        if (!url.contains("/bangumi/play/ep")) {
+            return 0L
+        }
+        val epId = url.substringAfter("/bangumi/play/ep", "")
+            .takeWhile { it.isDigit() }
+        return epId.toLongOrNull() ?: 0L
     }
 }
 

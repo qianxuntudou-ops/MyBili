@@ -467,7 +467,7 @@ class VideoPlayerViewModel(
         val targetAid = video.aid.takeIf { it > 0L } ?: currentAid
         val targetBvid = video.bvid.takeIf { it.isNotBlank() } ?: currentBvid
         val targetSeasonId = video.playbackSeasonId.takeIf { it > 0L }
-        val targetEpId = video.epid.takeIf { it > 0L }
+        val targetEpId = video.playbackEpId.takeIf { it > 0L }
         if (targetAid == null && targetBvid.isNullOrBlank() && targetEpId == null && targetSeasonId == null) {
             _error.value = "相关推荐缺少视频标识"
             return

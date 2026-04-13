@@ -223,6 +223,9 @@
     <string name="knowledge">知识</string>
     <string name="last_watch_" formatted="false">上次观看到第%s集 %s</string>
     <string name="later_watch">稍后观看</string>
+    <string name="later_watch_added">已加入稍后观看</string>
+    <string name="later_watch_removed">已移出稍后观看</string>
+    <string name="later_watch_">已加入</string>
     <string name="level_">LV%d</string>
     <string name="lifestyle">生活</string>
     <string name="like">点赞</string>

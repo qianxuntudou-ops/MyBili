@@ -269,6 +269,20 @@ interface ApiService {
     @GET("x/v2/history/toview")
     suspend fun getLaterWatch(): BaseResponse<LaterWatchWrapper>
 
+    @POST("x/v2/history/toview/add")
+    @FormUrlEncoded
+    suspend fun addWatchLater(
+        @Field("aid") aid: Long,
+        @Field("csrf") csrf: String
+    ): BaseBaseResponse
+
+    @POST("x/v2/history/toview/del")
+    @FormUrlEncoded
+    suspend fun removeWatchLater(
+        @Field("aid") aid: Long,
+        @Field("csrf") csrf: String
+    ): BaseBaseResponse
+
     @GET("x/web-interface/zone")
     suspend fun getZoneInfo(): BaseResponse<ZoneModel>
 

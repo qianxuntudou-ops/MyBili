@@ -284,7 +284,7 @@ class VideoPlayerOverlayController(
                 onPlayRelatedVideo(video, playQueue)
             },
             currentAid = view.aid,
-            currentBvid = view.bvid
+            currentVideoId = view.bvid
         ).apply {
             setOnDismissListener {
                 if (isViewActive()) {

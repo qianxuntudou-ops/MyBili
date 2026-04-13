@@ -12,6 +12,7 @@ import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.model.video.VideoPvModel
 import com.tutu.myblbl.model.player.PlayInfoModel
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.response.BaseBaseResponse
 import com.tutu.myblbl.network.security.NetworkSecurityGateway
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.ListDataModel
@@ -157,6 +158,22 @@ class VideoRepository(
             } else {
                 firstResponse
             }
+        }
+
+    suspend fun addWatchLater(aid: Long, csrf: String): Result<BaseBaseResponse> =
+        runCatching {
+            sessionGateway.syncAuthState(
+                apiService.addWatchLater(aid, csrf),
+                source = "video.addWatchLater"
+            )
+        }
+
+    suspend fun removeWatchLater(aid: Long, csrf: String): Result<BaseBaseResponse> =
+        runCatching {
+            sessionGateway.syncAuthState(
+                apiService.removeWatchLater(aid, csrf),
+                source = "video.removeWatchLater"
+            )
         }
 
     private fun BaseResponse<ListDataModel<VideoModel>>.mapListData(): BaseResponse<List<VideoModel>> {

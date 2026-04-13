@@ -39,7 +39,7 @@ data class PlayerLaunchContext(
             val resolvedAid = aid.takeIf { it > 0L } ?: resolvedVideo?.aid ?: 0L
             val resolvedBvid = bvid.takeIf { it.isNotBlank() } ?: resolvedVideo?.bvid.orEmpty()
             val resolvedCid = cid.takeIf { it > 0L } ?: resolvedVideo?.cid ?: 0L
-            val resolvedEpId = epId.takeIf { it > 0L } ?: resolvedVideo?.epid ?: 0L
+            val resolvedEpId = epId.takeIf { it > 0L } ?: resolvedVideo?.playbackEpId ?: 0L
             val resolvedSeasonId = seasonId.takeIf { it > 0L }
                 ?: resolvedVideo?.playbackSeasonId
                 ?: 0L

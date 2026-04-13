@@ -3,13 +3,16 @@ package com.tutu.myblbl.ui.dialog
 import android.content.Context
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.View
 import android.view.Window
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
+import com.tutu.myblbl.core.ui.decoration.LinearSpacingItemDecoration
 import com.tutu.myblbl.databinding.DialogActionBinding
 import com.tutu.myblbl.model.favorite.FavoriteFolderModel
 import com.tutu.myblbl.network.session.NetworkSessionGateway
@@ -17,6 +20,7 @@ import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
+import com.tutu.myblbl.ui.adapter.FavoriteFolderDialogAdapter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,6 +47,7 @@ class PlayerActionDialog(
     private var isLiked = false
     private var isFavorited = false
     private var isCoined = false
+    private var isInWatchLater = false
     private var selectedCoinMultiply = loadCoinMultiply()
 
     init {
@@ -131,10 +136,23 @@ class PlayerActionDialog(
         binding.buttonCollection.setOnClickListener {
             if (!checkLogin()) return@setOnClickListener
             scope.launch {
+                val currentUserMid = sessionGateway.getUserInfo()?.mid?.takeIf { it > 0L } ?: ownerMid
+                if (currentUserMid <= 0L) {
+                    toast("收藏夹信息未加载完成")
+                    return@launch
+                }
+                val folderResult = favoriteRepository.getFavoriteFolders(currentUserMid)
+                val folders = folderResult.getOrNull()?.data?.list.orEmpty()
+                val defaultFolder = folders.firstOrNull()
+                if (defaultFolder == null) {
+                    toast("暂无可用收藏夹")
+                    return@launch
+                }
+                val folderId = defaultFolder.id.toString()
                 val result = if (isFavorited) {
-                    favoriteRepository.removeFavorite(aid, "")
+                    favoriteRepository.removeFavorite(aid, folderId)
                 } else {
-                    favoriteRepository.addFavorite(aid, "")
+                    favoriteRepository.addFavorite(aid, folderId)
                 }
                 result.onSuccess { response ->
                     if (response.isSuccess) {
@@ -188,6 +206,37 @@ class PlayerActionDialog(
                 }
             }
         }
+
+        binding.buttonWatchLater.setOnClickListener {
+            if (!checkLogin()) return@setOnClickListener
+            scope.launch {
+                runCatching {
+                    if (isInWatchLater) {
+                        videoRepository.removeWatchLater(aid)
+                    } else {
+                        videoRepository.addWatchLater(aid)
+                    }
+                }.onSuccess { response ->
+                    if (response.isSuccess) {
+                        isInWatchLater = !isInWatchLater
+                        renderState()
+                        toast(
+                            if (isInWatchLater) context.getString(R.string.later_watch_added)
+                            else context.getString(R.string.later_watch_removed)
+                        )
+                    } else {
+                        if (isRiskControl(response.code, response.errorMessage)) {
+                            showRiskControlHint()
+                        } else {
+                            toast(response.errorMessage)
+                        }
+                    }
+                }.onFailure {
+                    AppLog.e("PlayerAction", "watchLater failed", it)
+                    toast(it.message ?: "操作失败")
+                }
+            }
+        }
     }
 
     private fun refreshState() {
@@ -231,6 +280,11 @@ class PlayerActionDialog(
         binding.textCollection.text = context.getString(
             if (isFavorited) R.string.collection_ else R.string.collection
         )
+        binding.iconWatchLater.alpha = 1f
+        binding.textWatchLater.alpha = 1f
+        binding.textWatchLater.text = context.getString(
+            if (isInWatchLater) R.string.later_watch_ else R.string.later_watch
+        )
         updateActionAppearance(
             enabled = isLiked,
             iconView = binding.iconLike,
@@ -245,6 +299,11 @@ class PlayerActionDialog(
             enabled = isFavorited,
             iconView = binding.iconCollection,
             textView = binding.textCollection
+        )
+        updateActionAppearance(
+            enabled = isInWatchLater,
+            iconView = binding.iconWatchLater,
+            textView = binding.textWatchLater
         )
         binding.buttonTriple.isVisible = true
         val allDone = isLiked && isCoined && isFavorited
@@ -314,42 +373,60 @@ class PlayerActionDialog(
     }
 
     private fun displayFavoriteFolderChooser(folders: List<FavoriteFolderModel>) {
-        val titles = folders.map { folder ->
-            "${folder.title} (${folder.mediaCount})"
-        }.toTypedArray()
-        AlertDialog.Builder(context, R.style.DialogTheme)
-            .setTitle(
-                if (isFavorited) context.getString(R.string.collection_)
-                else context.getString(R.string.collection)
-            )
-            .setItems(titles) { dialog, which ->
-                val folder = folders.getOrNull(which) ?: return@setItems
-                scope.launch {
-                    val result = if (isFavorited) {
-                        favoriteRepository.removeFavorite(aid, folder.id.toString())
-                    } else {
-                        favoriteRepository.addFavorite(aid, folder.id.toString())
-                    }
-                    result.onSuccess { response ->
-                        if (response.isSuccess) {
-                            isFavorited = !isFavorited
-                            renderState()
-                            toast(
-                                if (isFavorited) {
-                                    "已收藏到 ${folder.title}"
-                                } else {
-                                    "已从 ${folder.title} 取消收藏"
-                                }
-                            )
-                        } else {
-                            toast(response.errorMessage)
-                        }
-                    }.onFailure { toast(it.message ?: "操作失败") }
+        val dialog = AppCompatDialog(context, R.style.DialogTheme)
+        dialog.setContentView(R.layout.dialog_favorite_folder)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.findViewById<View>(R.id.dialog_root)?.setOnClickListener { dialog.dismiss() }
+
+        val titleView = dialog.findViewById<android.widget.TextView>(R.id.top_title)
+        val recyclerView = dialog.findViewById<RecyclerView>(R.id.recyclerView)
+        titleView?.text = if (isFavorited) context.getString(R.string.collection_)
+        else context.getString(R.string.collection)
+
+        val adapter = FavoriteFolderDialogAdapter(folders) { position ->
+            val folder = folders.getOrNull(position) ?: return@FavoriteFolderDialogAdapter
+            dialog.dismiss()
+            scope.launch {
+                val result = if (isFavorited) {
+                    favoriteRepository.removeFavorite(aid, folder.id.toString())
+                } else {
+                    favoriteRepository.addFavorite(aid, folder.id.toString())
                 }
-                dialog.dismiss()
+                result.onSuccess { response ->
+                    if (response.isSuccess) {
+                        isFavorited = !isFavorited
+                        renderState()
+                        toast(
+                            if (isFavorited) {
+                                "已收藏到 ${folder.title}"
+                            } else {
+                                "已从 ${folder.title} 取消收藏"
+                            }
+                        )
+                    } else {
+                        toast(response.errorMessage)
+                    }
+                }.onFailure { toast(it.message ?: "操作失败") }
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        }
+
+        recyclerView?.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(context)
+        recyclerView?.adapter = adapter
+        if (recyclerView != null && recyclerView.itemDecorationCount == 0) {
+            recyclerView.addItemDecoration(
+                LinearSpacingItemDecoration(
+                    context.resources.getDimensionPixelSize(R.dimen.px2),
+                    includeBottom = true
+                )
+            )
+        }
+
+        dialog.setOnShowListener {
+            recyclerView?.post {
+                adapter.requestInitialFocus(recyclerView)
+            }
+        }
+        dialog.show()
     }
 
     private fun loadCoinMultiply(): Int {

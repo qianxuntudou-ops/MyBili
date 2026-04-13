@@ -5,13 +5,42 @@
     android:background="@drawable/dialog_background"
     android:clickable="true"
     android:focusable="true"
-    android:layout_width="@dimen/px550"
-    android:layout_height="@dimen/px270">
+    android:layout_width="@dimen/px1000"
+    android:layout_height="wrap_content">
     <androidx.appcompat.widget.LinearLayoutCompat
         android:gravity="center"
         android:orientation="horizontal"
-        android:layout_width="@dimen/px550"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content">
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:gravity="center"
+            android:orientation="vertical"
+            android:id="@+id/button_watch_later"
+            android:background="?attr/selectableItemBackground"
+            android:padding="@dimen/px20"
+            android:focusable="true"
+            android:clickable="true"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/icon_watch_later"
+                android:layout_width="@dimen/px60"
+                android:layout_height="@dimen/px60"
+                app:srcCompat="@drawable/watch_later"
+                app:tint="@color/textColor"/>
+            <androidx.appcompat.widget.AppCompatTextView
+                android:textSize="@dimen/px27"
+                android:textStyle="bold"
+                android:textColor="@color/textColor"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:id="@+id/text_watch_later"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/px15"
+                android:text="@string/later_watch"/>
+        </androidx.appcompat.widget.LinearLayoutCompat>
         <androidx.appcompat.widget.LinearLayoutCompat
             android:gravity="center"
             android:orientation="vertical"
@@ -22,13 +51,7 @@
             android:clickable="true"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.15"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.25">
+            android:layout_weight="1">
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/icon_like"
                 android:layout_width="@dimen/px60"
@@ -36,13 +59,15 @@
                 app:srcCompat="@drawable/ic_like"
                 app:tint="@color/textColor"/>
             <androidx.appcompat.widget.AppCompatTextView
-                android:textSize="@dimen/px30"
+                android:textSize="@dimen/px27"
                 android:textStyle="bold"
                 android:textColor="@color/textColor"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:id="@+id/text_like"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/px20"
+                android:layout_marginTop="@dimen/px15"
                 android:text="@string/like"/>
         </androidx.appcompat.widget.LinearLayoutCompat>
         <androidx.appcompat.widget.LinearLayoutCompat
@@ -55,12 +80,7 @@
             android:clickable="true"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.25">
+            android:layout_weight="1">
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/icon_coin"
                 android:layout_width="@dimen/px60"
@@ -68,13 +88,15 @@
                 app:srcCompat="@drawable/ic_coin"
                 app:tint="@color/textColor"/>
             <androidx.appcompat.widget.AppCompatTextView
-                android:textSize="@dimen/px30"
+                android:textSize="@dimen/px27"
                 android:textStyle="bold"
                 android:textColor="@color/textColor"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:id="@+id/text_coin"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/px20"
+                android:layout_marginTop="@dimen/px15"
                 android:text="@string/give_coin"/>
         </androidx.appcompat.widget.LinearLayoutCompat>
         <androidx.appcompat.widget.LinearLayoutCompat
@@ -87,13 +109,7 @@
             android:clickable="true"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.85"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.25">
+            android:layout_weight="1">
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/icon_collection"
                 android:layout_width="@dimen/px60"
@@ -101,13 +117,15 @@
                 app:srcCompat="@drawable/ic_favorite"
                 app:tint="@color/textColor"/>
             <androidx.appcompat.widget.AppCompatTextView
-                android:textSize="@dimen/px30"
+                android:textSize="@dimen/px27"
                 android:textStyle="bold"
                 android:textColor="@color/textColor"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:id="@+id/text_collection"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/px20"
+                android:layout_marginTop="@dimen/px15"
                 android:text="@string/collection"/>
         </androidx.appcompat.widget.LinearLayoutCompat>
     </androidx.appcompat.widget.LinearLayoutCompat>
@@ -121,9 +139,8 @@
         android:padding="@dimen/px15"
         android:focusable="true"
         android:clickable="true"
-        android:layout_width="@dimen/px550"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/px10"
-        android:text="@string/triple_action"
-        app:layout_constraintBottom_toBottomOf="parent"/>
+        android:text="@string/triple_action"/>
 </androidx.appcompat.widget.LinearLayoutCompat>

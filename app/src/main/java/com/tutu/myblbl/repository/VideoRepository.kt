@@ -7,6 +7,7 @@ import com.tutu.myblbl.model.common.TripleActionResultModel
 import com.tutu.myblbl.model.recommend.RecommendListDataModel
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
+import com.tutu.myblbl.network.response.BaseBaseResponse
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.remote.VideoRepository as NetworkVideoRepository
 
@@ -81,5 +82,15 @@ class VideoRepository(
                 hasMore = data?.hasMore == true
             )
         }
+    }
+
+    suspend fun addWatchLater(aid: Long): BaseBaseResponse {
+        val csrf = sessionGateway.getCsrfToken()
+        return delegate.addWatchLater(aid, csrf).getOrThrow()
+    }
+
+    suspend fun removeWatchLater(aid: Long): BaseBaseResponse {
+        val csrf = sessionGateway.getCsrfToken()
+        return delegate.removeWatchLater(aid, csrf).getOrThrow()
     }
 }

@@ -34,7 +34,7 @@ class OwnerDetailDialog(
     private val onOpenSpace: (Long) -> Unit,
     private val onPlayVideo: (VideoModel, List<VideoModel>) -> Unit,
     private val currentAid: Long = 0L,
-    private val currentBvid: String = ""
+    private val currentVideoId: String = ""
 ) : AppCompatDialog(context, R.style.DialogTheme), KoinComponent {
 
     private val binding = DialogOwnerDetailBinding.inflate(LayoutInflater.from(context))
@@ -74,6 +74,12 @@ class OwnerDetailDialog(
             if (!checkLogin()) return@setOnClickListener
             toggleFollow()
         }
+        val openSpace = {
+            dismiss()
+            onOpenSpace(owner.mid)
+        }
+        binding.imageAvatar.setOnClickListener { openSpace() }
+        binding.textName.setOnClickListener { openSpace() }
     }
 
     private fun bindOwnerHeader() {
@@ -161,7 +167,7 @@ class OwnerDetailDialog(
     private fun scrollToCurrentVideo(videos: List<VideoModel>) {
         val targetIndex = videos.indexOfFirst { video ->
             (currentAid > 0L && video.aid == currentAid) ||
-                (currentBvid.isNotBlank() && video.bvid == currentBvid)
+                (currentVideoId.isNotBlank() && video.bvid == currentVideoId)
         }
         if (targetIndex >= 0) {
             binding.recyclerView.post {
@@ -228,12 +234,7 @@ class OwnerDetailDialog(
         return relationAttribute == 2 || relationAttribute == 6
     }
 
-    private fun checkLogin(): Boolean {
-        if (!sessionGateway.isLoggedIn()) {
-            return false
-        }
-        return true
-    }
+    private fun checkLogin(): Boolean = sessionGateway.isLoggedIn()
 
     private fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()

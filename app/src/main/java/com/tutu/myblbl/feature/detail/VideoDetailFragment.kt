@@ -524,7 +524,7 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
                 )
             },
             currentAid = currentAid,
-            currentBvid = currentBvid
+            currentVideoId = currentBvid
         ).apply {
             show()
         }

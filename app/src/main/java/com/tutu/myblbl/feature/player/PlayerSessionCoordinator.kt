@@ -166,13 +166,13 @@ class PlayerSessionCoordinator {
     private fun isPlayableVideo(video: VideoModel): Boolean {
         return video.aid > 0L ||
             video.bvid.isNotBlank() ||
-            video.epid > 0L ||
+            video.playbackEpId > 0L ||
             video.playbackSeasonId > 0L
     }
 
     private fun isSameVideo(left: VideoModel, right: VideoModel): Boolean {
         return when {
-            left.epid > 0L && right.epid > 0L -> left.epid == right.epid
+            left.playbackEpId > 0L && right.playbackEpId > 0L -> left.playbackEpId == right.playbackEpId
             left.bvid.isNotBlank() && right.bvid.isNotBlank() -> left.bvid == right.bvid
             left.aid > 0L && right.aid > 0L -> left.aid == right.aid
             left.cid > 0L && right.cid > 0L -> left.cid == right.cid
