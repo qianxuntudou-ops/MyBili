@@ -43,6 +43,7 @@ class PlayerActionDialog(
     private val favoriteRepository: FavoriteRepository by inject()
     private val sessionGateway: NetworkSessionGateway by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val safeBvid: String? get() = bvid.takeIf { it.isNotBlank() }
 
     private var isLiked = false
     private var isFavorited = false
@@ -68,7 +69,7 @@ class PlayerActionDialog(
             if (!checkLogin()) return@setOnClickListener
             scope.launch {
                 runCatching {
-                    videoRepository.like(aid, bvid, if (isLiked) 0 else 1)
+                    videoRepository.like(aid, safeBvid, if (isLiked) 0 else 1)
                 }.onSuccess { response ->
                     AppLog.d("PlayerAction", "like response: code=${response.code}, message=${response.message}")
                     if (response.isSuccess) {
@@ -102,7 +103,7 @@ class PlayerActionDialog(
             }
             scope.launch {
                 runCatching {
-                    videoRepository.giveCoin(aid, bvid, multiply = selectedCoinMultiply, selectLike = 0)
+                    videoRepository.giveCoin(aid, safeBvid, multiply = selectedCoinMultiply, selectLike = 0)
                 }.onSuccess { response ->
                     AppLog.d("PlayerAction", "coin response: code=${response.code}, message=${response.message}")
                     if (response.isSuccess) {
@@ -184,7 +185,7 @@ class PlayerActionDialog(
             scope.launch {
                 runCatching {
                     // 只传 bvid，不传 aid，避免大 aid 可能导致的问题
-                    videoRepository.tripleAction(null, bvid)
+                    videoRepository.tripleAction(null, safeBvid ?: bvid)
                 }.onSuccess { response ->
                     AppLog.d("PlayerActionDialog", "tripleAction response: code=${response.code}, message=${response.message}, msg=${response.msg}")
                     if (response.isSuccess) {
@@ -214,7 +215,7 @@ class PlayerActionDialog(
                     if (isInWatchLater) {
                         videoRepository.removeWatchLater(aid)
                     } else {
-                        videoRepository.addWatchLater(aid)
+                        videoRepository.addWatchLater(aid, bvid)
                     }
                 }.onSuccess { response ->
                     if (response.isSuccess) {
@@ -244,14 +245,14 @@ class PlayerActionDialog(
             return
         }
         scope.launch {
-            runCatching { videoRepository.hasLike(aid, bvid) }
+            runCatching { videoRepository.hasLike(aid, safeBvid) }
                 .onSuccess { response ->
                     if (response.isSuccess) {
                         isLiked = response.data == 1
                         renderState()
                     }
                 }
-            runCatching { videoRepository.hasGiveCoin(aid, bvid) }
+            runCatching { videoRepository.hasGiveCoin(aid, safeBvid) }
                 .onSuccess { response ->
                     if (response.isSuccess) {
                         isCoined = (response.data?.multiply ?: 0) > 0
@@ -264,6 +265,11 @@ class PlayerActionDialog(
                         isFavorited = response.data?.favoured == true
                         renderState()
                     }
+                }
+            runCatching { videoRepository.checkWatchLater(aid) }
+                .onSuccess { isInList ->
+                    isInWatchLater = isInList
+                    renderState()
                 }
         }
     }
@@ -430,7 +436,7 @@ class PlayerActionDialog(
     }
 
     private fun loadCoinMultiply(): Int {
-        return appSettings.getCachedString(KEY_GIVE_COIN_NUMBER_SETTINGS)?.toIntOrNull()?.coerceAtLeast(1) ?: 2
+        return appSettings.getCachedString(KEY_GIVE_COIN_NUMBER_SETTINGS)?.toIntOrNull()?.coerceIn(1, 2) ?: 2
     }
 
     private fun persistCoinMultiply(value: Int) {

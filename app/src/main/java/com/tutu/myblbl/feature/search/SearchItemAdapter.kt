@@ -7,7 +7,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import android.view.ViewConfiguration
 import androidx.core.text.HtmlCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -20,11 +20,13 @@ import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.search.SearchItemModel
 import com.tutu.myblbl.model.search.SearchType
 import com.tutu.myblbl.core.common.log.AppLog
-import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
+import com.tutu.myblbl.model.video.Owner
+import com.tutu.myblbl.model.video.VideoModel
+import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
 import com.bumptech.glide.Glide
 
 data class SearchResultEntry(
@@ -49,6 +51,32 @@ class SearchItemAdapter(
         }
         if (filtered.size == currentList.size) return
         submitList(filtered)
+    }
+
+    private fun RecyclerView.ViewHolder.showCardMenu() {
+        val position = bindingAdapterPosition
+        if (position == RecyclerView.NO_POSITION) return
+        val item = getItem(position)
+        val video = VideoModel(
+            aid = item.aid,
+            bvid = item.bvid,
+            title = decodeHtml(item.title),
+            pic = item.pic.ifBlank { item.cover },
+            owner = Owner(
+                mid = item.mid.toLongOrNull() ?: 0L,
+                name = item.author.ifBlank { item.uname }
+            )
+        )
+        VideoCardMenuDialog(
+            context = itemView.context,
+            video = video,
+            onDislikeVideo = {
+                val key = searchItemKey(item)
+                val filtered = currentList.filter { searchItemKey(it) != key }
+                if (filtered.size != currentList.size) submitList(filtered)
+            },
+            onDislikeUp = { upName -> removeBlockedItems(upName) }
+        ).show()
     }
 
     override fun getItemViewType(position: Int): Int = when (searchType) {
@@ -226,48 +254,17 @@ class SearchItemAdapter(
     ) {
         val handler = Handler(Looper.getMainLooper())
         var longPressRunnable: Runnable? = null
-        val longPressThreshold = 5_000L
         var longPressTriggered = false
 
-        val triggerBlock = { authorName: String ->
-            longPressTriggered = true
-            ContentFilter.addBlockedUpName(itemView.context, authorName)
-            Toast.makeText(
-                itemView.context,
-                itemView.context.getString(R.string.blocked_up_toast, authorName),
-                Toast.LENGTH_LONG
-            ).show()
-            AppLog.d("SearchItemAdapter", "Blocked UP: $authorName")
-            removeBlockedItems(authorName)
-        }
-
         val keyListener = View.OnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                when (event.action) {
-                    KeyEvent.ACTION_DOWN -> {
-                        if (event.repeatCount == 0) {
-                            longPressRunnable?.let { handler.removeCallbacks(it) }
-                            longPressTriggered = false
-                            longPressRunnable = Runnable {
-                                val pos = bindingAdapterPosition
-                                if (pos != RecyclerView.NO_POSITION) {
-                                    val item = getItem(pos)
-                                    val authorName = item.author.ifBlank { item.uname }
-                                    if (authorName.isNotBlank()) {
-                                        triggerBlock(authorName)
-                                    }
-                                }
-                            }
-                            handler.postDelayed(longPressRunnable!!, longPressThreshold)
-                        }
-                    }
-                    KeyEvent.ACTION_UP -> {
-                        longPressRunnable?.let { handler.removeCallbacks(it) }
-                        longPressRunnable = null
-                    }
-                }
+            if (keyCode == KeyEvent.KEYCODE_MENU && event.action == KeyEvent.ACTION_UP) {
+                longPressRunnable?.let { handler.removeCallbacks(it) }
+                longPressRunnable = null
+                showCardMenu()
+                true
+            } else {
+                false
             }
-            false
         }
 
         view.setOnClickListener {
@@ -284,19 +281,12 @@ class SearchItemAdapter(
         view.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    longPressRunnable?.let { handler.removeCallbacks(it) }
                     longPressTriggered = false
                     longPressRunnable = Runnable {
-                        val pos = bindingAdapterPosition
-                        if (pos != RecyclerView.NO_POSITION) {
-                            val item = getItem(pos)
-                            val authorName = item.author.ifBlank { item.uname }
-                            if (authorName.isNotBlank()) {
-                                triggerBlock(authorName)
-                            }
-                        }
+                        longPressTriggered = true
+                        showCardMenu()
                     }
-                    handler.postDelayed(longPressRunnable!!, longPressThreshold)
+                    handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     longPressRunnable?.let { handler.removeCallbacks(it) }
@@ -319,6 +309,15 @@ class SearchItemAdapter(
             url.startsWith("http") -> url
             url.startsWith("//") -> "https:$url"
             else -> url
+        }
+    }
+
+    private fun searchItemKey(item: SearchItemModel): String {
+        return when {
+            item.aid > 0L -> "aid:${item.aid}"
+            item.bvid.isNotBlank() -> "bvid:${item.bvid}"
+            item.id > 0L -> "id:${item.id}"
+            else -> "title:${item.title}"
         }
     }
 

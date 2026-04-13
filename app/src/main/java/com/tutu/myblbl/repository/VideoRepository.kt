@@ -84,13 +84,24 @@ class VideoRepository(
         }
     }
 
-    suspend fun addWatchLater(aid: Long): BaseBaseResponse {
+    suspend fun addWatchLater(aid: Long, bvid: String? = null): BaseBaseResponse {
         val csrf = sessionGateway.getCsrfToken()
-        return delegate.addWatchLater(aid, csrf).getOrThrow()
+        return delegate.addWatchLater(aid, bvid, csrf).getOrThrow()
     }
 
     suspend fun removeWatchLater(aid: Long): BaseBaseResponse {
         val csrf = sessionGateway.getCsrfToken()
         return delegate.removeWatchLater(aid, csrf).getOrThrow()
+    }
+
+    suspend fun checkWatchLater(aid: Long): Boolean {
+        return runCatching {
+            delegate.checkWatchLater(aid).getOrThrow()
+        }.getOrDefault(false)
+    }
+
+    suspend fun dislikeFeed(aid: Long, reasonId: Int): BaseBaseResponse {
+        val csrf = sessionGateway.getCsrfToken()
+        return delegate.dislikeFeed(aid, reasonId, csrf).getOrThrow()
     }
 }

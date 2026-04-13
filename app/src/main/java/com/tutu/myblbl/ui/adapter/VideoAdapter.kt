@@ -2,22 +2,23 @@ package com.tutu.myblbl.ui.adapter
 
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import android.view.ViewConfiguration
 import androidx.recyclerview.widget.DiffUtil
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.core.ui.base.BaseAdapter
 import com.tutu.myblbl.core.common.log.AppLog
-import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
+import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
 
 class VideoAdapter(
     private val displayStyle: DisplayStyle = DisplayStyle.DEFAULT,
@@ -106,7 +107,8 @@ class VideoAdapter(
                 rememberItemInteraction(view, position)
                 onItemFocused?.invoke(position)
             },
-            { blockedName -> removeBlockedItems(blockedName) }
+            { video -> removeDislikedItem(video) },
+            { upName -> removeDislikedUpItems(upName) }
         )
     }
 
@@ -141,8 +143,16 @@ class VideoAdapter(
         diffResult.dispatchUpdatesTo(this)
     }
 
-    private fun removeBlockedItems(blockedName: String) {
-        val filtered = items.filter { !it.authorName.equals(blockedName, ignoreCase = true) }
+    private fun removeDislikedItem(video: VideoModel) {
+        val key = videoKey(video)
+        val filtered = items.filter { videoKey(it) != key }
+        if (filtered.size == items.size) return
+        submitItems(filtered)
+        focusedView?.requestFocus()
+    }
+
+    private fun removeDislikedUpItems(upName: String) {
+        val filtered = items.filter { !it.authorName.equals(upName, ignoreCase = true) }
         if (filtered.size == items.size) return
         submitItems(filtered)
         focusedView?.requestFocus()
@@ -157,55 +167,50 @@ class VideoAdapter(
         private val focusDebugTag: String? = null,
         onFocusChange: ((View, Int, Boolean) -> Unit)? = null,
         private val onItemInteracted: ((View, Int) -> Unit)? = null,
-        private val onItemBlocked: ((String) -> Unit)? = null
+        private val onItemDisliked: ((VideoModel) -> Unit)? = null,
+        private val onUpDisliked: ((String) -> Unit)? = null
     ) : androidx.recyclerview.widget.RecyclerView.ViewHolder(binding.root) {
 
         private var currentVideo: VideoModel? = null
         private val handler = Handler(Looper.getMainLooper())
         private var longPressRunnable: Runnable? = null
-        private var longPressStartTime: Long = 0L
-        private val longPressThreshold = 5_000L
         private var longPressTriggered = false
 
         private val keyListener = View.OnKeyListener { _, keyCode, event ->
-            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER || keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
-                when (event.action) {
-                    android.view.KeyEvent.ACTION_DOWN -> {
-                        if (event.repeatCount == 0) {
-                            startLongPressTimer()
-                        }
-                    }
-                    android.view.KeyEvent.ACTION_UP -> {
-                        cancelLongPressTimer()
-                    }
-                }
+            if (keyCode == KeyEvent.KEYCODE_MENU && event.action == KeyEvent.ACTION_UP) {
+                showCardMenu()
+                true
+            } else {
+                false
             }
-            false
         }
 
-        private fun startLongPressTimer() {
-            cancelLongPressTimer()
+        private fun showCardMenu() {
+            cancelLongPress()
+            val video = currentVideo ?: return
+            VideoCardMenuDialog(
+                context = itemView.context,
+                video = video,
+                onDislikeVideo = {
+                    onItemDisliked?.invoke(video)
+                },
+                onDislikeUp = { upName ->
+                    onUpDisliked?.invoke(upName)
+                }
+            ).show()
+        }
+
+        private fun startLongPress() {
+            cancelLongPress()
             longPressTriggered = false
-            longPressStartTime = System.currentTimeMillis()
             longPressRunnable = Runnable {
-                val video = currentVideo ?: return@Runnable
-                val authorName = video.authorName
-                if (authorName.isNotBlank()) {
-                    longPressTriggered = true
-                    ContentFilter.addBlockedUpName(itemView.context, authorName)
-                    Toast.makeText(
-                        itemView.context,
-                        itemView.context.getString(R.string.blocked_up_toast, authorName),
-                        Toast.LENGTH_LONG
-                    ).show()
-                    AppLog.d("VideoAdapter", "Blocked UP: $authorName")
-                    onItemBlocked?.invoke(authorName)
-                }
+                longPressTriggered = true
+                showCardMenu()
             }
-            handler.postDelayed(longPressRunnable!!, longPressThreshold)
+            handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
         }
 
-        private fun cancelLongPressTimer() {
+        private fun cancelLongPress() {
             longPressRunnable?.let { handler.removeCallbacks(it) }
             longPressRunnable = null
         }
@@ -225,8 +230,8 @@ class VideoAdapter(
             binding.root.setOnKeyListener(keyListener)
             binding.root.setOnTouchListener { _, event ->
                 when (event.action) {
-                    MotionEvent.ACTION_DOWN -> startLongPressTimer()
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPressTimer()
+                    MotionEvent.ACTION_DOWN -> startLongPress()
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPress()
                 }
                 false
             }

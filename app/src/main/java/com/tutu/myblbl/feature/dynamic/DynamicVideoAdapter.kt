@@ -2,12 +2,12 @@ package com.tutu.myblbl.feature.dynamic
 
 import android.os.Handler
 import android.os.Looper
-import android.view.LayoutInflater
 import android.view.KeyEvent
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import android.view.ViewConfiguration
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -16,11 +16,11 @@ import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.core.common.log.AppLog
-import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
+import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
 
 class DynamicVideoAdapter(
     private val onItemClick: (VideoModel) -> Unit,
@@ -74,13 +74,20 @@ class DynamicVideoAdapter(
         focusedView?.requestFocus()
     }
 
+    private fun removeDislikedItem(video: VideoModel) {
+        val key = dynamicVideoKey(video)
+        val filtered = currentList.filter { dynamicVideoKey(it) != key }
+        if (filtered.size == currentList.size) return
+        submitList(filtered)
+        focusedView?.requestFocus()
+    }
+
     inner class ViewHolder(
         private val binding: CellVideoBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private val handler = Handler(Looper.getMainLooper())
         private var longPressRunnable: Runnable? = null
-        private val longPressThreshold = 5_000L
         private var longPressTriggered = false
 
         init {
@@ -110,28 +117,22 @@ class DynamicVideoAdapter(
                 }
             }
             binding.root.setOnKeyListener { _, keyCode, event ->
-                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                    when (event.action) {
-                        KeyEvent.ACTION_DOWN -> {
-                            if (event.repeatCount == 0) {
-                                startLongPressTimer()
-                            }
-                        }
-                        KeyEvent.ACTION_UP -> {
-                            cancelLongPressTimer()
+                if (keyCode == KeyEvent.KEYCODE_MENU && event.action == KeyEvent.ACTION_UP) {
+                    showCardMenu()
+                    true
+                } else {
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        debugTag?.let {
+                            AppLog.d(it, "video card key: position=$bindingAdapterPosition key=${keyName(keyCode)}")
                         }
                     }
-                } else if (event.action == KeyEvent.ACTION_DOWN) {
-                    debugTag?.let {
-                        AppLog.d(it, "video card key: position=$bindingAdapterPosition key=${keyName(keyCode)}")
-                    }
+                    false
                 }
-                false
             }
             binding.root.setOnTouchListener { _, event ->
                 when (event.action) {
-                    MotionEvent.ACTION_DOWN -> startLongPressTimer()
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPressTimer()
+                    MotionEvent.ACTION_DOWN -> startLongPress()
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPress()
                 }
                 false
             }
@@ -142,31 +143,30 @@ class DynamicVideoAdapter(
             )
         }
 
-        private fun startLongPressTimer() {
-            cancelLongPressTimer()
-            longPressTriggered = false
-            longPressRunnable = Runnable {
-                val position = bindingAdapterPosition
-                if (position != NO_POSITION && position < itemCount) {
-                    val video = getItem(position)
-                    val authorName = video.authorName
-                    if (authorName.isNotBlank()) {
-                        longPressTriggered = true
-                        ContentFilter.addBlockedUpName(itemView.context, authorName)
-                        Toast.makeText(
-                            itemView.context,
-                            itemView.context.getString(R.string.blocked_up_toast, authorName),
-                            Toast.LENGTH_LONG
-                        ).show()
-                        AppLog.d("DynamicVideoAdapter", "Blocked UP: $authorName")
-                        removeBlockedItems(authorName)
-                    }
-                }
-            }
-            handler.postDelayed(longPressRunnable!!, longPressThreshold)
+        private fun showCardMenu() {
+            cancelLongPress()
+            val position = bindingAdapterPosition
+            if (position == NO_POSITION || position !in currentList.indices) return
+            val video = getItem(position)
+            VideoCardMenuDialog(
+                context = itemView.context,
+                video = video,
+                onDislikeVideo = { removeDislikedItem(video) },
+                onDislikeUp = { upName -> removeBlockedItems(upName) }
+            ).show()
         }
 
-        private fun cancelLongPressTimer() {
+        private fun startLongPress() {
+            cancelLongPress()
+            longPressTriggered = false
+            longPressRunnable = Runnable {
+                longPressTriggered = true
+                showCardMenu()
+            }
+            handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
+        }
+
+        private fun cancelLongPress() {
             longPressRunnable?.let { handler.removeCallbacks(it) }
             longPressRunnable = null
         }

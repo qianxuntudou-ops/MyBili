@@ -6,6 +6,7 @@ import com.tutu.myblbl.model.common.GiveCoinResultModel
 import com.tutu.myblbl.model.common.TripleActionResultModel
 import com.tutu.myblbl.model.recommend.RecommendListDataModel
 import com.tutu.myblbl.model.video.GetVideoByChannelWrapper
+import com.tutu.myblbl.model.video.LaterWatchWrapper
 import com.tutu.myblbl.model.video.RegionVideoListWrapper
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
@@ -160,10 +161,10 @@ class VideoRepository(
             }
         }
 
-    suspend fun addWatchLater(aid: Long, csrf: String): Result<BaseBaseResponse> =
+    suspend fun addWatchLater(aid: Long, bvid: String?, csrf: String): Result<BaseBaseResponse> =
         runCatching {
             sessionGateway.syncAuthState(
-                apiService.addWatchLater(aid, csrf),
+                apiService.addWatchLater(aid, bvid, csrf),
                 source = "video.addWatchLater"
             )
         }
@@ -173,6 +174,27 @@ class VideoRepository(
             sessionGateway.syncAuthState(
                 apiService.removeWatchLater(aid, csrf),
                 source = "video.removeWatchLater"
+            )
+        }
+
+    suspend fun checkWatchLater(aid: Long): Result<Boolean> =
+        runCatching {
+            val response = sessionGateway.syncAuthState(
+                apiService.getLaterWatch(),
+                source = "video.checkWatchLater"
+            )
+            if (response.isSuccess) {
+                response.data?.list?.any { it.aid == aid } == true
+            } else {
+                false
+            }
+        }
+
+    suspend fun dislikeFeed(aid: Long, reasonId: Int, csrf: String): Result<BaseBaseResponse> =
+        runCatching {
+            sessionGateway.syncAuthState(
+                apiService.dislikeFeed(aid, reasonId, csrf),
+                source = "video.dislikeFeed"
             )
         }
 

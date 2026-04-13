@@ -7,7 +7,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import android.view.ViewConfiguration
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -16,11 +16,11 @@ import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.HistoryVideoModel
 import com.tutu.myblbl.core.common.log.AppLog
-import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
+import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
 
 class FavoriteHistoryAdapter(
     private val onItemClick: (HistoryVideoModel) -> Unit,
@@ -77,7 +77,8 @@ class FavoriteHistoryAdapter(
                 }
                 setFocusedState(view, false)
             },
-            onItemBlocked = { blockedName -> removeBlockedItems(blockedName) }
+            onItemDisliked = { item -> removeDislikedItem(item) },
+            onUpDisliked = { upName -> removeBlockedItems(upName) }
         )
     }
 
@@ -94,59 +95,61 @@ class FavoriteHistoryAdapter(
         focusedView?.requestFocus()
     }
 
+    private fun removeDislikedItem(item: HistoryVideoModel) {
+        val key = favoriteHistoryItemKey(item)
+        val filtered = currentList.filter { favoriteHistoryItemKey(it) != key }
+        if (filtered.size == currentList.size) return
+        submitList(filtered)
+        focusedView?.requestFocus()
+    }
+
     class ViewHolder(
         private val binding: CellVideoBinding,
         private val onItemClick: (HistoryVideoModel) -> Unit,
         private val onItemFocused: ((Int) -> Unit)?,
         private val updateFocusedPosition: (View, Int) -> Unit,
         private val clearFocusedPosition: (View) -> Unit,
-        private val onItemBlocked: ((String) -> Unit)? = null
+        private val onItemDisliked: ((HistoryVideoModel) -> Unit)? = null,
+        private val onUpDisliked: ((String) -> Unit)? = null
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private var currentItem: HistoryVideoModel? = null
         private val handler = Handler(Looper.getMainLooper())
         private var longPressRunnable: Runnable? = null
-        private val longPressThreshold = 5_000L
         private var longPressTriggered = false
 
         private val keyListener = View.OnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                when (event.action) {
-                    KeyEvent.ACTION_DOWN -> {
-                        if (event.repeatCount == 0) {
-                            startLongPressTimer()
-                        }
-                    }
-                    KeyEvent.ACTION_UP -> {
-                        cancelLongPressTimer()
-                    }
-                }
+            if (keyCode == KeyEvent.KEYCODE_MENU && event.action == KeyEvent.ACTION_UP) {
+                showCardMenu()
+                true
+            } else {
+                false
             }
-            false
         }
 
-        private fun startLongPressTimer() {
-            cancelLongPressTimer()
+        private fun showCardMenu() {
+            cancelLongPress()
+            val item = currentItem ?: return
+            val video = item.toVideoModel()
+            VideoCardMenuDialog(
+                context = itemView.context,
+                video = video,
+                onDislikeVideo = { onItemDisliked?.invoke(item) },
+                onDislikeUp = { upName -> onUpDisliked?.invoke(upName) }
+            ).show()
+        }
+
+        private fun startLongPress() {
+            cancelLongPress()
             longPressTriggered = false
             longPressRunnable = Runnable {
-                val item = currentItem ?: return@Runnable
-                val authorName = item.authorName
-                if (authorName.isNotBlank()) {
-                    longPressTriggered = true
-                    ContentFilter.addBlockedUpName(itemView.context, authorName)
-                    Toast.makeText(
-                        itemView.context,
-                        itemView.context.getString(R.string.blocked_up_toast, authorName),
-                        Toast.LENGTH_LONG
-                    ).show()
-                    AppLog.d("FavoriteHistoryAdapter", "Blocked UP: $authorName")
-                    onItemBlocked?.invoke(authorName)
-                }
+                longPressTriggered = true
+                showCardMenu()
             }
-            handler.postDelayed(longPressRunnable!!, longPressThreshold)
+            handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
         }
 
-        private fun cancelLongPressTimer() {
+        private fun cancelLongPress() {
             longPressRunnable?.let { handler.removeCallbacks(it) }
             longPressRunnable = null
         }
@@ -167,8 +170,8 @@ class FavoriteHistoryAdapter(
             binding.root.setOnKeyListener(keyListener)
             binding.root.setOnTouchListener { _, event ->
                 when (event.action) {
-                    MotionEvent.ACTION_DOWN -> startLongPressTimer()
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPressTimer()
+                    MotionEvent.ACTION_DOWN -> startLongPress()
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPress()
                 }
                 false
             }
