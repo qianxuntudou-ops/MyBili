@@ -324,6 +324,9 @@ class VideoPlayerViewModel(
     private var sessionStartTimestampMs: Long = 0L
     private var lastReportedHeartbeatPositionSec: Long = -1L
 
+    private var requestedQualityId: Int? = null
+    private var requestedAudioId: Int? = null
+    private var requestedCodec: VideoCodecEnum? = null
     private var selectedQualityId: Int? = null
     private var selectedAudioId: Int? = null
     private var selectedCodec: VideoCodecEnum? = null
@@ -374,8 +377,8 @@ class VideoPlayerViewModel(
         savedStateHandle[SAVED_SEASON_ID] = currentSeasonId ?: 0L
         savedStateHandle[SAVED_EPISODE_INDEX] = _selectedEpisodeIndex.value ?: 0
         savedStateHandle[SAVED_SEEK_POSITION_MS] = pendingSeekPositionMs.coerceAtLeast(0L)
-        savedStateHandle[SAVED_QUALITY_ID] = selectedQualityId ?: 0
-        savedStateHandle[SAVED_AUDIO_QUALITY_ID] = selectedAudioId ?: 0
+        savedStateHandle[SAVED_QUALITY_ID] = requestedQualityId ?: selectedQualityId ?: 0
+        savedStateHandle[SAVED_AUDIO_QUALITY_ID] = requestedAudioId ?: selectedAudioId ?: 0
         savedStateHandle[SAVED_SUBTITLE_INDEX] = _selectedSubtitleIndex.value ?: -1
     }
 
@@ -412,7 +415,9 @@ class VideoPlayerViewModel(
         seasonId: Long = 0L,
         epId: Long = 0L,
         seekPositionMs: Long = 0L,
-        startEpisodeIndex: Int = -1
+        startEpisodeIndex: Int = -1,
+        preferredQualityId: Int = 0,
+        preferredAudioQualityId: Int = 0
     ) {
         currentSettings = PlayerSettingsStore.load(appContext)
         currentAid = aid?.takeIf { it > 0L }
@@ -424,9 +429,12 @@ class VideoPlayerViewModel(
         currentSubtitleData = null
         currentGraphVersion = 0L
         loadedDanmakuCid = 0L
-        selectedQualityId = currentSettings.defaultVideoQualityId
-        selectedAudioId = currentSettings.defaultAudioQualityId
-        selectedCodec = currentSettings.defaultVideoCodec
+        requestedQualityId = preferredQualityId.takeIf { it > 0 } ?: currentSettings.defaultVideoQualityId
+        requestedAudioId = preferredAudioQualityId.takeIf { it > 0 } ?: currentSettings.defaultAudioQualityId
+        requestedCodec = currentSettings.defaultVideoCodec
+        selectedQualityId = null
+        selectedAudioId = null
+        selectedCodec = null
         pendingSeekPositionMs = seekPositionMs.coerceAtLeast(0L)
         pendingPlayWhenReady = true
         launchStartEpisodeIndex = startEpisodeIndex
@@ -444,6 +452,12 @@ class VideoPlayerViewModel(
         _interactionModel.value = null
         _videoSnapshot.value = null
         _error.value = null
+        _qualities.value = emptyList()
+        _selectedQuality.value = null
+        _audioQualities.value = emptyList()
+        _selectedAudioQuality.value = null
+        _videoCodecs.value = emptyList()
+        _selectedVideoCodec.value = null
         viewModelScope.launch {
             runCatching { playInfoGateway.warmupWbiKeys() }
         }
@@ -595,7 +609,7 @@ class VideoPlayerViewModel(
         currentPositionMs: Long,
         playWhenReady: Boolean
     ) {
-        selectedQualityId = quality.id
+        requestedQualityId = quality.id
         _selectedQuality.value = quality
         savePlayerSnapshot()
         capturePlaybackSnapshot(currentPositionMs, playWhenReady)
@@ -607,7 +621,7 @@ class VideoPlayerViewModel(
         currentPositionMs: Long,
         playWhenReady: Boolean
     ) {
-        selectedAudioId = quality.id
+        requestedAudioId = quality.id
         _selectedAudioQuality.value = quality
         savePlayerSnapshot()
         capturePlaybackSnapshot(currentPositionMs, playWhenReady)
@@ -619,7 +633,7 @@ class VideoPlayerViewModel(
         currentPositionMs: Long,
         playWhenReady: Boolean
     ) {
-        selectedCodec = codec
+        requestedCodec = codec
         _selectedVideoCodec.value = codec
         capturePlaybackSnapshot(currentPositionMs, playWhenReady)
         rebuildPlayback()
@@ -767,10 +781,20 @@ class VideoPlayerViewModel(
 
     private fun rebuildPlayback() {
         val playInfo = currentPlayInfo ?: return
-        val mediaSource = resolveMediaSource(playInfo) ?: run {
+        val selectionSnapshot = resolveSelectionSnapshot(playInfo) ?: run {
             _error.value = "当前清晰度/音轨组合不可播放"
             return
         }
+        val mediaSource = streamResolver.buildMediaSource(
+            playInfo = playInfo,
+            selectedQualityId = selectionSnapshot.selectedQualityId,
+            selectedAudioId = selectionSnapshot.selectedAudioId,
+            selectedCodec = selectionSnapshot.selectedCodec
+        )?.mediaSource ?: run {
+            _error.value = "当前清晰度/音轨组合不可播放"
+            return
+        }
+        applySelectionSnapshot(selectionSnapshot)
         _playbackRequest.value = PlaybackRequest(
             mediaSource = mediaSource,
             seekPositionMs = pendingSeekPositionMs,
@@ -1004,11 +1028,16 @@ class VideoPlayerViewModel(
         replaceInPlace: Boolean,
         playbackPositionMs: Long = pendingSeekPositionMs,
         playWhenReady: Boolean = pendingPlayWhenReady,
-        qualityCandidates: List<Int> = qualityPolicy.buildCandidates(selectedQualityId),
+        qualityCandidates: List<Int> = qualityPolicy.buildCandidates(
+            requestedQualityId ?: selectedQualityId
+        ),
         suppressUiSignals: Boolean = false
     ): PreparedPlayback? {
         val requestStartMs = System.currentTimeMillis()
-        val preferredQualityId = qualityCandidates.firstOrNull() ?: selectedQualityId ?: 80
+        val preferredQualityId = qualityCandidates.firstOrNull()
+            ?: requestedQualityId
+            ?: selectedQualityId
+            ?: 80
 
         val cachedPlayInfo = identity.bvid
             ?.takeIf { !replaceInPlace && it.isNotBlank() && identity.epId == null }
@@ -1068,8 +1097,8 @@ class VideoPlayerViewModel(
         var selectionSnapshot = streamResolver.resolveSelections(
             playInfo = initialPlayInfo,
             preferredQualityId = resolvedQualityId,
-            preferredAudioId = selectedAudioId,
-            preferredCodec = selectedCodec,
+            preferredAudioId = requestedAudioId ?: selectedAudioId,
+            preferredCodec = requestedCodec ?: selectedCodec,
             hardwareSupportedCodecs = hardwareSupportedVideoCodecs
         )
         if (selectionSnapshot.selectedQualityId != resolvedQualityId) {
@@ -1122,9 +1151,6 @@ class VideoPlayerViewModel(
     ) {
         clearPreloadedPlayback(cancelJob = false)
         currentPlayInfo = preparedPlayback.playInfo
-        selectedQualityId = preparedPlayback.selectionSnapshot.selectedQualityId
-        selectedAudioId = preparedPlayback.selectionSnapshot.selectedAudioId
-        selectedCodec = preparedPlayback.selectionSnapshot.selectedCodec
         applySelectionSnapshot(preparedPlayback.selectionSnapshot)
         if (preparedPlayback.resumeHintPositionMs != null) {
             didApplyLastPlayPosition = true
@@ -1136,9 +1162,12 @@ class VideoPlayerViewModel(
 
         initializeFallbackPlan(
             playInfo = preparedPlayback.playInfo,
-            lockedQualityId = preparedPlayback.selectionSnapshot.selectedQualityId ?: selectedQualityId ?: 80,
-            selectedAudioId = preparedPlayback.selectionSnapshot.selectedAudioId,
-            preferredCodec = preparedPlayback.selectionSnapshot.selectedCodec,
+            lockedQualityId = requestedQualityId
+                ?: preparedPlayback.selectionSnapshot.selectedQualityId
+                ?: selectedQualityId
+                ?: 80,
+            selectedAudioId = requestedAudioId ?: preparedPlayback.selectionSnapshot.selectedAudioId,
+            preferredCodec = requestedCodec ?: preparedPlayback.selectionSnapshot.selectedCodec,
             resetAttempts = resetFallbackAttempts
         )
         rememberCurrentFallbackAttempt(countAsFallback = countCurrentAttemptAsFallback)
@@ -1183,17 +1212,20 @@ class VideoPlayerViewModel(
 
         val handled = when (errorType) {
             PlaybackErrorType.DECODER -> {
-                trySwitchCodec(lastPlaybackPositionMs, reason = "decoder_error") ||
+                trySwitchToCodec(VideoCodecEnum.AVC, lastPlaybackPositionMs, reason = "decoder_error_prefer_avc") ||
+                    trySwitchCodec(lastPlaybackPositionMs, reason = "decoder_error") ||
                     tryNextCdnInCurrentCodec(lastPlaybackPositionMs, reason = "decoder_error_cdn_retry") ||
                     tryRefreshPlayInfo(reason = "decoder_error_refresh")
             }
             PlaybackErrorType.NETWORK -> {
-                tryNextCdnInCurrentCodec(lastPlaybackPositionMs, reason = "network_error") ||
+                trySwitchToCodec(VideoCodecEnum.AVC, lastPlaybackPositionMs, reason = "network_error_prefer_avc") ||
+                    tryNextCdnInCurrentCodec(lastPlaybackPositionMs, reason = "network_error") ||
                     tryRefreshPlayInfo(reason = "network_error_refresh") ||
                     trySwitchCodec(lastPlaybackPositionMs, reason = "network_error_codec_switch")
             }
             PlaybackErrorType.UNKNOWN -> {
-                tryNextCdnInCurrentCodec(lastPlaybackPositionMs, reason = "unknown_error") ||
+                trySwitchToCodec(VideoCodecEnum.AVC, lastPlaybackPositionMs, reason = "unknown_error_prefer_avc") ||
+                    tryNextCdnInCurrentCodec(lastPlaybackPositionMs, reason = "unknown_error") ||
                     trySwitchCodec(lastPlaybackPositionMs, reason = "unknown_error_codec_switch") ||
                     tryRefreshPlayInfo(reason = "unknown_error_refresh")
             }
@@ -1203,6 +1235,22 @@ class VideoPlayerViewModel(
             AppLog.e(TAG, "fallback exhausted: qualityLocked=${plan.qualityId}, attempts=$fallbackAttemptCount")
             _error.value = "当前清晰度下所有线路与编码器都不可用"
         }
+    }
+
+    fun handlePlaybackStall(positionMs: Long, stalledMs: Long): Boolean {
+        lastPlaybackPositionMs = positionMs.coerceAtLeast(0L)
+        val handled =
+            trySwitchToCodec(VideoCodecEnum.AVC, lastPlaybackPositionMs, reason = "stall_${stalledMs}ms_prefer_avc") ||
+                tryNextCdnInCurrentCodec(lastPlaybackPositionMs, reason = "stall_${stalledMs}ms") ||
+                tryRefreshPlayInfo(reason = "stall_${stalledMs}ms_refresh") ||
+                trySwitchCodec(lastPlaybackPositionMs, reason = "stall_${stalledMs}ms_codec_switch")
+        if (handled) {
+            AppLog.w(
+                TAG,
+                "handlePlaybackStall: position=$positionMs, stalledMs=$stalledMs, codec=$selectedCodec"
+            )
+        }
+        return handled
     }
 
     private enum class PlaybackErrorType {
@@ -1263,6 +1311,22 @@ class VideoPlayerViewModel(
         return false
     }
 
+    private fun trySwitchToCodec(
+        targetCodec: VideoCodecEnum,
+        positionMs: Long,
+        reason: String
+    ): Boolean {
+        val plan = currentStreamFallbackPlan ?: return false
+        if (selectedCodec == targetCodec) {
+            return false
+        }
+        val routeIndex = plan.routes.indexOfFirst { it.codec == targetCodec }
+        if (routeIndex < 0) {
+            return false
+        }
+        return tryDispatchPlaybackAttempt(routeIndex, 0, positionMs, reason)
+    }
+
     private fun tryRefreshPlayInfo(reason: String): Boolean {
         if (playInfoRefreshRetryCount >= MAX_PLAYINFO_REFRESH_RETRY) {
             return false
@@ -1277,7 +1341,7 @@ class VideoPlayerViewModel(
 
     private fun loadPlayUrlWithCurrentContext(reason: String): Boolean {
         val identity = currentPlayRequestIdentity() ?: return false
-        val lockedQualityId = selectedQualityId ?: 80
+        val lockedQualityId = requestedQualityId ?: selectedQualityId ?: 80
         viewModelScope.launch {
             val preparedPlayback = requestPreparedPlayback(
                 identity = identity,
@@ -1339,13 +1403,14 @@ class VideoPlayerViewModel(
             fallbackCdnIndex = cdnIndex
             selectedCodec = route.codec
             _selectedVideoCodec.value = route.codec
-            val selection = streamResolver.buildMediaSourceWithUrls(
+            val selection = streamResolver.buildMediaSourceForRoute(
+                route = route,
                 videoUrl = videoUrl,
                 audioUrl = audioUrl,
-                videoMimeType = route.videoMimeType,
-                audioMimeType = route.audioMimeType,
                 availableCodecs = plan.routes.map { it.codec },
-                selectedCodec = route.codec
+                selectedCodec = route.codec,
+                durationMs = plan.durationMs,
+                minBufferTimeMs = plan.minBufferTimeMs
             )
             _error.value = null
             _playbackRequest.value = PlaybackRequest(
@@ -1430,7 +1495,10 @@ class VideoPlayerViewModel(
         suppressUiSignals: Boolean
     ): PlayInfoFetchResult? {
         val attemptedQualities = linkedSetOf<Int>()
-        val requestedQualityId = qualityCandidates.firstOrNull() ?: selectedQualityId ?: 80
+        val requestedQualityId = qualityCandidates.firstOrNull()
+            ?: this.requestedQualityId
+            ?: selectedQualityId
+            ?: 80
         var lastResult: PlayInfoFetchResult? = null
         var allowWbi = true
         qualityCandidates.forEach { qualityId ->
@@ -1479,6 +1547,13 @@ class VideoPlayerViewModel(
                 return lastResult
             }
             if (response.code == 0 && playInfo != null && !hasPlayableMedia(playInfo)) {
+                if (shouldContinueQualityFallback(qualityId, response.message, playInfo)) {
+                    AppLog.w(
+                        TAG,
+                        "playurl empty media payload but quality fallback should continue: tried=$qualityId, cid=${identity.cid}, declared=${playInfo.acceptQuality.orEmpty()}, responseQuality=${playInfo.quality}, message=${response.message}"
+                    )
+                    return@forEach
+                }
                 AppLog.w(
                     TAG,
                     "playurl empty media payload (soft risk-control): tried=$qualityId, cid=${identity.cid}, stopFurtherFallback=true"
@@ -1500,6 +1575,30 @@ class VideoPlayerViewModel(
         val hasDashVideo = playInfo.dash?.video.orEmpty().isNotEmpty()
         val hasDurl = playInfo.durl.orEmpty().any { it.url.isNotBlank() }
         return hasDashVideo || hasDurl
+    }
+
+    private fun shouldContinueQualityFallback(
+        requestedQualityId: Int,
+        message: String,
+        playInfo: PlayInfoModel
+    ): Boolean {
+        val normalizedMessage = message.lowercase()
+        if (
+            normalizedMessage.contains("请求的画质太高") ||
+            normalizedMessage.contains("画质太高") ||
+            normalizedMessage.contains("quality is too high") ||
+            normalizedMessage.contains("requested quality is too high")
+        ) {
+            return true
+        }
+
+        val highestDeclaredQuality = buildList {
+            addAll(playInfo.acceptQuality.orEmpty())
+            addAll(playInfo.supportFormats.orEmpty().map { it.quality })
+            add(playInfo.quality)
+        }.filter { it > 0 }.maxOrNull()
+
+        return highestDeclaredQuality != null && highestDeclaredQuality < requestedQualityId
     }
 
     private fun resolvePlayableQualityId(
@@ -1532,8 +1631,8 @@ class VideoPlayerViewModel(
         if (availableQualities.any { it.id == requestedQualityId }) {
             return requestedQualityId
         }
-        val fallbackQualityId = availableQualities.firstOrNull()?.id
-            ?: availableQualities.maxByOrNull { it.id }?.id
+        val fallbackQualityId = availableQualities.maxByOrNull { it.id }?.id
+            ?: availableQualities.firstOrNull()?.id
             ?: requestedQualityId
         AppLog.w(
             TAG,
@@ -2092,21 +2191,17 @@ class VideoPlayerViewModel(
         _selectedVideoCodec.value = snapshot.selectedCodec
     }
 
-    private fun resolveMediaSource(playInfo: PlayInfoModel): MediaSource? {
-        val selection = streamResolver.buildMediaSource(
+    private fun resolveSelectionSnapshot(
+        playInfo: PlayInfoModel
+    ): VideoPlayerStreamResolver.SelectionSnapshot? {
+        val selectionSnapshot = streamResolver.resolveSelections(
             playInfo = playInfo,
-            selectedQualityId = selectedQualityId,
-            selectedAudioId = selectedAudioId,
-            selectedCodec = selectedCodec
-        ) ?: return null
-        if (selection.availableCodecs.isNotEmpty()) {
-            _videoCodecs.value = selection.availableCodecs
-        }
-        if (selectedCodec != selection.selectedCodec) {
-            selectedCodec = selection.selectedCodec
-            _selectedVideoCodec.value = selection.selectedCodec
-        }
-        return selection.mediaSource
+            preferredQualityId = requestedQualityId ?: selectedQualityId,
+            preferredAudioId = requestedAudioId ?: selectedAudioId,
+            preferredCodec = requestedCodec ?: selectedCodec,
+            hardwareSupportedCodecs = hardwareSupportedVideoCodecs
+        )
+        return selectionSnapshot.takeIf { it.selectedQualityId != null || it.selectedAudioId != null || it.selectedCodec != null }
     }
 
     private suspend fun loadSubtitleData(track: SubtitleInfoModel): SubtitleData? =

@@ -551,7 +551,11 @@ class SearchNewFragment :
         if (hasCategories) {
             binding.viewPagerResult.setCurrentItem(0, false)
             updateOrderButtonVisibility(0)
-            maybeLoadPage(0, forceRefresh = false)
+            val firstType = categories.first().type
+            val state = viewModel.searchPageStates.value[firstType]
+            if (state == null || state.items.isEmpty()) {
+                viewModel.loadSearchPage(firstType, currentKeyword, pageSize, currentOrder, forceRefresh = false)
+            }
         } else {
             binding.buttonOrder.visibility = View.GONE
         }

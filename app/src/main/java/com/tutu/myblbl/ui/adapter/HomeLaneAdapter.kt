@@ -28,8 +28,8 @@ class HomeLaneAdapter(
 ) : BaseAdapter<HomeLaneSection, RecyclerView.ViewHolder>() {
 
     companion object {
-        private const val VIEW_TYPE_SCROLLABLE = 0
-        private const val VIEW_TYPE_TIMELINE = 1
+        private const val VIEW_TYPE_SCROLLABLE = 100
+        private const val VIEW_TYPE_TIMELINE = 101
         private const val VIEW_TYPE_LOAD_MORE = -1000
     }
 

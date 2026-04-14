@@ -69,7 +69,7 @@ android {
         release {
             isMinifyEnabled = false
             ndk {
-                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -237,12 +237,12 @@ dependencies {
     // Protobuf (弹幕解析)
     implementation("com.google.protobuf:protobuf-javalite:3.24.0")
 
-    // AkDanmaku 官方弹幕引擎（源码内嵌，见 com.kuaishou.akdanmaku）
-    // Keep gdx core for utility classes used by AkDanmaku (Array/Pool/MathUtils).
+    // 官方弹幕引擎源码已内嵌在工程中。
+    // Keep gdx core for utility classes used by the embedded danmaku engine.
     implementation("com.badlogicgames.gdx:gdx:1.10.0")
     implementation("com.badlogicgames.ashley:ashley:1.7.3")
 
-    // ZXing 二维码
+    // 二维码解析
     implementation("com.google.zxing:core:3.5.2")
 
     testImplementation("junit:junit:4.13.2")

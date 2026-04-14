@@ -85,8 +85,8 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
             return
         }
         restoredFromSavedState = savedInstanceState != null
-        restoredTabIndex = mainNavigationViewModel.getSavedTabIndex()
         super.onCreate(savedInstanceState)
+        restoredTabIndex = mainNavigationViewModel.getSavedTabIndex()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 handleBackPressed()

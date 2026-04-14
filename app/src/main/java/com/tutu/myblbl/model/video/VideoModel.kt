@@ -145,11 +145,17 @@ data class VideoModel(
 
     @SerializedName("is_charging_arc")
     @JsonAdapter(FlexibleBooleanAdapter::class)
-    val isChargingArc: Boolean = false
+    val isChargingArc: Boolean = false,
+
+    @SerializedName("privilege_type")
+    val privilegeType: Int = 0,
+
+    @SerializedName("elec_arc_badge")
+    val elecArcBadge: String = ""
 ) : Serializable {
     val isChargingExclusive: Boolean
-        get() = isUpowerExclusive || isChargingArc || elecArcType == 1 || rights?.elec == 1
-                || (!isPgc && rights?.autoplay == 0)
+        get() = isUpowerExclusive || privilegeType > 0 || isChargingArc
+                || elecArcType == 1 || elecArcBadge == "充电专属"
     val coverUrl: String
         get() = pic.ifEmpty { cover }
 

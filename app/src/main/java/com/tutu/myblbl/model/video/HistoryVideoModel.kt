@@ -59,14 +59,24 @@ data class HistoryVideoModel(
     @SerializedName("is_upower_exclusive")
     val isUpowerExclusive: Boolean = false,
 
+    @SerializedName("is_charging_arc")
+    val isChargingArc: Boolean = false,
+
+    @SerializedName("privilege_type")
+    val privilegeType: Int = 0,
+
     @SerializedName("elec_arc_type")
     val elecArcType: Int = 0,
+
+    @SerializedName("elec_arc_badge")
+    val elecArcBadge: String = "",
 
     @SerializedName("rights")
     val rights: HistoryVideoRights? = null
 ) : Serializable {
     val isChargingExclusive: Boolean
-        get() = isUpowerExclusive || elecArcType == 1 || rights?.autoplay == 0
+        get() = isUpowerExclusive || privilegeType > 0 || isChargingArc
+                || elecArcType == 1 || elecArcBadge == "充电专属"
     fun toVideoModel(): VideoModel {
         val historyInfo = history
         val aid = historyInfo?.oid ?: 0L

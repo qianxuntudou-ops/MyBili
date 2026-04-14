@@ -25,6 +25,13 @@ class SearchResultPagerAdapter(
 ) : ListAdapter<SearchResultPagerAdapter.SearchResultPage, SearchResultPagerAdapter.ViewHolder>(DiffCallback) {
 
     private val holders = mutableMapOf<SearchType, ViewHolder>()
+    private val pendingStates = mutableMapOf<SearchType, PendingState>()
+
+    private data class PendingState(
+        val items: List<SearchItemModel>,
+        val loading: Boolean,
+        val hasMore: Boolean
+    )
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = PageSearchResultBinding.inflate(
@@ -71,10 +78,12 @@ class SearchResultPagerAdapter(
             )
         }
         holders.clear()
+        pendingStates.clear()
         submitList(newPages)
     }
 
     fun clearResults() {
+        pendingStates.clear()
         currentList.forEach { page ->
             page.items.clear()
             page.loading = false
@@ -92,12 +101,30 @@ class SearchResultPagerAdapter(
     }
 
     fun submitState(type: SearchType, items: List<SearchItemModel>, loading: Boolean, hasMore: Boolean) {
-        val page = currentList.firstOrNull { it.type == type } ?: return
+        val state = PendingState(items, loading, hasMore)
+        pendingStates[type] = state
+        val page = currentList.firstOrNull { it.type == type }
+        if (page != null) {
+            applyStateToPage(page, state)
+            holders[type]?.submit(page) ?: notifyItemChanged(currentList.indexOf(page))
+        }
+    }
+
+    private fun applyStateToPage(page: SearchResultPage, state: PendingState) {
         page.items.clear()
-        page.items.addAll(items)
-        page.loading = loading
-        page.hasMore = hasMore
-        holders[type]?.submit(page) ?: notifyItemChanged(currentList.indexOf(page))
+        page.items.addAll(state.items)
+        page.loading = state.loading
+        page.hasMore = state.hasMore
+    }
+
+    override fun onCurrentListChanged(previousList: MutableList<SearchResultPage>, currentList: MutableList<SearchResultPage>) {
+        super.onCurrentListChanged(previousList, currentList)
+        for (page in currentList) {
+            val state = pendingStates.remove(page.type)
+            if (state != null) {
+                applyStateToPage(page, state)
+            }
+        }
     }
 
     fun scrollToTop(position: Int) {

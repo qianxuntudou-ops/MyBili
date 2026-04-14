@@ -12,6 +12,10 @@ internal object PlayerInstancePool {
 
     private const val TAG = "PlayerInstancePool"
     private const val IDLE_RELEASE_DELAY_MS = 45_000L
+    private const val MIN_BUFFER_MS = 2_500
+    private const val MAX_BUFFER_MS = 15_000
+    private const val BUFFER_FOR_PLAYBACK_MS = 600
+    private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 1_200
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -92,10 +96,10 @@ internal object PlayerInstancePool {
     private fun buildPlayer(context: Context): ExoPlayer {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
-                DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+                MIN_BUFFER_MS,
+                MAX_BUFFER_MS,
+                BUFFER_FOR_PLAYBACK_MS,
+                BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
             )
             .setTargetBufferBytes(DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES)
             .setPrioritizeTimeOverSizeThresholds(true)

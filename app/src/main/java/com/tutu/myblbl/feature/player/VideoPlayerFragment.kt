@@ -3,6 +3,7 @@ package com.tutu.myblbl.feature.player
 import android.content.Intent
 import android.os.Bundle
 import android.os.Build
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -153,6 +154,8 @@ class VideoPlayerFragment : Fragment() {
     private var bottomProgressSeekPreviewDurationMs: Long = 0L
     private val sessionCoordinator = PlayerSessionCoordinator()
     private var resumePlaybackWhenStarted: Boolean = false
+    private var startupTrace: StartupTrace? = null
+    private var startupTraceSequence: Int = 0
 
     private val gaiaVgateLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -193,6 +196,15 @@ class VideoPlayerFragment : Fragment() {
                     playerView.pauseDanmaku()
                 }
                 Player.STATE_READY -> {
+                    startupTrace
+                        ?.takeIf { !it.readyLogged }
+                        ?.also {
+                            it.readyLogged = true
+                            AppLog.d(
+                                TAG,
+                                "startup trace #${it.sequence}: ready in ${SystemClock.elapsedRealtime() - it.startedAtMs}ms"
+                            )
+                        }
                     viewModel.setLoading(false)
                     if (player?.playWhenReady == true) {
                         playerView.resumeDanmaku()
@@ -213,6 +225,7 @@ class VideoPlayerFragment : Fragment() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            startupTrace = null
             viewModel.setLoading(false)
             viewModel.handlePlaybackError(error, player?.currentPosition ?: 0L)
             AppLog.e(TAG, "player error: ${error.message}", error)
@@ -284,7 +297,9 @@ class VideoPlayerFragment : Fragment() {
                         seasonId = snapshot.seasonId,
                         epId = snapshot.epId,
                         seekPositionMs = snapshot.seekPositionMs,
-                        startEpisodeIndex = snapshot.episodeIndex
+                        startEpisodeIndex = snapshot.episodeIndex,
+                        preferredQualityId = snapshot.qualityId,
+                        preferredAudioQualityId = snapshot.audioQualityId
                     )
                 }
             }
@@ -409,7 +424,17 @@ class VideoPlayerFragment : Fragment() {
         }
         playerView.setPlayer(player)
         playerView.setRenderEventListener(object : MyPlayerView.RenderEventListener {
-            override fun onRenderedFirstFrame() = Unit
+            override fun onRenderedFirstFrame() {
+                startupTrace
+                    ?.takeIf { !it.firstFrameLogged }
+                    ?.also {
+                        it.firstFrameLogged = true
+                        AppLog.d(
+                            TAG,
+                            "startup trace #${it.sequence}: first frame in ${SystemClock.elapsedRealtime() - it.startedAtMs}ms"
+                        )
+                    }
+            }
         })
         playerView.setControllerVisibilityListener(object : MyPlayerView.ControllerVisibilityListener {
             override fun onVisibilityChanged(visibility: Int) {
@@ -636,6 +661,14 @@ class VideoPlayerFragment : Fragment() {
                         if (!playbackRequest.replaceInPlace) {
                             playerView.prepareForPlaybackTransition()
                         }
+                        startupTrace = StartupTrace(
+                            sequence = ++startupTraceSequence,
+                            startedAtMs = SystemClock.elapsedRealtime()
+                        )
+                        AppLog.d(
+                            TAG,
+                            "startup trace #$startupTraceSequence: apply playback request replaceInPlace=${playbackRequest.replaceInPlace}, seek=${playbackRequest.seekPositionMs}, playWhenReady=${playbackRequest.playWhenReady}"
+                        )
                         playerView.syncDanmakuPosition(playbackRequest.seekPositionMs, forceSeek = true)
                         currentPlayer.playWhenReady = false
                         currentPlayer.setMediaSource(playbackRequest.mediaSource)
@@ -853,6 +886,12 @@ class VideoPlayerFragment : Fragment() {
             TAG,
             "playback stall detected: position=$positionMs, stalledMs=$stalledMs, isPlaying=${currentPlayer.isPlaying}, bufferedPosition=${currentPlayer.bufferedPosition}"
         )
+        if (viewModel.handlePlaybackStall(positionMs, stalledMs)) {
+            viewModel.setLoading(true)
+            playerView.pauseDanmaku()
+            progressCoordinator.restart()
+            return
+        }
         val snapshotPosition = currentPlayer.currentPosition
         currentPlayer.stop()
         currentPlayer.prepare()
@@ -1202,6 +1241,13 @@ class VideoPlayerFragment : Fragment() {
         val playWhenReady = currentPlayer?.playWhenReady ?: resumePlaybackWhenStarted
         return positionMs to playWhenReady
     }
+
+    private data class StartupTrace(
+        val sequence: Int,
+        val startedAtMs: Long,
+        var readyLogged: Boolean = false,
+        var firstFrameLogged: Boolean = false
+    )
 
     private fun resumePlaybackIfNeeded(reason: String) {
         val currentPlayer = player ?: return
