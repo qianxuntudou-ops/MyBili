@@ -380,7 +380,7 @@ object AllSeriesFilterFactory {
         return AllSeriesFilterModel(
             title = context.getString(R.string.filter_season),
             key = "season_month",
-            iconResourceId = R.drawable.ic_calendar,
+            iconResourceId = R.drawable.ic_flower,
             options = createSeasonMonthOptions()
         )
     }

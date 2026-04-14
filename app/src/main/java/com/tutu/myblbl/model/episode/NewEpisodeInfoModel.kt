@@ -8,6 +8,8 @@ data class NewEpisodeInfoModel(
     val id: Long = 0,
     @SerializedName("title")
     val title: String = "",
+    @SerializedName("desc")
+    val desc: String = "",
     @SerializedName("long_title")
     val longTitle: String = "",
     @SerializedName("cover")
