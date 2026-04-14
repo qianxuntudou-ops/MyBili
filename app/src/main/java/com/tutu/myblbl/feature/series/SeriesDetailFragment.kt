@@ -25,6 +25,7 @@ import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.SeriesDetailContentAdapter
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
+import com.tutu.myblbl.core.ui.navigation.navigateBackFromUi
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -122,7 +123,7 @@ class SeriesDetailFragment : Fragment() {
             }
         })
         binding.buttonBack1.setOnClickListener {
-            requireActivity().onBackPressedDispatcher.onBackPressed()
+            navigateBackFromUi()
         }
         binding.buttonBack1.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {

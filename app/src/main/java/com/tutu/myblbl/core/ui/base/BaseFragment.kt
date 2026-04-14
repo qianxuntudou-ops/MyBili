@@ -13,6 +13,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
 import androidx.viewbinding.ViewBinding
 import com.tutu.myblbl.R
+import com.tutu.myblbl.core.ui.navigation.navigateBackFromUi
 import com.tutu.myblbl.ui.activity.MainActivity
 
 abstract class BaseFragment<VB : ViewBinding> : Fragment() {
@@ -66,7 +67,7 @@ abstract class BaseFragment<VB : ViewBinding> : Fragment() {
             topBar?.visibility = if (isTopBarVisible()) View.VISIBLE else View.GONE
             buttonRetry?.setOnClickListener { onRetryClick() }
             buttonBack?.setOnClickListener {
-                mainActivity?.onBackPressedDispatcher?.onBackPressed()
+                navigateBackFromUi()
             }
             _binding = getViewBinding(inflater, contentContainer)
             if (binding.root.parent == null) {

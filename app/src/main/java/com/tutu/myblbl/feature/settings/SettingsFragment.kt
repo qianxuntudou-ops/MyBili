@@ -29,6 +29,7 @@ import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.cache.FileCacheManager
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.core.ui.image.ImageLoader
+import com.tutu.myblbl.core.ui.navigation.navigateBackFromUi
 import com.tutu.myblbl.feature.player.cache.PlayerMediaCache
 import com.tutu.myblbl.core.common.ext.normalizeDanmakuSmartFilterValue
 import com.tutu.myblbl.network.cookie.CookieManager
@@ -118,7 +119,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
     override fun initView() {
         binding.tvTitle.text = getString(R.string.setting)
         binding.buttonBack.setOnClickListener {
-            requireActivity().onBackPressedDispatcher.onBackPressed()
+            navigateBackFromUi()
         }
         initSettings()
         setupRecyclerView()

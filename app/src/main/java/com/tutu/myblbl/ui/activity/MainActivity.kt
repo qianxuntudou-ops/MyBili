@@ -397,6 +397,16 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         Toast.makeText(this, R.string.app_exit, Toast.LENGTH_SHORT).show()
     }
 
+    fun closeTopOverlayFromUi() {
+        if (supportFragmentManager.backStackEntryCount > 0) {
+            pendingFocusRestoreDelayMs =
+                if (isOverlayVisible(SETTINGS_OVERLAY_TAG)) SETTINGS_OVERLAY_EXIT_ANIM_MS else 0L
+            supportFragmentManager.popBackStack()
+            return
+        }
+        handleBackPressed()
+    }
+
     private fun dispatchBackPressedToVisibleFragment(): Boolean {
         val topFragment = supportFragmentManager.fragments
             .asReversed()

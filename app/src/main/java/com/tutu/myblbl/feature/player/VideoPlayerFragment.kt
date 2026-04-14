@@ -48,6 +48,7 @@ import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.feature.player.settings.PlayerSettings
 import com.tutu.myblbl.feature.player.settings.PlayerSettingsStore
 import com.tutu.myblbl.core.common.time.TimeUtils
+import com.tutu.myblbl.core.ui.navigation.navigateBackFromUi
 import com.tutu.myblbl.core.ui.system.ViewUtils
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -487,7 +488,7 @@ class VideoPlayerFragment : Fragment() {
 
             override fun onClose() {
                 AppLog.d(TAG, "controller request close")
-                requireActivity().onBackPressedDispatcher.onBackPressed()
+                exitPlayerHost()
             }
 
             override fun onChooseEpisode() {
@@ -559,9 +560,8 @@ class VideoPlayerFragment : Fragment() {
                         hideController = { playerView.hideController() },
                         hidePanel = { hideContentPanel() },
                         exitPlayer = {
-                            (activity as? MainActivity)?.skipNextFocusRestore()
                             isEnabled = false
-                            requireActivity().onBackPressedDispatcher.onBackPressed()
+                            exitPlayerHost()
                             isEnabled = true
                         },
                         showExitPrompt = {
@@ -1031,7 +1031,7 @@ class VideoPlayerFragment : Fragment() {
             }
 
             PlayerSessionCoordinator.ContinuationPlan.ExitPlayer -> {
-                requireActivity().onBackPressedDispatcher.onBackPressed()
+                exitPlayerHost()
             }
 
             PlayerSessionCoordinator.ContinuationPlan.ShowController -> {
@@ -1090,6 +1090,10 @@ class VideoPlayerFragment : Fragment() {
 
     private fun showPlayerActionDialog() {
         overlayUiController.showPlayerActionDialog()
+    }
+
+    private fun exitPlayerHost() {
+        navigateBackFromUi(skipNextFocusRestore = activity is MainActivity)
     }
 
     private fun showOwnerDetailDialog() {
