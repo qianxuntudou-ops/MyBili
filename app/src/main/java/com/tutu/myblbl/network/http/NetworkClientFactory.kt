@@ -47,6 +47,10 @@ object NetworkClientFactory {
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
 
+        if (BuildConfig.DEBUG) {
+            builder.eventListenerFactory(DebugNetworkEventListener.Factory())
+        }
+
         if (cacheDir != null) {
             val httpCacheDir = File(cacheDir, "http_cache")
             builder.cache(Cache(httpCacheDir, HTTP_CACHE_SIZE))
