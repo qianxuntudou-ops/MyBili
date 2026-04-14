@@ -374,6 +374,7 @@ class VideoPlayerFragment : Fragment() {
             onPlayRelatedVideo = { video, playQueue ->
                 sessionCoordinator.replacePlayQueue(playQueue)
                 sessionCoordinator.updateCurrentVideo(video)
+                updatePlaybackPreload()
                 viewModel.playRelatedVideo(video)
             },
             onOpenFragmentFromHost = ::openFragmentFromPlayerHost,
@@ -539,6 +540,10 @@ class VideoPlayerFragment : Fragment() {
         renderControllerChrome(View.GONE)
     }
 
+    private fun updatePlaybackPreload() {
+        viewModel.preloadPlayback(sessionCoordinator.buildPreloadTarget())
+    }
+
     private fun setupBackHandler() {
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
@@ -601,6 +606,7 @@ class VideoPlayerFragment : Fragment() {
                     viewModel.videoInfo.collect { info ->
                         latestVideoInfo = info
                         sessionCoordinator.updateVideoInfo(info)
+                        updatePlaybackPreload()
                         updatePrimaryActionVisibility()
                         renderPlayerHeader()
                     }
@@ -750,6 +756,7 @@ class VideoPlayerFragment : Fragment() {
                 launch {
                     viewModel.episodes.collect { episodes ->
                         sessionCoordinator.updateEpisodes(episodes)
+                        updatePlaybackPreload()
                         playerView.showHideEpisodeButton(episodes.isNotEmpty())
                         updateEpisodeNavigationVisibility()
                         renderPlayerHeader()
@@ -759,6 +766,7 @@ class VideoPlayerFragment : Fragment() {
                 launch {
                     viewModel.selectedEpisodeIndex.collect { index ->
                         sessionCoordinator.updateSelectedEpisodeIndex(index)
+                        updatePlaybackPreload()
                         updateEpisodeNavigationVisibility()
                         renderPlayerHeader()
                     }
@@ -768,6 +776,7 @@ class VideoPlayerFragment : Fragment() {
                     viewModel.relatedVideos.collect { rawRelated ->
                         val related = ContentFilter.filterVideos(requireContext(), rawRelated)
                         sessionCoordinator.updateRelatedVideos(related)
+                        updatePlaybackPreload()
                         relatedAdapter.setData(related)
                         playerView.showHideRelatedButton(related.isNotEmpty())
                     }

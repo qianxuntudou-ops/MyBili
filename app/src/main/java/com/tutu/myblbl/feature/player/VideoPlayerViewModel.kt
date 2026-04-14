@@ -48,6 +48,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -131,6 +132,11 @@ class VideoPlayerViewModel(
         val resumeHintPositionMs: Long?,
         val replaceInPlace: Boolean,
         val requestDurationMs: Long
+    )
+
+    private data class PreloadedPlayback(
+        val source: PlaybackPreloadTarget.Source,
+        val preparedPlayback: PreparedPlayback
     )
 
     private data class PlayInfoFetchResult(
@@ -319,6 +325,9 @@ class VideoPlayerViewModel(
     private var fallbackAttemptCount: Int = 0
     private val attemptedFallbackSignatures = linkedSetOf<String>()
     private var lastPlaybackPositionMs: Long = 0L
+    private var preloadedPlayback: PreloadedPlayback? = null
+    private var preloadingIdentity: PlayRequestIdentity? = null
+    private var preloadJob: Job? = null
     private val hardwareSupportedVideoCodecs by lazy(LazyThreadSafetyMode.NONE) {
         VideoCodecSupport.getHardwareSupportedCodecs()
     }
@@ -353,6 +362,7 @@ class VideoPlayerViewModel(
         sessionStartTimestampMs = 0L
         lastReportedHeartbeatPositionSec = -1L
         resetFallbackState()
+        clearPreloadedPlayback(cancelJob = true)
         val loadGeneration = ++videoLoadGeneration
         _selectedSubtitleIndex.value = -1
         _currentSubtitleText.value = null
@@ -460,6 +470,7 @@ class VideoPlayerViewModel(
         _interactionModel.value = null
         _videoSnapshot.value = null
         _error.value = null
+        clearPreloadedPlayback(cancelJob = false)
         loadPlayUrl(preferLastPlayTime = false)
     }
 
@@ -473,6 +484,7 @@ class VideoPlayerViewModel(
             return
         }
         reportPlaybackHeartbeat()
+        clearPreloadedPlayback(cancelJob = false)
         loadVideoInfo(
             aid = targetAid,
             bvid = targetBvid,
@@ -498,6 +510,7 @@ class VideoPlayerViewModel(
         currentSubtitleCueIndex = 0
         _selectedSubtitleIndex.value = -1
         _currentSubtitleText.value = null
+        clearPreloadedPlayback(cancelJob = false)
         loadPlayUrl(preferLastPlayTime = false)
         loadInteractionInfo(edgeId)
         loadVideoSnapshot()
@@ -579,6 +592,56 @@ class VideoPlayerViewModel(
         _error.value = message
     }
 
+    fun preloadPlayback(target: PlaybackPreloadTarget?) {
+        val identity = target?.toPlayRequestIdentity()
+        val currentIdentity = currentPlayRequestIdentity()
+        if (identity == null || identity == currentIdentity) {
+            clearPreloadedPlayback(cancelJob = true)
+            return
+        }
+        val cachedPreload = preloadedPlayback
+        if (cachedPreload?.preparedPlayback?.identity == identity && cachedPreload.source == target.source) {
+            return
+        }
+        if (preloadingIdentity == identity) {
+            return
+        }
+
+        preloadJob?.cancel()
+        preloadedPlayback = null
+        preloadingIdentity = identity
+        preloadJob = viewModelScope.launch {
+            val preparedPlayback = runCatching {
+                requestPreparedPlayback(
+                    identity = identity,
+                    preferLastPlayTime = false,
+                    replaceInPlace = false,
+                    playbackPositionMs = 0L,
+                    playWhenReady = true,
+                    suppressUiSignals = true
+                )
+            }.getOrNull()
+            ensureActive()
+            if (preloadingIdentity != identity) {
+                return@launch
+            }
+            preloadingIdentity = null
+            preloadJob = null
+            if (preparedPlayback == null) {
+                AppLog.d(TAG, "preload skipped: source=${target.source}, cid=${identity.cid}")
+                return@launch
+            }
+            preloadedPlayback = PreloadedPlayback(
+                source = target.source,
+                preparedPlayback = preparedPlayback
+            )
+            AppLog.d(
+                TAG,
+                "preload ready: source=${target.source}, cid=${identity.cid}, quality=${preparedPlayback.selectionSnapshot.selectedQualityId}, cost=${preparedPlayback.requestDurationMs}ms"
+            )
+        }
+    }
+
     fun reportPlaybackHeartbeat(playType: Int = 2) {
         val aid = currentAid
         val bvid = currentBvid
@@ -657,7 +720,11 @@ class VideoPlayerViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val preparedPlayback = requestPreparedPlayback(
+                val preparedPlayback = consumePreloadedPlayback(
+                    identity = identity,
+                    preferLastPlayTime = preferLastPlayTime,
+                    replaceInPlace = replaceInPlace
+                ) ?: requestPreparedPlayback(
                     identity = identity,
                     preferLastPlayTime = preferLastPlayTime,
                     replaceInPlace = replaceInPlace
@@ -860,7 +927,8 @@ class VideoPlayerViewModel(
         replaceInPlace: Boolean,
         playbackPositionMs: Long = pendingSeekPositionMs,
         playWhenReady: Boolean = pendingPlayWhenReady,
-        qualityCandidates: List<Int> = qualityPolicy.buildCandidates(selectedQualityId)
+        qualityCandidates: List<Int> = qualityPolicy.buildCandidates(selectedQualityId),
+        suppressUiSignals: Boolean = false
     ): PreparedPlayback? {
         val requestStartMs = System.currentTimeMillis()
         val preferredQualityId = qualityCandidates.firstOrNull() ?: selectedQualityId ?: 80
@@ -875,7 +943,8 @@ class VideoPlayerViewModel(
         } else {
             val playInfoFetch = requestPlayInfoWithQualityFallback(
                 identity = identity,
-                qualityCandidates = qualityCandidates
+                qualityCandidates = qualityCandidates,
+                suppressUiSignals = suppressUiSignals
             )
             if (playInfoFetch == null) {
                 AppLog.e(TAG, "loadPlayUrl requestPlayInfoWithQualityFallback returned null")
@@ -886,13 +955,17 @@ class VideoPlayerViewModel(
                 val vVoucher = response.vVoucher.trim()
                 if (vVoucher.isNotBlank()) {
                     AppLog.w(TAG, "loadPlayUrl v_voucher detected, posting to UI: vVoucherLen=${vVoucher.length}")
-                    appSettings.putStringAsync("gaia_vgate_v_voucher", vVoucher)
-                    appSettings.putStringAsync("gaia_vgate_v_voucher_saved_at_ms", System.currentTimeMillis().toString())
-                    _riskControlVVoucher.value = vVoucher
-                    _error.value = "账号被风控，正在请求人机验证…"
+                    if (!suppressUiSignals) {
+                        appSettings.putStringAsync("gaia_vgate_v_voucher", vVoucher)
+                        appSettings.putStringAsync("gaia_vgate_v_voucher_saved_at_ms", System.currentTimeMillis().toString())
+                        _riskControlVVoucher.value = vVoucher
+                        _error.value = "账号被风控，正在请求人机验证…"
+                    }
                 } else if (response.isTryLookBypass) {
-                    _error.value = "账号被风控，已降级为试看模式"
-                    _riskControlTryLookBypass.value = true
+                    if (!suppressUiSignals) {
+                        _error.value = "账号被风控，已降级为试看模式"
+                        _riskControlTryLookBypass.value = true
+                    }
                 }
                 AppLog.e(
                     TAG,
@@ -970,6 +1043,7 @@ class VideoPlayerViewModel(
         resetFallbackAttempts: Boolean = true,
         countCurrentAttemptAsFallback: Boolean = false
     ) {
+        clearPreloadedPlayback(cancelJob = false)
         currentPlayInfo = preparedPlayback.playInfo
         selectedQualityId = preparedPlayback.selectionSnapshot.selectedQualityId
         selectedAudioId = preparedPlayback.selectionSnapshot.selectedAudioId
@@ -1275,7 +1349,8 @@ class VideoPlayerViewModel(
 
     private suspend fun requestPlayInfoWithQualityFallback(
         identity: PlayRequestIdentity,
-        qualityCandidates: List<Int>
+        qualityCandidates: List<Int>,
+        suppressUiSignals: Boolean
     ): PlayInfoFetchResult? {
         val attemptedQualities = linkedSetOf<Int>()
         val requestedQualityId = qualityCandidates.firstOrNull() ?: selectedQualityId ?: 80
@@ -1313,7 +1388,9 @@ class VideoPlayerViewModel(
                         TAG,
                         "playurl try_look bypass activated: requested=$requestedQualityId, actualRequest=$qualityId, cid=${identity.cid}"
                     )
-                    _riskControlTryLookBypass.value = true
+                    if (!suppressUiSignals) {
+                        _riskControlTryLookBypass.value = true
+                    }
                 }
                 return lastResult
             }
@@ -1396,6 +1473,51 @@ class VideoPlayerViewModel(
             cid = cid,
             epId = currentEpId?.takeIf { it > 0L }
         )
+    }
+
+    private fun PlaybackPreloadTarget.toPlayRequestIdentity(): PlayRequestIdentity? {
+        val resolvedCid = cid.takeIf { it > 0L } ?: return null
+        val resolvedAid = aid?.takeIf { it > 0L }
+        val resolvedBvid = bvid?.takeIf { it.isNotBlank() }
+        val resolvedEpId = epId?.takeIf { it > 0L }
+        if (resolvedAid == null && resolvedBvid.isNullOrBlank() && resolvedEpId == null) {
+            return null
+        }
+        return PlayRequestIdentity(
+            aid = resolvedAid,
+            bvid = resolvedBvid,
+            cid = resolvedCid,
+            epId = resolvedEpId
+        )
+    }
+
+    private fun consumePreloadedPlayback(
+        identity: PlayRequestIdentity,
+        preferLastPlayTime: Boolean,
+        replaceInPlace: Boolean
+    ): PreparedPlayback? {
+        if (preferLastPlayTime || replaceInPlace) {
+            return null
+        }
+        val preloaded = preloadedPlayback ?: return null
+        if (preloaded.preparedPlayback.identity != identity) {
+            return null
+        }
+        preloadedPlayback = null
+        AppLog.d(TAG, "preload consumed: source=${preloaded.source}, cid=${identity.cid}")
+        return preloaded.preparedPlayback.copy(
+            playWhenReady = pendingPlayWhenReady,
+            replaceInPlace = false
+        )
+    }
+
+    private fun clearPreloadedPlayback(cancelJob: Boolean) {
+        preloadedPlayback = null
+        if (cancelJob) {
+            preloadJob?.cancel()
+            preloadJob = null
+            preloadingIdentity = null
+        }
     }
 
     private fun isActiveVideoLoad(loadGeneration: Long): Boolean {
