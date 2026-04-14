@@ -41,7 +41,6 @@ import com.tutu.myblbl.network.response.Base2Response
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.network.cookie.CookieManager
-import com.tutu.myblbl.feature.player.cache.PlayerMediaCache
 import com.tutu.myblbl.feature.player.settings.PlayerSettings
 import com.tutu.myblbl.feature.player.settings.PlayerSettingsStore
 import kotlinx.coroutines.Dispatchers
@@ -174,20 +173,17 @@ class VideoPlayerViewModel(
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
-    private val dataSourceFactory = PlayerMediaCache.buildDataSourceFactory(
-        context = appContext,
-        upstreamFactory = OkHttpDataSource.Factory(playerOkHttpClient)
-            .setUserAgent(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                    "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    private val dataSourceFactory = OkHttpDataSource.Factory(playerOkHttpClient)
+        .setUserAgent(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        )
+        .setDefaultRequestProperties(
+            mapOf(
+                "Origin" to "https://www.bilibili.com",
+                "Referer" to "https://www.bilibili.com"
             )
-            .setDefaultRequestProperties(
-                mapOf(
-                    "Origin" to "https://www.bilibili.com",
-                    "Referer" to "https://www.bilibili.com"
-                )
-            )
-    )
+        )
 
     // Keeps stream selection and fallback policy out of the ViewModel's lifecycle code.
     private val streamResolver = VideoPlayerStreamResolver(
@@ -348,8 +344,17 @@ class VideoPlayerViewModel(
     private var preloadedPlayback: PreloadedPlayback? = null
     private var preloadingIdentity: PlayRequestIdentity? = null
     private var preloadJob: Job? = null
+    private var pendingPlayerExtrasCid: Long = 0L
+    private var pendingDanmakuRequest: PendingDanmakuRequest? = null
+    private var loadedPlayerExtrasCid: Long = 0L
     private val hardwareSupportedVideoCodecs: Set<VideoCodecEnum>
         get() = VideoCodecSupport.getHardwareSupportedCodecs()
+
+    private data class PendingDanmakuRequest(
+        val cid: Long,
+        val aid: Long,
+        val durationMs: Long
+    )
 
 
     data class SavedPlayerSnapshot(
@@ -429,6 +434,9 @@ class VideoPlayerViewModel(
         currentSubtitleData = null
         currentGraphVersion = 0L
         loadedDanmakuCid = 0L
+        loadedPlayerExtrasCid = 0L
+        pendingPlayerExtrasCid = 0L
+        pendingDanmakuRequest = null
         requestedQualityId = preferredQualityId.takeIf { it > 0 } ?: currentSettings.defaultVideoQualityId
         requestedAudioId = preferredAudioQualityId.takeIf { it > 0 } ?: currentSettings.defaultAudioQualityId
         requestedCodec = currentSettings.defaultVideoCodec
@@ -1182,18 +1190,39 @@ class VideoPlayerViewModel(
             _resumeHint.value = ResumeProgressHint(targetPositionMs = targetPositionMs)
         }
         _error.value = null
-        loadPlayerExtras()
+        if (loadedPlayerExtrasCid != preparedPlayback.identity.cid) {
+            pendingPlayerExtrasCid = preparedPlayback.identity.cid
+        }
         if (loadedDanmakuCid != preparedPlayback.identity.cid) {
-            loadedDanmakuCid = preparedPlayback.identity.cid
             val danmakuAid = currentAid
                 ?: preparedPlayback.identity.aid
                 ?: 0L
-            loadDanmaku(
+            pendingDanmakuRequest = PendingDanmakuRequest(
                 cid = preparedPlayback.identity.cid,
                 aid = danmakuAid,
                 durationMs = preparedPlayback.playInfo.timeLength
             )
         }
+    }
+
+    fun onPlaybackFirstFrame() {
+        val cid = currentCid.takeIf { it > 0L } ?: return
+        if (pendingPlayerExtrasCid == cid && loadedPlayerExtrasCid != cid) {
+            pendingPlayerExtrasCid = 0L
+            loadedPlayerExtrasCid = cid
+            loadPlayerExtras()
+        }
+        pendingDanmakuRequest
+            ?.takeIf { it.cid == cid && loadedDanmakuCid != cid }
+            ?.also { request ->
+                pendingDanmakuRequest = null
+                loadedDanmakuCid = request.cid
+                loadDanmaku(
+                    cid = request.cid,
+                    aid = request.aid,
+                    durationMs = request.durationMs
+                )
+            }
     }
 
     fun handlePlaybackError(error: androidx.media3.common.PlaybackException, currentPositionMs: Long) {

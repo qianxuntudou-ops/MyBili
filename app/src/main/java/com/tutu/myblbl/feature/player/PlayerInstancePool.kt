@@ -12,10 +12,10 @@ internal object PlayerInstancePool {
 
     private const val TAG = "PlayerInstancePool"
     private const val IDLE_RELEASE_DELAY_MS = 45_000L
-    private const val MIN_BUFFER_MS = 2_500
-    private const val MAX_BUFFER_MS = 15_000
-    private const val BUFFER_FOR_PLAYBACK_MS = 600
-    private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 1_200
+    private const val MIN_BUFFER_MS = 1_500
+    private const val MAX_BUFFER_MS = 12_000
+    private const val BUFFER_FOR_PLAYBACK_MS = 250
+    private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 500
 
     private val mainHandler = Handler(Looper.getMainLooper())
 

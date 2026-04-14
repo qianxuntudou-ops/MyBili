@@ -156,6 +156,8 @@ class VideoPlayerFragment : Fragment() {
     private var resumePlaybackWhenStarted: Boolean = false
     private var startupTrace: StartupTrace? = null
     private var startupTraceSequence: Int = 0
+    private var suppressPlaybackEnvironmentSync: Boolean = false
+    private var lastKeepScreenOnState: Boolean? = null
 
     private val gaiaVgateLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -425,6 +427,7 @@ class VideoPlayerFragment : Fragment() {
         playerView.setPlayer(player)
         playerView.setRenderEventListener(object : MyPlayerView.RenderEventListener {
             override fun onRenderedFirstFrame() {
+                viewModel.onPlaybackFirstFrame()
                 startupTrace
                     ?.takeIf { !it.firstFrameLogged }
                     ?.also {
@@ -670,11 +673,17 @@ class VideoPlayerFragment : Fragment() {
                             "startup trace #$startupTraceSequence: apply playback request replaceInPlace=${playbackRequest.replaceInPlace}, seek=${playbackRequest.seekPositionMs}, playWhenReady=${playbackRequest.playWhenReady}"
                         )
                         playerView.syncDanmakuPosition(playbackRequest.seekPositionMs, forceSeek = true)
-                        currentPlayer.playWhenReady = false
-                        currentPlayer.setMediaSource(playbackRequest.mediaSource)
-                        currentPlayer.seekTo(playbackRequest.seekPositionMs)
-                        currentPlayer.prepare()
-                        currentPlayer.playWhenReady = playbackRequest.playWhenReady
+                        suppressPlaybackEnvironmentSync = true
+                        try {
+                            currentPlayer.playWhenReady = false
+                            currentPlayer.setMediaSource(playbackRequest.mediaSource)
+                            currentPlayer.seekTo(playbackRequest.seekPositionMs)
+                            currentPlayer.prepare()
+                            currentPlayer.playWhenReady = playbackRequest.playWhenReady
+                        } finally {
+                            suppressPlaybackEnvironmentSync = false
+                        }
+                        syncPlaybackEnvironment()
                     }
                 }
 
@@ -866,11 +875,18 @@ class VideoPlayerFragment : Fragment() {
     }
 
     private fun syncPlaybackEnvironment() {
+        if (suppressPlaybackEnvironmentSync) {
+            return
+        }
         val currentPlayer = player
         val keepScreenOn = currentPlayer != null &&
             currentPlayer.playWhenReady &&
             currentPlayer.playbackState != Player.STATE_IDLE &&
             currentPlayer.playbackState != Player.STATE_ENDED
+        if (lastKeepScreenOnState == keepScreenOn) {
+            return
+        }
+        lastKeepScreenOnState = keepScreenOn
         activity?.let { ViewUtils.keepScreenOn(it, keepScreenOn) }
     }
 
@@ -1225,6 +1241,7 @@ class VideoPlayerFragment : Fragment() {
         playerView.destroy()
         playerView.stopDanmaku()
         PlayerInstancePool.detach(player, allowReuse = true)
+        lastKeepScreenOnState = false
         activity?.let { ViewUtils.keepScreenOn(it, false) }
         viewRelated.clearAnimation()
         player = null

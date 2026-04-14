@@ -63,10 +63,16 @@ object ViewUtils {
     }
     
     fun keepScreenOn(activity: Activity, keepOn: Boolean) {
+        val window = activity.window
+        val currentlyKeptOn =
+            (window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+        if (currentlyKeptOn == keepOn) {
+            return
+        }
         if (keepOn) {
-            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
-            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
     
