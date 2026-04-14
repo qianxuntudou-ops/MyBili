@@ -1,6 +1,10 @@
 package com.tutu.myblbl.feature.player
 
 import android.os.SystemClock
+import com.tutu.myblbl.core.model.id.Aid
+import com.tutu.myblbl.core.model.id.Bvid
+import com.tutu.myblbl.core.model.id.Cid
+import com.tutu.myblbl.core.model.id.EpId
 import com.tutu.myblbl.model.video.VideoModel
 import java.io.Serializable
 
@@ -16,6 +20,11 @@ data class PlayerLaunchContext(
     val playQueue: ArrayList<VideoModel> = arrayListOf(),
     val startEpisodeIndex: Int = -1
 ) : Serializable {
+
+    val typedAid: Aid get() = Aid(aid)
+    val typedBvid: Bvid get() = Bvid(bvid)
+    val typedCid: Cid get() = Cid(cid)
+    val typedEpId: EpId get() = EpId(epId)
 
     companion object {
         fun create(

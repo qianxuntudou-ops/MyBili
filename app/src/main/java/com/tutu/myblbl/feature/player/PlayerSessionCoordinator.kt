@@ -3,6 +3,7 @@ package com.tutu.myblbl.feature.player
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
+import com.tutu.myblbl.core.model.id.Cid
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.core.common.ext.serializableCompat
@@ -113,7 +114,7 @@ class PlayerSessionCoordinator {
 
     fun buildPreloadTarget(): PlaybackPreloadTarget? {
         val nextEpisode = episodes.getOrNull(selectedEpisodeIndex + 1)
-        if (nextEpisode != null && nextEpisode.cid > 0L) {
+        if (nextEpisode != null && Cid(nextEpisode.cid).isValid()) {
             return PlaybackPreloadTarget(
                 aid = nextEpisode.aid.takeIf { it > 0L },
                 bvid = nextEpisode.bvid.takeIf { it.isNotBlank() },
@@ -275,7 +276,8 @@ class PlayerSessionCoordinator {
     }
 
     private fun VideoModel.toPreloadTarget(source: PlaybackPreloadTarget.Source): PlaybackPreloadTarget? {
-        val targetCid = cid.takeIf { it > 0L } ?: return null
+        val typedCid = Cid(cid)
+        if (!typedCid.isValid()) return null
         val targetAid = aid.takeIf { it > 0L }
         val targetBvid = bvid.takeIf { it.isNotBlank() }
         val targetEpId = playbackEpId.takeIf { it > 0L }
@@ -285,7 +287,7 @@ class PlayerSessionCoordinator {
         return PlaybackPreloadTarget(
             aid = targetAid,
             bvid = targetBvid,
-            cid = targetCid,
+            cid = cid,
             epId = targetEpId,
             source = source
         )
