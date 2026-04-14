@@ -63,7 +63,7 @@ object AllSeriesFilterFactory {
     }
 
     private fun shouldIgnoreInitialUrlSelection(seasonType: Int, filterKey: String): Boolean {
-        return seasonType == SeriesType.ANIME && filterKey == "area"
+        return filterKey == "order" || (seasonType == SeriesType.ANIME && filterKey == "area")
     }
 
     private fun createAnimeFilters(context: Context): List<AllSeriesFilterModel> = buildList {
@@ -568,11 +568,11 @@ object AllSeriesFilterFactory {
     private fun createOrderOptions(seasonType: Int): List<AllSeriesFilterOption> {
         return when (seasonType) {
             SeriesType.ANIME, SeriesType.CHINA_ANIME -> listOf(
-                option("追番人数", "3"),
+                option("追番人数", "2"),
                 option("最近更新", "0"),
-                option("最高评分", "4"),
-                option("播放数量", "2"),
-                option("开播时间", "5")
+                option("最高评分", "3"),
+                option("播放数量", "1"),
+                option("开播时间", "4")
             )
             SeriesType.VARIETY -> listOf(
                 option("播放数量", "2"),
