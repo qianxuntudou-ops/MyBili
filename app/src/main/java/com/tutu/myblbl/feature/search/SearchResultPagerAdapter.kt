@@ -3,6 +3,7 @@ package com.tutu.myblbl.feature.search
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.util.Log
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
@@ -50,13 +51,23 @@ class SearchResultPagerAdapter(
 
     fun getPageType(position: Int): SearchType? = currentList.getOrNull(position)?.type
 
-    fun setPages(categories: List<SearchCategoryItem>) {
+    fun setPages(
+        categories: List<SearchCategoryItem>,
+        initialStates: Map<SearchType, SearchViewModel.SearchPageState> = emptyMap()
+    ) {
         val existing = currentList.associateBy { it.type }
+        Log.d("SearchPager", "setPages: categories=${categories.size}, existingPages=${existing.keys}, initialStates=${initialStates.map { "${it.key}=items:${it.value.items.size}" }}")
         val newPages = categories.map { category ->
+            val state = initialStates[category.type]
+            val items = state?.items?.toMutableList()
+                ?: existing[category.type]?.items
+                ?: mutableListOf()
             SearchResultPage(
                 type = category.type,
                 title = category.showText,
-                items = existing[category.type]?.items ?: mutableListOf()
+                items = items,
+                loading = state?.loading ?: false,
+                hasMore = state?.hasMore ?: true
             )
         }
         holders.clear()
@@ -81,6 +92,7 @@ class SearchResultPagerAdapter(
     }
 
     fun submitState(type: SearchType, items: List<SearchItemModel>, loading: Boolean, hasMore: Boolean) {
+        Log.d("SearchPager", "submitState: type=$type, items=${items.size}, loading=$loading, hasMore=$hasMore, hasHolder=${holders.containsKey(type)}")
         val page = currentList.firstOrNull { it.type == type } ?: return
         page.items.clear()
         page.items.addAll(items)
@@ -160,6 +172,7 @@ class SearchResultPagerAdapter(
 
         fun submit(page: SearchResultPage) {
             val filteredItems = ContentFilter.filterSearchItems(binding.root.context, page.items)
+            Log.d("SearchPager", "submit: type=${page.type}, rawItems=${page.items.size}, filteredItems=${filteredItems.size}, loading=${page.loading}, showEmpty=${!page.loading && filteredItems.isEmpty()}")
             val applyUiState = {
                 currentAdapter?.setItems(filteredItems)
                 binding.recyclerViewResult.isVisible = filteredItems.isNotEmpty()

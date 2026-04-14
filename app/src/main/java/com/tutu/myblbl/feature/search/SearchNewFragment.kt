@@ -3,6 +3,7 @@ package com.tutu.myblbl.feature.search
 import android.content.Context
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -164,7 +165,9 @@ class SearchNewFragment :
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.searchPageStates.collectLatest { states ->
+                    Log.d("SearchFragment", "searchPageStates collected: count=${states.size}")
                     states.forEach { (type, state) ->
+                        Log.d("SearchFragment", "  pageState: type=$type, items=${state.items.size}, loading=${state.loading}")
                         resultPagerAdapter.submitState(type, state.items, state.loading, state.hasMore)
                     }
                     maybeResolvePendingResultFocus()
@@ -526,7 +529,9 @@ class SearchNewFragment :
     }
 
     private fun applySearchCategories(categories: List<SearchCategoryItem>) {
-        resultPagerAdapter.setPages(categories)
+        Log.d("SearchFragment", "applySearchCategories: count=${categories.size}, types=${categories.map { it.type }}")
+        val pageStates = viewModel.searchPageStates.value
+        resultPagerAdapter.setPages(categories, pageStates)
         tabMediator?.detach()
         tabMediator = TabLayoutMediator(binding.tabSearchResult, binding.viewPagerResult) { tab, position ->
             tab.text = resultPagerAdapter.getPageTitle(position)
@@ -539,6 +544,7 @@ class SearchNewFragment :
             onNavigateRight = ::focusOrderButton
         )
         viewModel.searchPageStates.value.forEach { (type, state) ->
+            Log.d("SearchFragment", "applySearchCategories submitState: type=$type, items=${state.items.size}, loading=${state.loading}")
             resultPagerAdapter.submitState(type, state.items, state.loading, state.hasMore)
         }
         val hasCategories = categories.isNotEmpty()
