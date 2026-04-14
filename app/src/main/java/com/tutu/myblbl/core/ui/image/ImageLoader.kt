@@ -125,19 +125,26 @@ object ImageLoader {
             .into(imageView)
     }
 
+    private var cachedCoverRequestOptions: RequestOptions? = null
+
+    private fun getCoverRequestOptions(context: android.content.Context): RequestOptions {
+        return cachedCoverRequestOptions ?: RequestOptions()
+            .transform(CenterCrop(), RoundedCorners(context.resources.getDimensionPixelSize(R.dimen.px15)))
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .also { cachedCoverRequestOptions = it }
+    }
+
     fun loadVideoCover(
         imageView: ImageView,
         url: String?,
         placeholder: Int = R.drawable.default_video,
         error: Int = R.drawable.default_video
     ) {
-        val radius = imageView.context.resources.getDimensionPixelSize(R.dimen.px15)
         Glide.with(imageView)
             .load(buildImageModel(buildOptimizedVideoCoverUrl(imageView, url)))
             .placeholder(placeholder)
             .error(error)
-            .apply(RequestOptions().transform(CenterCrop(), RoundedCorners(radius)))
-            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .apply(getCoverRequestOptions(imageView.context))
             .into(imageView)
     }
 

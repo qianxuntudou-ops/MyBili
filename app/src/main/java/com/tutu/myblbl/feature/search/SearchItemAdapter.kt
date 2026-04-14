@@ -8,7 +8,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
-import androidx.core.text.HtmlCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -60,7 +59,7 @@ class SearchItemAdapter(
         val video = VideoModel(
             aid = item.aid,
             bvid = item.bvid,
-            title = decodeHtml(item.title),
+            title = item.decodedTitle,
             pic = item.pic.ifBlank { item.cover },
             goto = if (searchType == SearchType.LiveRoom || item.roomId > 0L) "live" else "av",
             roomId = item.roomId,
@@ -130,7 +129,7 @@ class SearchItemAdapter(
         }
 
         fun bind(item: SearchItemModel) {
-            binding.textView.text = decodeHtml(item.title)
+            binding.textView.text = item.decodedTitle
             val ownerName = item.author.ifBlank { item.uname }
             val publishText = item.pubDate.takeIf { it > 0L }?.let(TimeUtils::formatRelativeTime).orEmpty()
             binding.textViewOwner.text = buildString {
@@ -185,7 +184,7 @@ class SearchItemAdapter(
         }
 
         fun bind(item: SearchItemModel) {
-            binding.textView.text = decodeHtml(item.title)
+            binding.textView.text = item.decodedTitle
             binding.textPlayCount.text = NumberUtils.formatCount(item.online)
 
             val ownerName = item.uname.ifBlank { item.author }
@@ -224,7 +223,7 @@ class SearchItemAdapter(
         }
 
         fun bind(item: SearchItemModel) {
-            binding.textView.text = decodeHtml(item.title)
+            binding.textView.text = item.decodedTitle
             binding.textSub.text = item.indexShow.ifBlank { item.desc }
             binding.textBadge.visibility = if (item.type.contains("media")) View.VISIBLE else View.GONE
             binding.textBadge.text = item.type.removePrefix("media_").ifBlank { "PGC" }
@@ -329,10 +328,6 @@ class SearchItemAdapter(
             item.id > 0L -> "id:${item.id}"
             else -> "title:${item.title}"
         }
-    }
-
-    private fun decodeHtml(value: String): String {
-        return HtmlCompat.fromHtml(value, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
     }
 
     private companion object {

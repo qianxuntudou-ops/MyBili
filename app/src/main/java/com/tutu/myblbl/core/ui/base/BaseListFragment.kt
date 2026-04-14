@@ -19,6 +19,11 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
 
     companion object {
         private const val TAG = "MainEntryFocus"
+        val sharedVideoPool by lazy {
+            RecyclerView.RecycledViewPool().apply {
+                setMaxRecycledViews(0, 20)
+            }
+        }
     }
 
     protected var recyclerView: RecyclerView? = null
@@ -55,6 +60,7 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
         adapter = createAdapter()
         recyclerView?.adapter = adapter
         adapter?.registerAdapterDataObserver(restoreObserver)
+        recyclerView?.setRecycledViewPool(sharedVideoPool)
         layoutManager = createLayoutManager()
         recyclerView?.layoutManager = layoutManager
         if (layoutManager is WrapContentGridLayoutManager) {

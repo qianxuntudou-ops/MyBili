@@ -127,4 +127,18 @@ data class SearchItemModel(
 
     @SerializedName("official_verify")
     val officialVerify: OfficialVerifySimple? = null
-) : Serializable
+) : Serializable {
+
+    private var _decodedTitle: String? = null
+
+    val decodedTitle: String
+        get() = _decodedTitle ?: run {
+            val result = if (title.contains('<') || title.contains('&')) {
+                android.text.Html.fromHtml(title, android.text.Html.FROM_HTML_MODE_LEGACY).toString()
+            } else {
+                title
+            }
+            _decodedTitle = result
+            result
+        }
+}

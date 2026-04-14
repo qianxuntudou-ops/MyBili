@@ -3,6 +3,7 @@ package com.tutu.myblbl.core.ui.base
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 
@@ -12,6 +13,9 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
     internal var showLoadMore = true
     internal var focusedView: View? = null
     internal var rememberedPosition: Int = RecyclerView.NO_POSITION
+
+    protected open fun areItemsSame(old: MODEL, new: MODEL): Boolean = old == new
+    protected open fun areContentsSame(old: MODEL, new: MODEL): Boolean = old == new
 
     fun contentCount(): Int = items.size
 
@@ -60,33 +64,22 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
     abstract fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): VH
 
     fun setData(data: List<MODEL>) {
-        val oldItemCount = itemCount
         focusedView = null
         rememberedPosition = rememberedPosition
             .takeIf { it != RecyclerView.NO_POSITION && it < data.size }
             ?: RecyclerView.NO_POSITION
+        val oldItems = items.toList()
+        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = oldItems.size
+            override fun getNewListSize() = data.size
+            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
+                areItemsSame(oldItems[oldPos], data[newPos])
+            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
+                areContentsSame(oldItems[oldPos], data[newPos])
+        })
         items.clear()
         items.addAll(data)
-        val newItemCount = itemCount
-        when {
-            oldItemCount == 0 && newItemCount > 0 -> {
-                notifyItemRangeInserted(0, newItemCount)
-            }
-            oldItemCount > 0 && newItemCount == 0 -> {
-                notifyItemRangeRemoved(0, oldItemCount)
-            }
-            oldItemCount > 0 && newItemCount > 0 -> {
-                val sharedCount = minOf(oldItemCount, newItemCount)
-                if (sharedCount > 0) {
-                    notifyItemRangeChanged(0, sharedCount)
-                }
-                if (newItemCount > oldItemCount) {
-                    notifyItemRangeInserted(oldItemCount, newItemCount - oldItemCount)
-                } else if (oldItemCount > newItemCount) {
-                    notifyItemRangeRemoved(newItemCount, oldItemCount - newItemCount)
-                }
-            }
-        }
+        diffResult.dispatchUpdatesTo(this)
     }
 
     fun clear() {

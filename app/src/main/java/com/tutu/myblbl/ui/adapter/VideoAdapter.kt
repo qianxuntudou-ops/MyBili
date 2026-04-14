@@ -65,8 +65,9 @@ class VideoAdapter(
     }
 
     fun addData(newItems: List<VideoModel>) {
-        val deduplicated = deduplicate(newItems).filter { incoming ->
-            items.none { existing -> videoKey(existing) == videoKey(incoming) }
+        val existingKeys = items.mapTo(HashSet(items.size)) { videoKey(it) }
+        val deduplicated = deduplicate(newItems).filterNot { incoming ->
+            existingKeys.contains(videoKey(incoming))
         }
         if (deduplicated.isEmpty()) {
             return
