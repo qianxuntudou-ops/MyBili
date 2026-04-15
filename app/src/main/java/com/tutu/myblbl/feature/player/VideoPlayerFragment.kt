@@ -619,6 +619,45 @@ class VideoPlayerFragment : Fragment() {
 
     private fun setupObservers() {
         viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.playbackRequest.collect { request ->
+                val currentPlayer = player ?: return@collect
+                val playbackRequest = request ?: return@collect
+                viewModel.setErrorMessage(null)
+                resumePlaybackWhenStarted = playbackRequest.playWhenReady
+
+                if (playbackRequest.replaceInPlace) {
+                    playerView.showController()
+                    playerView.removeControllerHideCallbacks()
+                }
+                progressCoordinator.reset()
+                if (!playbackRequest.replaceInPlace) {
+                    playerView.prepareForPlaybackTransition()
+                }
+                startupTrace = StartupTrace(
+                    sequence = ++startupTraceSequence,
+                    startedAtMs = SystemClock.elapsedRealtime()
+                )
+                AppLog.d(
+                    TAG,
+                    "startup trace #$startupTraceSequence: apply playback request replaceInPlace=${playbackRequest.replaceInPlace}, seek=${playbackRequest.seekPositionMs}, playWhenReady=${playbackRequest.playWhenReady}"
+                )
+                playerView.syncDanmakuPosition(playbackRequest.seekPositionMs, forceSeek = true)
+                suppressPlaybackEnvironmentSync = true
+                try {
+                    currentPlayer.playWhenReady = false
+                    currentPlayer.stop()
+                    currentPlayer.setMediaSource(playbackRequest.mediaSource)
+                    currentPlayer.seekTo(playbackRequest.seekPositionMs)
+                    currentPlayer.prepare()
+                    currentPlayer.playWhenReady = playbackRequest.playWhenReady
+                } finally {
+                    suppressPlaybackEnvironmentSync = false
+                }
+                syncPlaybackEnvironment()
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.riskControlVVoucher.collect { vVoucher ->
@@ -647,44 +686,6 @@ class VideoPlayerFragment : Fragment() {
                         sessionCoordinator.updateVideoInfo(info)
                         schedulePreloadAndHeaderRefresh()
                         updatePrimaryActionVisibility()
-                    }
-                }
-
-                launch {
-                    viewModel.playbackRequest.collect { request ->
-                        val currentPlayer = player ?: return@collect
-                        val playbackRequest = request ?: return@collect
-                        viewModel.setErrorMessage(null)
-                        resumePlaybackWhenStarted = playbackRequest.playWhenReady
-
-                        if (playbackRequest.replaceInPlace) {
-                            playerView.showController()
-                            playerView.removeControllerHideCallbacks()
-                        }
-                        progressCoordinator.reset()
-                        if (!playbackRequest.replaceInPlace) {
-                            playerView.prepareForPlaybackTransition()
-                        }
-                        startupTrace = StartupTrace(
-                            sequence = ++startupTraceSequence,
-                            startedAtMs = SystemClock.elapsedRealtime()
-                        )
-                        AppLog.d(
-                            TAG,
-                            "startup trace #$startupTraceSequence: apply playback request replaceInPlace=${playbackRequest.replaceInPlace}, seek=${playbackRequest.seekPositionMs}, playWhenReady=${playbackRequest.playWhenReady}"
-                        )
-                        playerView.syncDanmakuPosition(playbackRequest.seekPositionMs, forceSeek = true)
-                        suppressPlaybackEnvironmentSync = true
-                        try {
-                            currentPlayer.playWhenReady = false
-                            currentPlayer.setMediaSource(playbackRequest.mediaSource)
-                            currentPlayer.seekTo(playbackRequest.seekPositionMs)
-                            currentPlayer.prepare()
-                            currentPlayer.playWhenReady = playbackRequest.playWhenReady
-                        } finally {
-                            suppressPlaybackEnvironmentSync = false
-                        }
-                        syncPlaybackEnvironment()
                     }
                 }
 
