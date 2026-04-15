@@ -330,6 +330,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     private fun handleIntent(intent: Intent) {
         val launchContext = intent.serializableExtraCompat<PlayerLaunchContext>(EXTRA_LAUNCH_CONTEXT)
             ?: PlayerLaunchContext.create()
+        AppLog.d(TAG, "cardClick:start aid=${launchContext.aid}, bvid=${launchContext.bvid}, cid=${launchContext.cid}, clickElapsedRealtime=${SystemClock.elapsedRealtime()}")
         AppLog.d(TAG, "handleIntent: aid=${launchContext.aid}, bvid=${launchContext.bvid}, cid=${launchContext.cid}")
         if (
             launchContext.aid <= 0L &&
@@ -479,6 +480,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                         it.firstFrameLogged = true
                         AppLog.d(TAG, "startup trace #${it.sequence}: first frame in ${SystemClock.elapsedRealtime() - it.startedAtMs}ms")
                     }
+                AppLog.d(TAG, "click->firstFrame: totalElapsedRealtime=${SystemClock.elapsedRealtime()}")
             }
         })
         playerView.setControllerVisibilityListener(object : MyPlayerView.ControllerVisibilityListener {
@@ -502,13 +504,13 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         playerView.onResumeProgressCancelled = { cancelResume() }
         playerView.showSettingButton(false)
         playerView.showHideNextPrevious(false)
-        playerView.showHideFfRe(playerSettings.showRewindFastForward)
-        playerView.showHideActionButton(false)
+        playerView.showSettingButton(true)
+        playerView.showHideActionButton(true)
         playerView.showHideEpisodeButton(false)
         playerView.showHideRelatedButton(false)
-        playerView.showHideDmSwitchButton(false)
+        playerView.showHideDmSwitchButton(true)
         playerView.showHideLiveSettingButton(false)
-        playerView.showHideSubtitleButton(false)
+        playerView.showHideSubtitleButton(true)
         playerView.setShowHideOwnerInfo(false)
         playerView.setRepeatMode(Player.REPEAT_MODE_OFF)
         applyPlayerSettings(playerSettings)
@@ -708,6 +710,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         viewModel.reportPlaybackHeartbeat()
         viewModel.savePlayerSnapshot()
         resumePlaybackWhenStarted = snapshotPlayWhenReady
+        player?.pause()
         player?.playWhenReady = false
         playerView.pauseDanmaku()
         stopProgressUpdates()

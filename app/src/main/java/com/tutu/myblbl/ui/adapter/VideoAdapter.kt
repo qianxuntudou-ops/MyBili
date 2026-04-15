@@ -230,7 +230,7 @@ class VideoAdapter(
             }
             binding.root.setOnKeyListener(keyListener)
             binding.root.setOnTouchListener { _, event ->
-                when (event.action) {
+                when(event.action) {
                     MotionEvent.ACTION_DOWN -> startLongPress()
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPress()
                 }

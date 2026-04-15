@@ -83,6 +83,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         private const val KEY_DM_MERGE_DUPLICATE = "dm_merge_duplicate"
         private const val KEY_GAIA_VGATE_V_VOUCHER = "gaia_vgate_v_voucher"
         private const val KEY_GAIA_VGATE_V_VOUCHER_SAVED_AT_MS = "gaia_vgate_v_voucher_saved_at_ms"
+        private const val KEY_IPV4_ONLY = "ipv4_only"
         private const val COMMON_POSITION_RISK_CONTROL = 8
         private val DM_SMART_FILTER_OPTIONS = arrayOf("关", "1", "2", "3")
 
@@ -168,7 +169,8 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             SettingModel(getString(R.string.give_coin_number), "2"),
             SettingModel(getString(R.string.show_next_previous), "关"),
             SettingModel(getString(R.string.show_dm_switch), "关"),
-            SettingModel(getString(R.string.ff_seek_second), "10s")
+            SettingModel(getString(R.string.ff_seek_second), "10s"),
+            SettingModel(getString(R.string.ipv4_only), "开")
         )
 
         dmSettings = mutableListOf(
@@ -306,6 +308,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             14 -> toggleSetting(playerSettings, 14, KEY_SHOW_NEXT_PREVIOUS)
             15 -> toggleSetting(playerSettings, 15, KEY_SHOW_DM_SWITCH)
             16 -> showPlayerChoiceDialog(position, KEY_FF_SEEK_SECOND, arrayOf("10s", "15s", "20s", "25s", "30s", "35s", "40s", "45s", "50s", "55s", "60s"))
+            17 -> toggleSetting(playerSettings, 17, KEY_IPV4_ONLY)
         }
     }
 
@@ -443,6 +446,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         applySavedValue(playerSettings, 14, KEY_SHOW_NEXT_PREVIOUS)
         applySavedValue(playerSettings, 15, KEY_SHOW_DM_SWITCH)
         applySavedValue(playerSettings, 16, KEY_FF_SEEK_SECOND)
+        applySavedValue(playerSettings, 17, KEY_IPV4_ONLY)
 
         applySavedValue(dmSettings, 0, KEY_DM_SWITCH)
         applySavedValue(dmSettings, 1, KEY_DM_ALPHA)

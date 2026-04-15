@@ -380,14 +380,14 @@ class VideoPlayerFragment : Fragment() {
 
     private fun setupOverlayController() {
         autoPlayController = VideoPlayerAutoPlayController(
-            fragment = this,
+            activity = requireActivity() as androidx.appcompat.app.AppCompatActivity,
             viewNext = viewNext,
             imageNext = imageNext,
             textNext = textNext,
             canExecutePendingAction = { _binding != null && player?.playbackState == Player.STATE_ENDED }
         )
         overlayUiController = VideoPlayerOverlayController(
-            fragment = this,
+            activity = requireActivity() as androidx.appcompat.app.AppCompatActivity,
             playerView = playerView,
             overlayCoordinator = overlayCoordinator,
             sessionCoordinator = sessionCoordinator,
@@ -409,7 +409,7 @@ class VideoPlayerFragment : Fragment() {
             isViewActive = { _binding != null }
         )
         resumeHintController = VideoPlayerResumeHintController(
-            fragment = this,
+            activity = requireActivity() as androidx.appcompat.app.AppCompatActivity,
             playerProvider = { player },
             onCancelResume = { viewModel.cancelResumeProgress() },
             onClearResumeHint = { viewModel.clearResumeHint() }

@@ -434,6 +434,7 @@
     <string name="video">视频</string>
     <string name="video_">Video：%s</string>
     <string name="video_codec">视频编码</string>
+    <string name="ipv4_only">仅使用IPv4</string>
     <string name="video_codec_">VideoCodec：%s</string>
     <string name="video_info">视频信息</string>
     <string name="video_order">视频排序</string>

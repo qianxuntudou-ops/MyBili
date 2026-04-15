@@ -31,19 +31,29 @@ internal object PlayerInstancePool {
             cachedPlayer = it
         }
         isAttached = true
-        AppLog.d(TAG, if (reused) "acquire reused player" else "acquire created player")
+        if (reused) {
+            val state = player.playbackState
+            val hasMedia = player.mediaItemCount
+            AppLog.d(TAG, "acquire reused player state=$state mediaItemCount=$hasMedia")
+        } else {
+            AppLog.d(TAG, "acquire created player")
+        }
         return player
     }
 
     @Synchronized
     fun softDetach(player: ExoPlayer?) {
         if (player == null || player !== cachedPlayer) return
+        val stateBefore = player.playbackState
+        val mediaCount = player.mediaItemCount
+        
+        player.pause()
         isAttached = false
         player.playWhenReady = false
         player.stop()
         player.clearVideoSurface()
         scheduleRelease()
-        AppLog.d(TAG, "softDetach: player stopped and kept alive, release in ${IDLE_RELEASE_DELAY_MS}ms")
+        AppLog.d(TAG, "softDetach: stateBefore=$stateBefore mediaCount=$mediaCount paused,stopped, release in ${IDLE_RELEASE_DELAY_MS}ms")
     }
 
     @Synchronized

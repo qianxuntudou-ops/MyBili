@@ -13,9 +13,11 @@ import com.tutu.myblbl.network.security.BiliSecurityCoordinator
 import com.tutu.myblbl.network.session.NetworkSessionStore
 import com.tutu.myblbl.network.ua.DesktopUserAgentStore
 import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.network.cookie.CookieManager
 import okhttp3.OkHttpClient
 import org.json.JSONObject
+import org.koin.mp.KoinPlatform
 import retrofit2.Retrofit
 
 object NetworkManager {
@@ -43,11 +45,15 @@ object NetworkManager {
     private val internalCookieManager: CookieManager by lazy { CookieManager() }
 
     private val internalOkHttpClient: OkHttpClient by lazy {
+        val settings: AppSettingsDataStore? = runCatching {
+            KoinPlatform.getKoin().get<AppSettingsDataStore>()
+        }.getOrNull()
         NetworkClientFactory.createOkHttpClient(
             cookieManager = internalCookieManager,
             userAgentProvider = { currentUserAgentValue },
             acceptLanguageProvider = { getAcceptLanguage() },
-            cacheDir = appContext?.cacheDir
+            cacheDir = appContext?.cacheDir,
+            ipv4OnlyEnabled = { settings?.getCachedString("ipv4_only") != "关" }
         )
     }
 

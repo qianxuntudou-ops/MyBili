@@ -9,8 +9,12 @@ import com.tutu.myblbl.network.interceptor.HeaderInterceptor
 import com.tutu.myblbl.network.interceptor.HttpCacheInterceptor
 import com.tutu.myblbl.network.cookie.CookieManager
 import java.io.File
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import okhttp3.Cache
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -24,16 +28,14 @@ object NetworkClientFactory {
         cookieManager: CookieManager,
         userAgentProvider: () -> String,
         acceptLanguageProvider: () -> String,
-        cacheDir: File? = null
+        cacheDir: File? = null,
+        ipv4OnlyEnabled: () -> Boolean = { true }
     ): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .cookieJar(cookieManager)
+            .dns(ipv4OnlyDns(ipv4OnlyEnabled))
             .addInterceptor(HttpLoggingInterceptor().apply {
-                level = if (BuildConfig.DEBUG) {
-                    HttpLoggingInterceptor.Level.BODY
-                } else {
-                    HttpLoggingInterceptor.Level.NONE
-                }
+                level = HttpLoggingInterceptor.Level.NONE
             })
             .addInterceptor(
                 HeaderInterceptor(
@@ -79,4 +81,17 @@ object NetworkClientFactory {
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
+
+    private fun ipv4OnlyDns(ipv4OnlyEnabled: () -> Boolean): Dns =
+        object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> {
+                val host = hostname.trim()
+                if (host.isBlank()) throw UnknownHostException("hostname is blank")
+                val addresses = Dns.SYSTEM.lookup(host)
+                if (!ipv4OnlyEnabled()) return addresses
+                val ipv4 = addresses.filterIsInstance<Inet4Address>()
+                if (ipv4.isNotEmpty()) return ipv4
+                throw UnknownHostException("No IPv4 address for $host")
+            }
+        }
 }

@@ -3,6 +3,8 @@
 package com.tutu.myblbl.feature.player
 
 import android.content.Context
+import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.MediaSource
 import com.google.gson.Gson
@@ -47,13 +50,14 @@ import com.tutu.myblbl.feature.player.settings.PlayerSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
+import java.net.URL
+import kotlinx.coroutines.withContext
+import org.koin.mp.KoinPlatform
 import java.util.concurrent.TimeUnit
 
 @UnstableApi
@@ -170,10 +174,26 @@ class VideoPlayerViewModel(
 
     private val gson = Gson()
     private val appContext = context.applicationContext
+    private val ipv4OnlyEnabled: () -> Boolean = {
+        runCatching { KoinPlatform.getKoin().get<AppSettingsDataStore>() }
+            .getOrNull()
+            ?.getCachedString("ipv4_only") != "关"
+    }
     private val playerOkHttpClient = okHttpClient.newBuilder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .connectionPool(okhttp3.ConnectionPool(5, 30, TimeUnit.SECONDS))
+        .dns(object : okhttp3.Dns {
+            override fun lookup(hostname: String): List<java.net.InetAddress> {
+                val host = hostname.trim()
+                if (host.isBlank()) throw java.net.UnknownHostException("hostname is blank")
+                val addresses = okhttp3.Dns.SYSTEM.lookup(host)
+                if (!ipv4OnlyEnabled()) return addresses
+                val ipv4 = addresses.filterIsInstance<java.net.Inet4Address>()
+                if (ipv4.isNotEmpty()) return ipv4
+                throw java.net.UnknownHostException("No IPv4 address for $host")
+            }
+        })
         .build()
     private val upstreamDataSourceFactory = OkHttpDataSource.Factory(playerOkHttpClient)
         .setUserAgent(
@@ -186,9 +206,9 @@ class VideoPlayerViewModel(
                 "Referer" to "https://www.bilibili.com"
             )
         )
-    private val dataSourceFactory = PlayerMediaCache.buildDefaultDataSourceFactory(
-        context = appContext,
-        upstreamFactory = upstreamDataSourceFactory
+    private val dataSourceFactory = DefaultDataSource.Factory(
+        appContext,
+        upstreamDataSourceFactory
     )
 
     var useDashPlayback: Boolean = true
@@ -199,8 +219,8 @@ class VideoPlayerViewModel(
         urlNormalizer = ::normalizeUrl
     )
     private val dashMediaSourceFactory = VideoPlayerDashMediaSourceFactory(
-        dataSourceFactory = dataSourceFactory,
-        manifestBuilder = VideoPlayerDashManifestBuilder
+        context = appContext,
+        okHttpClient = playerOkHttpClient
     )
     private var currentDashSession: VideoPlaybackSession? = null
     private val qualityPolicy = VideoPlayerQualityPolicy()
@@ -711,6 +731,13 @@ class VideoPlayerViewModel(
         if (!hasReachedFirstFrame) return
         val identity = target?.toPlayRequestIdentity()
         val currentIdentity = currentPlayRequestIdentity()
+
+        // Temporarily disabled LIST_TOUCH prefetch due to Koin dependency issues
+        if (target?.source == PlaybackPreloadTarget.Source.LIST_TOUCH) {
+            AppLog.d(TAG, "preloadPlayback:skipped source=LIST_TOUCH disabled")
+            return
+        }
+
         if (identity == null || identity == currentIdentity) {
             clearPreloadedPlayback(cancelJob = true)
             return
@@ -722,6 +749,8 @@ class VideoPlayerViewModel(
         if (preloadingIdentity == identity) {
             return
         }
+
+        AppLog.d(TAG, "playurlPrefetch:start source=${target.source} bvid=${identity.bvid} cid=${identity.cid} aid=${identity.aid} epId=${identity.epId}")
 
         preloadJob?.cancel()
         preloadedPlayback = null
@@ -737,14 +766,13 @@ class VideoPlayerViewModel(
                     suppressUiSignals = true
                 )
             }.getOrNull()
-            ensureActive()
             if (preloadingIdentity != identity) {
                 return@launch
             }
             preloadingIdentity = null
             preloadJob = null
             if (preparedPlayback == null) {
-                AppLog.d(TAG, "preload skipped: source=${target.source}, cid=${identity.cid}")
+                AppLog.d(TAG, "playurlPrefetch:failed source=${target.source} cid=${identity.cid}")
                 return@launch
             }
             preloadedPlayback = PreloadedPlayback(
@@ -753,7 +781,7 @@ class VideoPlayerViewModel(
             )
             AppLog.d(
                 TAG,
-                "preload ready: source=${target.source}, cid=${identity.cid}, quality=${preparedPlayback.selectionSnapshot.selectedQualityId}, cost=${preparedPlayback.requestDurationMs}ms"
+                "playurlPrefetch:done source=${target.source} cid=${identity.cid} quality=${preparedPlayback.selectionSnapshot.selectedQualityId} cost=${preparedPlayback.requestDurationMs}ms"
             )
         }
     }
@@ -885,11 +913,18 @@ class VideoPlayerViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             try {
+                val loadStartMs = System.currentTimeMillis()
                 val preparedPlayback = consumePreloadedPlayback(
                     identity = identity,
                     preferLastPlayTime = preferLastPlayTime,
                     replaceInPlace = replaceInPlace
-                ) ?: requestPreparedPlayback(
+                )
+                if (preparedPlayback != null) {
+                    AppLog.d(TAG, "loadPlayUrl: preload path totalCost=${System.currentTimeMillis() - loadStartMs}ms cid=${identity.cid}")
+                } else {
+                    AppLog.d(TAG, "loadPlayUrl: fresh request path cid=${identity.cid}")
+                }
+                val resolvedPlayback = preparedPlayback ?: requestPreparedPlayback(
                     identity = identity,
                     preferLastPlayTime = preferLastPlayTime,
                     replaceInPlace = replaceInPlace
@@ -897,12 +932,12 @@ class VideoPlayerViewModel(
                 if (!isActiveVideoLoad(loadGeneration)) {
                     return@launch
                 }
-                if (preparedPlayback == null) {
+                if (resolvedPlayback == null) {
                     _error.value = "播放地址请求失败"
                     return@launch
                 }
                 AppLog.d(TAG, "loadPlayUrl: prepared, applying... cid=${identity.cid}")
-                applyPreparedPlayback(preparedPlayback)
+                applyPreparedPlayback(resolvedPlayback)
             } catch (e: Exception) {
                 AppLog.e(TAG, "loadPlayUrl exception: ${e.message}", e)
                 _error.value = e.message ?: "播放地址加载失败"
@@ -992,6 +1027,7 @@ class VideoPlayerViewModel(
         val preparedPlaybackDeferred = initialIdentity
             ?.takeIf { it.cid > 0L && !it.bvid.isNullOrBlank() }
             ?.let { identity ->
+                AppLog.d(TAG, "detailPrefetch:speculative playurl:start cid=${identity.cid} bvid=${identity.bvid}")
                 async {
                     requestPreparedPlayback(
                         identity = identity,
@@ -1000,6 +1036,9 @@ class VideoPlayerViewModel(
                     )
                 }
             }
+        if (preparedPlaybackDeferred == null && initialIdentity != null) {
+            AppLog.d(TAG, "detailPrefetch:speculative playurl:skipped cid=${initialIdentity.cid} bvid=${initialIdentity.bvid}")
+        }
         val detailResponse = apiService.getVideoDetail(currentAid, currentBvid)
         if (!detailResponse.isSuccess || detailResponse.data == null) {
             AppLog.e(
@@ -1042,8 +1081,12 @@ class VideoPlayerViewModel(
             preparedPlaybackDeferred != null &&
             canReusePreparedPlayback(initialIdentity, resolvedIdentity)
         ) {
+            AppLog.d(TAG, "detailPrefetch:speculative playurl:reusing cid=${resolvedIdentity?.cid}")
             preparedPlaybackDeferred.await()
         } else {
+            if (preparedPlaybackDeferred != null) {
+                AppLog.d(TAG, "detailPrefetch:speculative playurl:discarded identityChanged initialCid=${initialIdentity?.cid} resolvedCid=${resolvedIdentity?.cid}")
+            }
             null
         }
         if (!isActiveVideoLoad(loadGeneration)) {
@@ -1109,6 +1152,12 @@ class VideoPlayerViewModel(
             ?.takeIf { !replaceInPlace && it.isNotBlank() && identity.epId == null }
             ?.let { bvid -> VideoPlayerPlayInfoCache.get(bvid = bvid, cid = identity.cid) }
             ?.takeIf(::hasPlayableMedia)
+
+        if (cachedPlayInfo != null) {
+            AppLog.d(TAG, "playurlCache:hit bvid=${identity.bvid} cid=${identity.cid}")
+        } else {
+            AppLog.d(TAG, "playurlCache:miss bvid=${identity.bvid} cid=${identity.cid} hasBvid=${!identity.bvid.isNullOrBlank()} replaceInPlace=$replaceInPlace")
+        }
 
         val (initialPlayInfo, effectiveRequestedQualityId) = if (cachedPlayInfo != null) {
             cachedPlayInfo to preferredQualityId
@@ -1186,6 +1235,11 @@ class VideoPlayerViewModel(
             if (dashRoutePlan != null && dashRoutePlan.routes.isNotEmpty()) {
                 val firstRoute = dashRoutePlan.routes.first()
                 AppLog.d(TAG, "dashRoute:resolved cid=${identity.cid} codec=${firstRoute.codec} routes=${dashRoutePlan.routes.size}")
+
+                viewModelScope.launch(Dispatchers.IO) {
+                    triggerCdnPreconnectForRoute(firstRoute)
+                }
+
                 val sessionExpiryMs = resolveSessionExpiryMs(firstRoute)
                 try {
                     dashMediaSource = dashMediaSourceFactory.createMediaSource(firstRoute)
@@ -1268,6 +1322,7 @@ class VideoPlayerViewModel(
         countCurrentAttemptAsFallback: Boolean = false
     ) {
         val applyStartMs = System.currentTimeMillis()
+        AppLog.d(TAG, "applyPreparedPlayback: cost=${preparedPlayback.requestDurationMs}ms replaceInPlace=${preparedPlayback.replaceInPlace} cid=${preparedPlayback.identity.cid}")
         clearPreloadedPlayback(cancelJob = false)
         currentPlayInfo = preparedPlayback.playInfo
         applySelectionSnapshot(preparedPlayback.selectionSnapshot)
@@ -1915,14 +1970,19 @@ class VideoPlayerViewModel(
         replaceInPlace: Boolean
     ): PreparedPlayback? {
         if (preferLastPlayTime || replaceInPlace) {
+            AppLog.d(TAG, "playurlPrefetch:skip reason=preferLastPlayTime=$preferLastPlayTime replaceInPlace=$replaceInPlace cid=${identity.cid}")
             return null
         }
-        val preloaded = preloadedPlayback ?: return null
+        val preloaded = preloadedPlayback ?: run {
+            AppLog.d(TAG, "playurlPrefetch:miss reason=no_preloaded cid=${identity.cid}")
+            return null
+        }
         if (preloaded.preparedPlayback.identity != identity) {
+            AppLog.d(TAG, "playurlPrefetch:miss reason=identity_mismatch cid=${identity.cid} preloadedCid=${preloaded.preparedPlayback.identity.cid}")
             return null
         }
         preloadedPlayback = null
-        AppLog.d(TAG, "preload consumed: source=${preloaded.source}, cid=${identity.cid}")
+        AppLog.d(TAG, "playurlPrefetch:hit source=${preloaded.source} cid=${identity.cid} requestDurationMs=${preloaded.preparedPlayback.requestDurationMs}")
         return preloaded.preparedPlayback.copy(
             playWhenReady = pendingPlayWhenReady,
             replaceInPlace = false
@@ -2558,6 +2618,63 @@ class VideoPlayerViewModel(
 
     private fun isPgcPlayback(): Boolean {
         return (currentEpId ?: 0L) > 0L || (currentSeasonId ?: 0L) > 0L
+    }
+
+    private suspend fun preconnectCdnHosts(videoUrls: List<String>, audioUrls: List<String>) {
+        val uniqueHosts = mutableSetOf<String>()
+        val startTime = System.currentTimeMillis()
+
+        for (url in videoUrls + audioUrls) {
+            try {
+                val host = URL(url).host
+                if (host.isNotBlank()) {
+                    uniqueHosts.add(host)
+                }
+            } catch (e: Exception) {
+                continue
+            }
+        }
+
+        if (uniqueHosts.isEmpty()) {
+            return
+        }
+
+        AppLog.d(TAG, "cdnPreconnect:start hosts=${uniqueHosts.joinToString(",")} count=${uniqueHosts.size}")
+
+        coroutineScope {
+            uniqueHosts.forEach { host ->
+                launch(Dispatchers.IO) {
+                    runCatching {
+                        val preconnectStart = System.currentTimeMillis()
+                        val request = Request.Builder()
+                            .url("https://$host")
+                            .head()
+                            .build()
+                        val call = playerOkHttpClient.newCall(request)
+                        val response = call.execute()
+                        response.close()
+                        val elapsed = System.currentTimeMillis() - preconnectStart
+                        AppLog.d(TAG, "cdnPreconnect:done host=$host elapsed=${elapsed}ms")
+                    }.onFailure { e ->
+                        AppLog.d(TAG, "cdnPreconnect:failed host=$host error=${e.message}")
+                    }
+                }
+            }
+        }
+
+        val totalElapsed = System.currentTimeMillis() - startTime
+        AppLog.d(TAG, "cdnPreconnect:total elapsed=${totalElapsed}ms count=${uniqueHosts.size}")
+    }
+
+    private suspend fun triggerCdnPreconnectForRoute(route: DashRoute?) {
+        if (route == null) return
+        try {
+            val allUrls = route.videoUrls + route.audioUrls
+            if (allUrls.isEmpty()) return
+            preconnectCdnHosts(route.videoUrls, route.audioUrls)
+        } catch (e: Exception) {
+            AppLog.w(TAG, "cdnPreconnect:error cid=${currentCid} error=${e.message}")
+        }
     }
 }
 

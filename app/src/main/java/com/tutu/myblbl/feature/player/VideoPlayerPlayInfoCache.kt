@@ -11,8 +11,8 @@ import com.tutu.myblbl.model.player.PlayInfoModel
  */
 internal object VideoPlayerPlayInfoCache {
 
-    private const val TTL_MS = 90_000L
-    private const val MAX_ENTRIES = 8
+    private const val TTL_MS = 300_000L
+    private const val MAX_ENTRIES = 16
 
     private data class Entry(
         val playInfo: PlayInfoModel,

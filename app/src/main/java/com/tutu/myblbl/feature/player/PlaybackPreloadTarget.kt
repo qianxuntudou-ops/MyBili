@@ -15,7 +15,8 @@ data class PlaybackPreloadTarget(
     enum class Source {
         NEXT_EPISODE,
         PLAY_QUEUE,
-        RELATED_VIDEO
+        RELATED_VIDEO,
+        LIST_TOUCH
     }
 
     val typedAid: Aid? get() = aid?.let(::Aid)
