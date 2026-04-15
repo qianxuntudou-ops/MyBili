@@ -15,6 +15,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.MediaSource
 import com.google.gson.Gson
 import com.tutu.myblbl.core.common.media.VideoCodecSupport
+import com.tutu.myblbl.feature.player.cache.PlayerMediaCache
 import com.tutu.myblbl.model.dm.AdvancedDanmakuParser
 import com.tutu.myblbl.model.dm.DmColorfulStyleParser
 import com.tutu.myblbl.model.dm.DmModel
@@ -174,7 +175,7 @@ class VideoPlayerViewModel(
         .readTimeout(15, TimeUnit.SECONDS)
         .connectionPool(okhttp3.ConnectionPool(5, 30, TimeUnit.SECONDS))
         .build()
-    private val dataSourceFactory = OkHttpDataSource.Factory(playerOkHttpClient)
+    private val upstreamDataSourceFactory = OkHttpDataSource.Factory(playerOkHttpClient)
         .setUserAgent(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
@@ -185,6 +186,10 @@ class VideoPlayerViewModel(
                 "Referer" to "https://www.bilibili.com"
             )
         )
+    private val dataSourceFactory = PlayerMediaCache.buildDefaultDataSourceFactory(
+        context = appContext,
+        upstreamFactory = upstreamDataSourceFactory
+    )
 
     var useDashPlayback: Boolean = true
 
