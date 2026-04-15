@@ -320,14 +320,18 @@ internal class VideoPlayerStreamResolver(
             val selectedAudio = buildAudioTracks(playInfo)
                 .firstOrNull { it.id == selectedAudioId }
                 ?: buildAudioTracks(playInfo).maxByOrNull { it.bandwidth }
-            val videoUrls = buildDistinctUrls(
-                primaryUrl = selectedVideo.realBaseUrl,
-                backupUrls = selectedVideo.realBackupUrl
+            val videoUrls = CdnLatencyProfile.sortUrlsByLatency(
+                buildDistinctUrls(
+                    primaryUrl = selectedVideo.realBaseUrl,
+                    backupUrls = selectedVideo.realBackupUrl
+                )
             )
             val audioUrls = selectedAudio?.let {
-                buildDistinctUrls(
-                    primaryUrl = it.realBaseUrl,
-                    backupUrls = it.realBackupUrl
+                CdnLatencyProfile.sortUrlsByLatency(
+                    buildDistinctUrls(
+                        primaryUrl = it.realBaseUrl,
+                        backupUrls = it.realBackupUrl
+                    )
                 )
             }.orEmpty()
             val mediaSource = createMediaSource(
@@ -658,7 +662,7 @@ internal class VideoPlayerStreamResolver(
             .takeIf { it.isNotEmpty() }
             ?.let { createProgressiveSource(it, audioMimeType) }
         return if (audioSource != null) {
-            MergingMediaSource(videoSource, audioSource)
+            MergingMediaSource(true, true, videoSource, audioSource)
         } else {
             videoSource
         }
