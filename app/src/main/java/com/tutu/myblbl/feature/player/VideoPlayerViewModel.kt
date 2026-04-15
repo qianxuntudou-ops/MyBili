@@ -901,6 +901,7 @@ class VideoPlayerViewModel(
                     _error.value = "播放地址请求失败"
                     return@launch
                 }
+                AppLog.d(TAG, "loadPlayUrl: prepared, applying... cid=${identity.cid}")
                 applyPreparedPlayback(preparedPlayback)
             } catch (e: Exception) {
                 AppLog.e(TAG, "loadPlayUrl exception: ${e.message}", e)
@@ -1247,6 +1248,7 @@ class VideoPlayerViewModel(
         val resumeHintPositionMs = startPosition.takeIf { shouldResume && !replaceInPlace }
         val seekToStart = if (resumeHintPositionMs != null) 0L else startPosition
         AppLog.d(TAG, "playerPrepare:start cid=${identity.cid} totalCost=${System.currentTimeMillis() - requestStartMs}ms")
+        AppLog.d(TAG, "requestPreparedPlayback: returning, thread=${Thread.currentThread().name}")
         return PreparedPlayback(
             identity = identity,
             playInfo = initialPlayInfo,

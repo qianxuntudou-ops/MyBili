@@ -40,9 +40,10 @@ internal object PlayerInstancePool {
         if (player == null || player !== cachedPlayer) return
         isAttached = false
         player.playWhenReady = false
+        player.stop()
         player.clearVideoSurface()
         scheduleRelease()
-        AppLog.d(TAG, "softDetach: player kept alive, release in ${IDLE_RELEASE_DELAY_MS}ms")
+        AppLog.d(TAG, "softDetach: player stopped and kept alive, release in ${IDLE_RELEASE_DELAY_MS}ms")
     }
 
     @Synchronized
