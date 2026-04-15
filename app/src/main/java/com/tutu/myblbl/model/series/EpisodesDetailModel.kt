@@ -43,5 +43,20 @@ data class EpisodesDetailModel(
     @SerializedName("new_ep")
     val newEp: NewEpisodeInfoModel? = null,
     @SerializedName("user_status")
-    val userStatus: SeriesUserState? = null
+    val userStatus: SeriesUserState? = null,
+    @SerializedName("publish")
+    val publish: PublishInfo? = null
+) : Serializable
+
+data class PublishInfo(
+    @SerializedName("is_finish")
+    val isFinish: Int = 0,
+    @SerializedName("weekday")
+    val weekday: Int = 0,
+    @SerializedName("pub_time")
+    val pubTime: String = "",
+    @SerializedName("pub_time_show")
+    val pubTimeShow: String = "",
+    @SerializedName("release_date_show")
+    val releaseDateShow: String = ""
 ) : Serializable

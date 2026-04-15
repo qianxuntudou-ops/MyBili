@@ -8,6 +8,7 @@ object NumberUtils {
     private val decimalFormat = DecimalFormat("#.#")
     private val wanFormat = DecimalFormat("#.#万")
     private val yiFormat = DecimalFormat("#.#亿")
+    private val commaFormat = DecimalFormat("#,###")
     
     fun formatCount(count: Long): String {
         return when {
@@ -18,7 +19,7 @@ object NumberUtils {
                 wanFormat.format(count / 10000.0)
             }
             else -> {
-                count.toString()
+                commaFormat.format(count)
             }
         }
     }

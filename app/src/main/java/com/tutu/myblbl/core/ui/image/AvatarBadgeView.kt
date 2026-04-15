@@ -65,7 +65,7 @@ class AvatarBadgeView @JvmOverloads constructor(
     private fun resolveBadgeType(officialVerifyType: Int, vipStatus: Int, vipType: Int, vipAvatarSubscript: Int): Int {
         if (officialVerifyType == 0) return BADGE_YELLOW_V
         if (officialVerifyType == 1) return BADGE_BLUE_V
-        if (vipType > 0 && vipStatus == 1) return BADGE_VIP
+        if (vipAvatarSubscript == 1 || (vipType > 0 && vipStatus == 1)) return BADGE_VIP
         return BADGE_NONE
     }
 }

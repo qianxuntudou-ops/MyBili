@@ -193,7 +193,8 @@ class SeriesDetailContentAdapter(
                     TimeUtils.formatDuration(lastTime)
                 )
             } else {
-                detail.newEp?.indexShow?.takeIf { it.isNotBlank() } ?: detail.subtitle
+                detail.newEp?.pubTime?.takeIf { it.isNotBlank() }
+                    ?: detail.subtitle
             }
             binding.textWatchInfo.visibility =
                 if (binding.textWatchInfo.text.isNullOrBlank()) View.GONE else View.VISIBLE
@@ -218,6 +219,7 @@ class SeriesDetailContentAdapter(
 
         private fun buildSubtitle(detail: EpisodesDetailModel): String {
             return buildList {
+                buildStatusInfo(detail)?.let { add(it) }
                 detail.rating?.score
                     ?.takeIf { it > 0 }
                     ?.let { add("评分 $it") }
@@ -227,10 +229,43 @@ class SeriesDetailContentAdapter(
                 detail.stat?.danmaku
                     ?.takeIf { it > 0 }
                     ?.let { add("${NumberUtils.formatCount(it)} 弹幕") }
-                detail.newEp?.indexShow
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { add(it) }
-            }.joinToString("  ")
+            }.joinToString(" | ")
+        }
+
+        private fun buildStatusInfo(detail: EpisodesDetailModel): String? {
+            detail.newEp?.desc?.takeIf { it.isNotBlank() }?.let { return it }
+            detail.newEp?.indexShow?.takeIf { it.isNotBlank() }?.let { return it }
+            val publish = detail.publish
+            if (publish != null) {
+                val unit = if (detail.type == 1) "话" else "集"
+                val statusText = if (publish.isFinish == 1) {
+                    "已完结，全${detail.total}${unit}"
+                } else {
+                    val timeShow = publish.pubTimeShow.takeIf { it.isNotBlank() }
+                        ?: publish.releaseDateShow.takeIf { it.isNotBlank() }
+                    if (!timeShow.isNullOrBlank()) {
+                        "连载中，$timeShow"
+                    } else {
+                        val episodeCount = detail.episodes?.size ?: 0
+                        "连载中，更新至第${episodeCount}${unit}"
+                    }
+                }
+                return statusText
+            }
+            val total = detail.total
+            val episodeCount = detail.episodes?.size ?: 0
+            val unit = if (detail.type == 1) "话" else "集"
+            if (total > 0) {
+                return if (episodeCount >= total) {
+                    "已完结，全${total}${unit}"
+                } else {
+                    "连载中，更新至第${episodeCount}${unit}"
+                }
+            }
+            if (episodeCount > 0) {
+                return "更新至第${episodeCount}${unit}"
+            }
+            return null
         }
     }
 
