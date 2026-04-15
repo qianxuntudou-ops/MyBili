@@ -25,12 +25,12 @@ object VideoPlayerDashManifestBuilder {
             append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
             append("<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" ")
             append("profiles=\"urn:mpeg:dash:profile:isoff-on-demand:2011\" ")
-            append("type=\"static\" minBufferTime=\"PT${formatMpdDuration(route.minBufferTimeMs)}\"")
+            append("type=\"static\" minBufferTime=\"${formatMpdDuration(route.minBufferTimeMs)}\"")
             if (durationAttr.isNotEmpty()) {
                 append(" mediaPresentationDuration=\"").append(durationAttr).append("\"")
             }
             append(">\n")
-            append("  <Period start=\"PT0S\"")
+            append("  <Period start=\"${formatMpdDuration(0L)}\"")
             if (durationAttr.isNotEmpty()) {
                 append(" duration=\"").append(durationAttr).append("\"")
             }
