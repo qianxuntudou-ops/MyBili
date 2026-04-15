@@ -1265,6 +1265,7 @@ class VideoPlayerViewModel(
         resetFallbackAttempts: Boolean = true,
         countCurrentAttemptAsFallback: Boolean = false
     ) {
+        val applyStartMs = System.currentTimeMillis()
         clearPreloadedPlayback(cancelJob = false)
         currentPlayInfo = preparedPlayback.playInfo
         applySelectionSnapshot(preparedPlayback.selectionSnapshot)
@@ -1276,16 +1277,9 @@ class VideoPlayerViewModel(
             lastReportedHeartbeatPositionSec = -1L
         }
 
-        initializeFallbackPlan(
-            playInfo = preparedPlayback.playInfo,
-            lockedQualityId = requestedQualityId
-                ?: preparedPlayback.selectionSnapshot.selectedQualityId
-                ?: selectedQualityId
-                ?: 80,
-            selectedAudioId = requestedAudioId ?: preparedPlayback.selectionSnapshot.selectedAudioId,
-            preferredCodec = requestedCodec ?: preparedPlayback.selectionSnapshot.selectedCodec,
-            resetAttempts = resetFallbackAttempts
-        )
+        if (resetFallbackAttempts) {
+            resetFallbackState()
+        }
         rememberCurrentFallbackAttempt(countAsFallback = countCurrentAttemptAsFallback)
 
         _playbackRequest.value = PlaybackRequest(
@@ -1310,6 +1304,32 @@ class VideoPlayerViewModel(
                 aid = danmakuAid,
                 durationMs = preparedPlayback.playInfo.timeLength
             )
+        }
+        AppLog.d(TAG, "applyPreparedPlayback: cost=${System.currentTimeMillis() - applyStartMs}ms, fallback deferred")
+
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val fbStartMs = System.currentTimeMillis()
+            val plan = streamResolver.buildStreamFallbackPlan(
+                playInfo = preparedPlayback.playInfo,
+                lockedQualityId = requestedQualityId
+                    ?: preparedPlayback.selectionSnapshot.selectedQualityId
+                    ?: selectedQualityId
+                    ?: 80,
+                selectedAudioId = requestedAudioId ?: preparedPlayback.selectionSnapshot.selectedAudioId,
+                preferredCodec = requestedCodec ?: preparedPlayback.selectionSnapshot.selectedCodec,
+                hardwareSupportedCodecs = hardwareSupportedVideoCodecs
+            )
+            val routeIdx = plan
+                ?.routes
+                ?.indexOfFirst { it.codec == (requestedCodec ?: preparedPlayback.selectionSnapshot.selectedCodec) }
+                ?.takeIf { it >= 0 }
+                ?: 0
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                currentStreamFallbackPlan = plan
+                fallbackRouteIndex = routeIdx
+                fallbackCdnIndex = 0
+            }
+            AppLog.d(TAG, "initializeFallbackPlan: deferred cost=${System.currentTimeMillis() - fbStartMs}ms")
         }
     }
 

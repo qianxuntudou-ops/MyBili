@@ -417,6 +417,7 @@ class VideoPlayerFragment : Fragment() {
     }
 
     private fun setupPlayer() {
+        val startMs = SystemClock.elapsedRealtime()
         player = PlayerInstancePool.acquire(requireContext()).also {
             it.playWhenReady = false
             if (::playerSettings.isInitialized) {
@@ -1240,7 +1241,7 @@ class VideoPlayerFragment : Fragment() {
         player?.removeListener(playerListener)
         playerView.destroy()
         playerView.stopDanmaku()
-        PlayerInstancePool.detach(player, allowReuse = true)
+        PlayerInstancePool.softDetach(player)
         lastKeepScreenOnState = false
         activity?.let { ViewUtils.keepScreenOn(it, false) }
         viewRelated.clearAnimation()

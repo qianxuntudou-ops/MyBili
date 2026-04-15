@@ -36,18 +36,34 @@ internal object PlayerInstancePool {
     }
 
     @Synchronized
-    fun detach(player: ExoPlayer?, allowReuse: Boolean) {
-        if (player == null || player !== cachedPlayer) {
-            return
-        }
+    fun softDetach(player: ExoPlayer?) {
+        if (player == null || player !== cachedPlayer) return
         isAttached = false
+        player.playWhenReady = false
+        player.clearVideoSurface()
+        scheduleRelease()
+        AppLog.d(TAG, "softDetach: player kept alive, release in ${IDLE_RELEASE_DELAY_MS}ms")
+    }
+
+    @Synchronized
+    fun hardReset(player: ExoPlayer?) {
+        if (player == null || player !== cachedPlayer) return
+        val startMs = System.currentTimeMillis()
+        player.playWhenReady = false
+        player.clearMediaItems()
+        player.stop()
+        player.playbackParameters = PlaybackParameters(1f)
+        AppLog.d(TAG, "hardReset: cost=${System.currentTimeMillis() - startMs}ms")
+    }
+
+    @Synchronized
+    fun detach(player: ExoPlayer?, allowReuse: Boolean) {
+        if (player == null || player !== cachedPlayer) return
         if (!allowReuse) {
             releaseNow("detach_without_reuse")
             return
         }
-        resetForReuse(player)
-        scheduleRelease()
-        AppLog.d(TAG, "detach scheduled release in ${IDLE_RELEASE_DELAY_MS}ms")
+        softDetach(player)
     }
 
     @Synchronized
@@ -65,9 +81,7 @@ internal object PlayerInstancePool {
         cancelPendingRelease()
         val releaseRunnable = Runnable {
             synchronized(this) {
-                if (isAttached) {
-                    return@synchronized
-                }
+                if (isAttached) return@synchronized
                 cachedPlayer?.let(PlayerAudioNormalizer::release)
                 cachedPlayer?.release()
                 cachedPlayer = null
@@ -83,14 +97,6 @@ internal object PlayerInstancePool {
     private fun cancelPendingRelease() {
         pendingReleaseRunnable?.let(mainHandler::removeCallbacks)
         pendingReleaseRunnable = null
-    }
-
-    private fun resetForReuse(player: ExoPlayer) {
-        player.playWhenReady = false
-        player.clearVideoSurface()
-        player.clearMediaItems()
-        player.stop()
-        player.playbackParameters = PlaybackParameters(1f)
     }
 
     private fun buildPlayer(context: Context): ExoPlayer {
