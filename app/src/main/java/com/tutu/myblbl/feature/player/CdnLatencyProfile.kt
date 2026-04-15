@@ -1,7 +1,7 @@
 package com.tutu.myblbl.feature.player
 
 import android.net.Uri
-import com.tutu.myblbl.core.common.log.AppLog
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 internal object CdnLatencyProfile {
@@ -9,6 +9,10 @@ internal object CdnLatencyProfile {
     private const val TAG = "CdnLatencyProfile"
     private const val MAX_ENTRIES = 32
     private const val RECORD_TTL_MS = 10 * 60 * 1000L
+
+    private const val CDN_PREF_BILIVIDEO = 0
+    private const val CDN_PREF_MCDN = 1
+    private const val CDN_PREF_OTHER = 2
 
     private data class LatencyRecord(
         val host: String,
@@ -48,7 +52,19 @@ internal object CdnLatencyProfile {
 
     fun sortUrlsByLatency(urls: List<String>): List<String> {
         if (urls.size <= 1) return urls
-        return urls.sortedBy { averageTtfbMs(it) }
+        return urls.sortedWith(compareBy({ cdnPreference(it) }, { averageTtfbMs(it) }))
+    }
+
+    private fun cdnPreference(url: String): Int {
+        val host = runCatching { Uri.parse(url).host }.getOrNull()
+            ?.lowercase(Locale.US) ?: return CDN_PREF_OTHER
+        val isMcdn = host.contains("mcdn") && host.contains("bilivideo")
+        val isBilivideo = host.contains("bilivideo") && !isMcdn
+        return when {
+            isBilivideo -> CDN_PREF_BILIVIDEO
+            isMcdn -> CDN_PREF_MCDN
+            else -> CDN_PREF_OTHER
+        }
     }
 
     private fun extractHost(url: String): String? {
