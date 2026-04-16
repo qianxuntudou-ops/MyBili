@@ -2,6 +2,7 @@ package com.tutu.myblbl.core.ui.image
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import androidx.appcompat.widget.AppCompatImageView
@@ -22,6 +23,26 @@ class AvatarBadgeView @JvmOverloads constructor(
 
     private var badgeDrawable: Drawable? = null
     private var badgeType: Int = BADGE_NONE
+
+    private val borderWidthPx = resources.displayMetrics.density * 2f * 2f / 3f
+    private val gapPx = 1f
+
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = borderWidthPx
+        color = 0xFF666666.toInt()
+        isAntiAlias = true
+    }
+
+    init {
+        val extra = (gapPx + borderWidthPx).toInt().coerceAtLeast(1)
+        setPadding(
+            paddingLeft + extra,
+            paddingTop + extra,
+            paddingRight + extra,
+            paddingBottom + extra
+        )
+    }
 
     fun setBadge(officialVerifyType: Int, vipStatus: Int = 0, vipType: Int = 0, vipAvatarSubscript: Int = 0) {
         val newBadgeType = resolveBadgeType(officialVerifyType, vipStatus, vipType, vipAvatarSubscript)
@@ -50,6 +71,7 @@ class AvatarBadgeView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        drawCircleBorder(canvas)
         badgeDrawable?.let { badge ->
             val ratio = if (badgeType == BADGE_VIP) 0.32f else 0.4f
             val contentWidth = width - paddingLeft - paddingRight
@@ -60,6 +82,16 @@ class AvatarBadgeView @JvmOverloads constructor(
             badge.setBounds(left, top, left + badgeSize, top + badgeSize)
             badge.draw(canvas)
         }
+    }
+
+    private fun drawCircleBorder(canvas: Canvas) {
+        val contentWidth = width - paddingLeft - paddingRight
+        val contentHeight = height - paddingTop - paddingBottom
+        val cx = paddingLeft + contentWidth / 2f
+        val cy = paddingTop + contentHeight / 2f
+        val contentRadius = Math.min(contentWidth, contentHeight) / 2f
+        val ringRadius = contentRadius + gapPx + borderWidthPx / 2f
+        canvas.drawCircle(cx, cy, ringRadius, borderPaint)
     }
 
     private fun resolveBadgeType(officialVerifyType: Int, vipStatus: Int, vipType: Int, vipAvatarSubscript: Int): Int {

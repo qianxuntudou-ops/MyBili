@@ -108,14 +108,14 @@ class SettingAdapter(
             binding.clickView.isSelected = isFocused
             binding.iconArrow.alpha = if (isFocused) 1f else 0.72f
             binding.tvInfo.alpha = if (isFocused) 1f else 0.86f
-            val targetTranslation = if (isFocused) binding.clickView.resources.displayMetrics.density * 6f else 0f
+            val targetTranslation = if (isFocused) binding.clickView.resources.displayMetrics.density * 4f else 0f
             binding.clickView.animate()
-                .scaleX(if (isFocused) 1.02f else 1f)
-                .scaleY(if (isFocused) 1.02f else 1f)
+                .scaleX(if (isFocused) 1.01f else 1f)
+                .scaleY(if (isFocused) 1.01f else 1f)
                 .translationX(targetTranslation)
                 .setDuration(120L)
                 .start()
-            ViewCompat.setElevation(binding.clickView, if (isFocused) binding.clickView.resources.displayMetrics.density * 3f else 0f)
+            ViewCompat.setElevation(binding.clickView, if (isFocused) binding.clickView.resources.displayMetrics.density * 2f else 0f)
         }
     }
 }

@@ -99,7 +99,12 @@ data class HistoryVideoModel(
             historyProgress = progress,
             historyViewAt = viewAt,
             historyBadge = badge,
-            historyBusiness = historyInfo?.business.orEmpty()
+            historyBusiness = historyInfo?.business.orEmpty(),
+            isUpowerExclusive = isUpowerExclusive,
+            isChargingArc = isChargingArc,
+            elecArcType = elecArcType,
+            elecArcBadge = elecArcBadge,
+            privilegeType = privilegeType
         )
     }
 }

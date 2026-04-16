@@ -235,7 +235,12 @@ class VideoPlayerOverlayController(
             pubDate = currentVideo?.pubDate ?: detailView?.pubDate ?: 0L,
             createTime = currentVideo?.createTime ?: detailView?.createTime ?: 0L,
             owner = currentVideo?.owner ?: detailView?.owner,
-            stat = currentVideo?.stat ?: detailView?.stat
+            stat = currentVideo?.stat ?: detailView?.stat,
+            isUpowerExclusive = detailView?.isUpowerExclusive ?: currentVideo?.isUpowerExclusive ?: false,
+            isChargingArc = detailView?.isChargingArc ?: currentVideo?.isChargingArc ?: false,
+            elecArcType = detailView?.elecArcType ?: currentVideo?.elecArcType ?: 0,
+            elecArcBadge = detailView?.elecArcBadge ?: currentVideo?.elecArcBadge.orEmpty(),
+            privilegeType = detailView?.privilegeType ?: currentVideo?.privilegeType ?: 0
         )
     }
 

@@ -247,18 +247,28 @@ class MyPlayerDanmakuController(
                 danmakuData = preparedData
                 preparedDanmakuSignature = signature
                 preparedDanmakuCount = preparedData.size
-                recreatePlayer()
+                val existingPlayer = danmakuPlayer
+                if (existingPlayer != null) {
+                    existingPlayer.updateData(danmakuData)
+                    if (danmakuPositionMs > 0L) {
+                        seekPlayerTo(
+                            player = existingPlayer,
+                            targetPositionMs = danmakuPositionMs,
+                            currentTimeMs = existingPlayer.getCurrentTimeMs(),
+                            forceSeek = true,
+                            reason = "replace",
+                            bypassDedup = true
+                        )
+                    }
+                } else {
+                    initPlayer()
+                }
             }
         }
     }
 
     private fun ensurePlayer() {
-        if (danmakuPlayer == null) {
-            initPlayer()
-        }
-    }
-
-    private fun recreatePlayer() {
+        if (danmakuPlayer != null) return
         initPlayer()
     }
 

@@ -319,7 +319,12 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
                 owner = view.owner,
                 stat = view.stat,
                 cid = view.cid,
-                duration = view.duration
+                duration = view.duration,
+                isUpowerExclusive = view.isUpowerExclusive,
+                isChargingArc = view.isChargingArc,
+                elecArcType = view.elecArcType,
+                elecArcBadge = view.elecArcBadge,
+                privilegeType = view.privilegeType
             )
         }
 
@@ -567,7 +572,12 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
             duration = duration,
             pubDate = pubDate,
             owner = owner,
-            stat = stat
+            stat = stat,
+            isUpowerExclusive = isUpowerExclusive,
+            isChargingArc = isChargingArc,
+            elecArcType = elecArcType,
+            elecArcBadge = elecArcBadge,
+            privilegeType = privilegeType
         )
     }
 }

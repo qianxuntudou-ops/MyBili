@@ -123,8 +123,15 @@ class UserRepository(
         pageSize: Int = 20
     ): Result<BaseResponse<UserDynamicResponse>> =
         runCatching {
+            val params = mapOf(
+                "mid" to mid.toString(),
+                "pn" to page.toString(),
+                "ps" to pageSize.toString()
+            )
+            val wbiKeys = sessionGateway.getWbiKeys()
+            val signedParams = WbiGenerator.generateWbiParams(params, wbiKeys.first, wbiKeys.second)
             sessionGateway.syncAuthState(
-                apiService.getUserDynamic(mid, page, pageSize),
+                apiService.getUserArcSearch(signedParams),
                 source = "getUserDynamic"
             )
         }

@@ -39,6 +39,8 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
     private lateinit var adapter: HomeFragmentStateAdapter
     private var tabMediator: TabLayoutMediator? = null
     private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
+    private var lastTabSelectedPosition = -1
+    private var lastTabSelectedTime = 0L
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -53,7 +55,7 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
         super.onViewCreated(view, savedInstanceState)
         adapter = HomeFragmentStateAdapter(childFragmentManager, viewLifecycleOwner.lifecycle)
         binding.viewPager.adapter = adapter
-        binding.viewPager.offscreenPageLimit = ViewPager2.OFFSCREEN_PAGE_LIMIT_DEFAULT
+        binding.viewPager.offscreenPageLimit = adapter.itemCount - 1
         tabMediator = TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = adapter.getPageTitle(position)
         }.also { it.attach() }
@@ -64,16 +66,29 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
         )
 
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab) = Unit
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                lastTabSelectedPosition = tab.position
+                lastTabSelectedTime = System.currentTimeMillis()
+                AppLog.d(TAG, "TabLayout onTabSelected: position=${tab.position}")
+            }
 
-            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+            override fun onTabUnselected(tab: TabLayout.Tab) {
+                AppLog.d(TAG, "TabLayout onTabUnselected: position=${tab.position}")
+            }
 
             override fun onTabReselected(tab: TabLayout.Tab) {
+                val elapsed = System.currentTimeMillis() - lastTabSelectedTime
+                if (tab.position == lastTabSelectedPosition && elapsed < 300) {
+                    AppLog.d(TAG, "TabLayout onTabReselected ignored (spurious): position=${tab.position}, elapsed=${elapsed}ms")
+                    return
+                }
+                AppLog.d(TAG, "TabLayout onTabReselected: position=${tab.position}")
                 postTopTabEvent(tab.position)
             }
         })
         pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
+                AppLog.d(TAG, "ViewPager2 onPageSelected: position=$position")
                 notifyTabSelected(position)
             }
         }.also { callback ->

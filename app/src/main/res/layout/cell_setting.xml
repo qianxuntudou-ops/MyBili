@@ -15,12 +15,12 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="@dimen/px120"
+        android:minHeight="@dimen/px80"
         android:orientation="horizontal"
         android:paddingStart="@dimen/px50"
-        android:paddingTop="@dimen/px30"
+        android:paddingTop="@dimen/px18"
         android:paddingEnd="@dimen/px50"
-        android:paddingBottom="@dimen/px30">
+        android:paddingBottom="@dimen/px18">
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/tvTitle"

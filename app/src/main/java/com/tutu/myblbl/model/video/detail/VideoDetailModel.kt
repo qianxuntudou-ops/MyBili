@@ -1,6 +1,8 @@
 package com.tutu.myblbl.model.video.detail
 
+import com.google.gson.annotations.JsonAdapter
 import com.google.gson.annotations.SerializedName
+import com.tutu.myblbl.model.adapter.FlexibleBooleanAdapter
 import com.tutu.myblbl.model.video.Owner
 import com.tutu.myblbl.model.video.Stat
 import com.tutu.myblbl.model.video.Dimension
@@ -87,10 +89,43 @@ data class VideoView(
     
     @SerializedName("is_season_display")
     val isSeasonDisplay: Boolean = false,
-    
+
     @SerializedName("ugc_season")
-    val ugcSeason: UgcSeason? = null
-)
+    val ugcSeason: UgcSeason? = null,
+
+    @SerializedName("is_upower_exclusive")
+    @JsonAdapter(FlexibleBooleanAdapter::class)
+    val isUpowerExclusive: Boolean = false,
+
+    @SerializedName("is_upower_play")
+    @JsonAdapter(FlexibleBooleanAdapter::class)
+    val isUpowerPlay: Boolean = false,
+
+    @SerializedName("is_upower_preview")
+    @JsonAdapter(FlexibleBooleanAdapter::class)
+    val isUpowerPreview: Boolean = false,
+
+    @SerializedName("is_chargeable_season")
+    @JsonAdapter(FlexibleBooleanAdapter::class)
+    val isChargeableSeason: Boolean = false,
+
+    @SerializedName("is_charging_arc")
+    @JsonAdapter(FlexibleBooleanAdapter::class)
+    val isChargingArc: Boolean = false,
+
+    @SerializedName("elec_arc_type")
+    val elecArcType: Int = 0,
+
+    @SerializedName("elec_arc_badge")
+    val elecArcBadge: String = "",
+
+    @SerializedName("privilege_type")
+    val privilegeType: Int = 0
+) {
+    val isChargingExclusive: Boolean
+        get() = isUpowerExclusive || privilegeType > 0 || isChargingArc
+                || elecArcType == 1 || elecArcBadge == "充电专属"
+}
 
 data class Tag(
     @SerializedName("id")

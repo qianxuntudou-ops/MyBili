@@ -256,7 +256,12 @@ class PlayerSessionCoordinator {
             historyProgress = current?.historyProgress ?: 0L,
             historyViewAt = current?.historyViewAt ?: 0L,
             historyBadge = current?.historyBadge.orEmpty(),
-            historyBusiness = current?.historyBusiness.orEmpty()
+            historyBusiness = current?.historyBusiness.orEmpty(),
+            isUpowerExclusive = detailView.isUpowerExclusive || current?.isUpowerExclusive ?: false,
+            isChargingArc = detailView.isChargingArc || current?.isChargingArc ?: false,
+            elecArcType = detailView.elecArcType.takeIf { it > 0 } ?: current?.elecArcType ?: 0,
+            elecArcBadge = detailView.elecArcBadge.ifBlank { current?.elecArcBadge.orEmpty() },
+            privilegeType = detailView.privilegeType.takeIf { it > 0 } ?: current?.privilegeType ?: 0
         )
     }
 
@@ -271,7 +276,12 @@ class PlayerSessionCoordinator {
             duration = duration,
             pubDate = pubDate,
             owner = owner,
-            stat = stat
+            stat = stat,
+            isUpowerExclusive = isUpowerExclusive,
+            isChargingArc = isChargingArc,
+            elecArcType = elecArcType,
+            elecArcBadge = elecArcBadge,
+            privilegeType = privilegeType
         )
     }
 

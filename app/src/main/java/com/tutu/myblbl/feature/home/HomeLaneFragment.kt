@@ -115,10 +115,12 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
                         return@collectLatest
                     }
                     when (event) {
-                        is MainNavigationViewModel.Event.MainTabReselected ->
+                        is MainNavigationViewModel.Event.MainTabReselected -> {
+                            AppLog.d(TAG, "received MainTabReselected: index=${event.index}, type=$type, isLoading=$isLoading")
                             if (event.index == 0 && !isLoading) {
                                 refresh()
                             }
+                        }
 
                         is MainNavigationViewModel.Event.SecondaryTabReselected -> {
                             val shouldRefresh = event.host == MainNavigationViewModel.SecondaryTabHost.HOME &&
@@ -126,15 +128,18 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
                                     (event.position == 2 && type == TYPE_ANIMATION) ||
                                         (event.position == 3 && type == TYPE_CINEMA)
                                     )
+                            AppLog.d(TAG, "received SecondaryTabReselected: host=${event.host}, position=${event.position}, type=$type, shouldRefresh=$shouldRefresh, isLoading=$isLoading")
                             if (shouldRefresh && !isLoading) {
                                 refresh()
                             }
                         }
 
-                        MainNavigationViewModel.Event.MenuPressed ->
+                        MainNavigationViewModel.Event.MenuPressed -> {
+                            AppLog.d(TAG, "received MenuPressed: type=$type, isLoading=$isLoading")
                             if (!isLoading) {
                                 refresh()
                             }
+                        }
 
                         MainNavigationViewModel.Event.BackPressed -> scrollToTop()
                         else -> Unit

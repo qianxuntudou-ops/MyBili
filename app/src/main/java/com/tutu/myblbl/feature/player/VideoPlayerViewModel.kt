@@ -379,16 +379,9 @@ class VideoPlayerViewModel(
     private var preloadJob: Job? = null
     private var hasReachedFirstFrame: Boolean = false
     private var pendingPlayerExtrasCid: Long = 0L
-    private var pendingDanmakuRequest: PendingDanmakuRequest? = null
     private var loadedPlayerExtrasCid: Long = 0L
     private val hardwareSupportedVideoCodecs: Set<VideoCodecEnum>
         get() = VideoCodecSupport.getHardwareSupportedCodecs()
-
-    private data class PendingDanmakuRequest(
-        val cid: Long,
-        val aid: Long,
-        val durationMs: Long
-    )
 
 
     data class SavedPlayerSnapshot(
@@ -470,7 +463,6 @@ class VideoPlayerViewModel(
         loadedDanmakuCid = 0L
         loadedPlayerExtrasCid = 0L
         pendingPlayerExtrasCid = 0L
-        pendingDanmakuRequest = null
         requestedQualityId = preferredQualityId.takeIf { it > 0 } ?: currentSettings.defaultVideoQualityId
         requestedAudioId = preferredAudioQualityId.takeIf { it > 0 } ?: currentSettings.defaultAudioQualityId
         requestedCodec = currentSettings.defaultVideoCodec
@@ -1205,6 +1197,10 @@ class VideoPlayerViewModel(
             ?.takeIf { it.isNotBlank() && identity.epId == null }
             ?.let { bvid -> VideoPlayerPlayInfoCache.put(bvid = bvid, cid = identity.cid, playInfo = initialPlayInfo) }
 
+        viewModelScope.launch(Dispatchers.IO) {
+            triggerCdnPreconnectForPlayInfo(initialPlayInfo)
+        }
+
         val initialQualities = streamResolver.buildQualityList(initialPlayInfo)
         val resolvedQualityId = resolvePlayableQualityId(
             requestedQualityId = effectiveRequestedQualityId,
@@ -1360,7 +1356,8 @@ class VideoPlayerViewModel(
             val danmakuAid = currentAid
                 ?: preparedPlayback.identity.aid
                 ?: 0L
-            pendingDanmakuRequest = PendingDanmakuRequest(
+            loadedDanmakuCid = preparedPlayback.identity.cid
+            loadDanmaku(
                 cid = preparedPlayback.identity.cid,
                 aid = danmakuAid,
                 durationMs = preparedPlayback.playInfo.timeLength
@@ -1402,17 +1399,15 @@ class VideoPlayerViewModel(
             loadedPlayerExtrasCid = cid
             loadPlayerExtras()
         }
-        pendingDanmakuRequest
-            ?.takeIf { it.cid == cid && loadedDanmakuCid != cid }
-            ?.also { request ->
-                pendingDanmakuRequest = null
-                loadedDanmakuCid = request.cid
-                loadDanmaku(
-                    cid = request.cid,
-                    aid = request.aid,
-                    durationMs = request.durationMs
-                )
-            }
+        if (loadedDanmakuCid != cid) {
+            val danmakuAid = currentAid ?: 0L
+            loadedDanmakuCid = cid
+            loadDanmaku(
+                cid = cid,
+                aid = danmakuAid,
+                durationMs = currentPlayInfo?.timeLength ?: 0L
+            )
+        }
     }
 
     fun handlePlaybackError(error: androidx.media3.common.PlaybackException, currentPositionMs: Long) {
@@ -2470,10 +2465,6 @@ class VideoPlayerViewModel(
         danmakuLoadJob?.cancel()
         _danmaku.value = emptyList()
         _specialDanmaku.value = emptyList()
-        _danmakuUpdates.tryEmit(DanmakuUpdate(
-            items = emptyList(),
-            replace = true
-        ))
     }
 
     private fun isActiveDanmakuRequest(loadGeneration: Long): Boolean {
@@ -2678,6 +2669,19 @@ class VideoPlayerViewModel(
             preconnectCdnHosts(route.videoUrls, route.audioUrls)
         } catch (e: Exception) {
             AppLog.w(TAG, "cdnPreconnect:error cid=${currentCid} error=${e.message}")
+        }
+    }
+
+    private suspend fun triggerCdnPreconnectForPlayInfo(playInfo: PlayInfoModel) {
+        try {
+            val dash = playInfo.dash ?: return
+            val videoUrls = dash.video?.mapNotNull { it.realBaseUrl.ifEmpty { null } }.orEmpty()
+            val audioUrls = dash.audio?.mapNotNull { it.realBaseUrl.ifEmpty { null } }.orEmpty()
+            val allUrls = videoUrls + audioUrls
+            if (allUrls.isEmpty()) return
+            preconnectCdnHosts(videoUrls, audioUrls)
+        } catch (e: Exception) {
+            AppLog.w(TAG, "cdnPreconnect:early error=${e.message}")
         }
     }
 }

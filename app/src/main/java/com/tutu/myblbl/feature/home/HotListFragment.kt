@@ -15,6 +15,7 @@ import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import com.tutu.myblbl.core.common.ext.toast
+import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -23,6 +24,7 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 class HotListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
 
     companion object {
+        private const val TAG = "HotListFragment"
         private const val CACHE_KEY = "hotCacheList"
 
         fun newInstance(): HotListFragment {
@@ -178,23 +180,29 @@ class HotListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
                         return@collectLatest
                     }
                     when (event) {
-                        is MainNavigationViewModel.Event.MainTabReselected ->
+                        is MainNavigationViewModel.Event.MainTabReselected -> {
+                            AppLog.d(TAG, "received MainTabReselected: index=${event.index}, isLoading=$isLoading")
                             if (event.index == 0 && !isLoading) {
                                 refresh()
                             }
+                        }
 
-                        is MainNavigationViewModel.Event.SecondaryTabReselected ->
+                        is MainNavigationViewModel.Event.SecondaryTabReselected -> {
+                            AppLog.d(TAG, "received SecondaryTabReselected: host=${event.host}, position=${event.position}, isLoading=$isLoading")
                             if (event.host == MainNavigationViewModel.SecondaryTabHost.HOME &&
                                 event.position == 1 &&
                                 !isLoading
                             ) {
                                 refresh()
                             }
+                        }
 
-                        MainNavigationViewModel.Event.MenuPressed ->
+                        MainNavigationViewModel.Event.MenuPressed -> {
+                            AppLog.d(TAG, "received MenuPressed: isLoading=$isLoading")
                             if (!isLoading) {
                                 refresh()
                             }
+                        }
 
                         MainNavigationViewModel.Event.BackPressed -> scrollToTop()
                         else -> Unit

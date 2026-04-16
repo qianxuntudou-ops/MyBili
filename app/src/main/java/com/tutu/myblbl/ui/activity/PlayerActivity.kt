@@ -359,10 +359,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     }
 
     private fun startPlayback(launchContext: PlayerLaunchContext) {
-        player?.stop()
         playerView.pauseDanmaku()
-        playerView.setDanmakuData(emptyList())
-        playerView.setSpecialDanmakuData(emptyList())
         viewModel.loadVideoInfo(
             aid = launchContext.aid,
             bvid = launchContext.bvid,

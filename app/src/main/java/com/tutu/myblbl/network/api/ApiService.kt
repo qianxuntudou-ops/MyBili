@@ -91,6 +91,11 @@ interface ApiService {
         @Query("ps") pageSize: Int
     ): BaseResponse<UserDynamicResponse>
 
+    @GET("x/space/wbi/arc/search")
+    suspend fun getUserArcSearch(
+        @QueryMap params: Map<String, String>
+    ): BaseResponse<UserDynamicResponse>
+
     @GET("x/polymer/web-dynamic/desktop/v1/feed/video")
     suspend fun getAllDynamic(
         @Query("page") page: Int,
