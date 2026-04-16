@@ -145,12 +145,14 @@ class VideoPlayerOverlayController(
         overlayCoordinator.onRelatedPanelHidden()
         if (!viewRelated.isVisible) {
             dimBackground.visibility = View.GONE
+            dimBackground.setOnClickListener(null)
             if (restoreFocus && isViewActive()) {
                 restoreControllerAfterOverlay()
             }
             return
         }
         dimBackground.visibility = View.GONE
+        dimBackground.setOnClickListener(null)
         viewRelated.clearAnimation()
         AnimationUtils.loadAnimation(activity, R.anim.slide_down).apply {
             setAnimationListener(object : Animation.AnimationListener {

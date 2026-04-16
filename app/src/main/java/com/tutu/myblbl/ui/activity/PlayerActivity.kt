@@ -566,30 +566,18 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     private fun setupBackHandler() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (overlayCoordinator.hasVisiblePanel()) {
-                    overlayCoordinator.handleBackPress(
-                        nowMs = System.currentTimeMillis(),
-                        isSettingShowing = playerView.isSettingViewShowing(),
-                        hideSetting = { playerView.showHideSettingView(false) },
-                        isControllerFullyVisible = playerView.isControllerFullyVisible(),
-                        hideController = { playerView.hideController() },
-                        hidePanel = { hideContentPanel() },
-                        exitPlayer = { finish() },
-                        showExitPrompt = {
-                            Toast.makeText(this@PlayerActivity, "再按一次退出", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    return
-                }
-                if (playerView.isSettingViewShowing()) {
-                    playerView.showHideSettingView(false)
-                    return
-                }
-                if (playerView.isControllerFullyVisible()) {
-                    playerView.hideController()
-                    return
-                }
-                finish()
+                overlayCoordinator.handleBackPress(
+                    nowMs = System.currentTimeMillis(),
+                    isSettingShowing = playerView.isSettingViewShowing(),
+                    hideSetting = { playerView.showHideSettingView(false) },
+                    isControllerFullyVisible = playerView.isControllerFullyVisible(),
+                    hideController = { playerView.hideController() },
+                    hidePanel = { hideContentPanel() },
+                    exitPlayer = { finish() },
+                    showExitPrompt = {
+                        Toast.makeText(this@PlayerActivity, "再按一次退出", Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
         })
     }

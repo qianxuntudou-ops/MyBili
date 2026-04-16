@@ -152,6 +152,7 @@ internal class PlayerControlFocusCoordinator(
         onRewind: () -> Unit,
         onFastForward: () -> Unit
     ) {
+        AppLog.d("KeyTrace", "focusButtonByKeyDown: keyCode=${event.keyCode}, action=${event.action}")
         if (event.action != KeyEvent.ACTION_DOWN) {
             return
         }
@@ -173,10 +174,10 @@ internal class PlayerControlFocusCoordinator(
     }
 
     fun requestPlayPauseFocus() {
-        AppLog.d("FocusDebug", "requestPlayPauseFocus: called")
-        if (buttonPlay.visibility == View.VISIBLE) {
+        val result = if (buttonPlay.visibility == View.VISIBLE) {
             buttonPlay.requestFocus()
-        }
+        } else false
+        AppLog.d("KeyTrace", "requestPlayPauseFocus: buttonVisible=${buttonPlay.visibility == View.VISIBLE}, requestFocusResult=$result, actuallyFocused=${buttonPlay.isFocused}")
     }
 
     fun requestSettingButtonFocus() {

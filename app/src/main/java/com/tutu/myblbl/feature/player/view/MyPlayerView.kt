@@ -37,6 +37,7 @@ import com.tutu.myblbl.model.video.quality.VideoCodecEnum
 import com.tutu.myblbl.model.video.quality.VideoQuality
 import com.tutu.myblbl.core.common.ext.isAdvancedDanmakuEnabled
 import com.tutu.myblbl.core.common.ext.getDanmakuSmartFilterLevel
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.feature.player.LiveQualityInfo
 
 @OptIn(UnstableApi::class)
@@ -558,6 +559,22 @@ class MyPlayerView @JvmOverloads constructor(
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyName = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> "UP"
+            KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
+            KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
+            KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
+            KeyEvent.KEYCODE_DPAD_CENTER -> "CENTER"
+            KeyEvent.KEYCODE_ENTER -> "ENTER"
+            KeyEvent.KEYCODE_BACK -> "BACK"
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> "FF"
+            KeyEvent.KEYCODE_MEDIA_REWIND -> "RW"
+            else -> "0x${event.keyCode.toString(16)}"
+        }
+        val action = when (event.action) { KeyEvent.ACTION_DOWN -> "DN" else -> "UP" }
+        val focused = findFocus()
+        AppLog.d("KeyTrace", "dispatchKeyEvent: $keyName/$action, controller=${controller != null}, fullyVisible=${controller?.isFullyVisible()}, useController=$useController, seeking=${progressiveSeekHelper.isActive()}, focused=${focused?.javaClass?.simpleName}#${focused?.id?.let { try { resources.getResourceEntryName(it) } catch (_: Exception) { "unknown" } }}")
+
         if (player == null) return super.dispatchKeyEvent(event)
         if (controller == null) return false
 
@@ -612,12 +629,14 @@ class MyPlayerView @JvmOverloads constructor(
         val isSeekKey = event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
 
         if (isDpadKey && useController && controller?.isFullyVisible() != true) {
+            AppLog.d("KeyTrace", "  -> entering hidden-controller DPAD branch, isSeekKey=$isSeekKey")
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (isSeekKey) {
                     progressiveSeekHelper.handleKeyEvent(event)
                 } else if (!gestureListener.handleKeyDown(event) && !gestureListener.isDoubleTapping) {
                     maybeShowController(true)
                     controller?.focusButtonByKeyDown(event)
+                    AppLog.d("KeyTrace", "  -> maybeShowController + focusButtonByKeyDown done, controllerVisible=${controller?.isFullyVisible()}")
                 }
             } else if (event.action == KeyEvent.ACTION_UP && isSeekKey) {
                 progressiveSeekHelper.handleKeyEvent(event)
@@ -1323,6 +1342,7 @@ class MyPlayerView @JvmOverloads constructor(
         }
 
         private fun finishSeek() {
+            AppLog.d("KeyTrace", "finishSeek: isSpeedMode=$isSpeedMode, isForward=$isForward, isSeeking=$isSeeking")
             cancelPendingRunnable()
             cancelSpeedStepRunnable()
             isSeeking = false
@@ -1337,7 +1357,7 @@ class MyPlayerView @JvmOverloads constructor(
             } else if (isForward) {
                 doSingleSeek()
             }
-            restoreControllerAfterGesture()
+            hideController()
         }
 
         private fun doSingleSeek() {
