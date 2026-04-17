@@ -1,6 +1,7 @@
 package com.tutu.myblbl.repository
 
 import com.tutu.myblbl.model.series.FollowSeriesResult
+import com.tutu.myblbl.model.series.RelatedRecommendResult
 import com.tutu.myblbl.repository.remote.SeriesRepository as NetworkSeriesRepository
 
 class SeriesRepository(
@@ -20,4 +21,7 @@ class SeriesRepository(
 
     suspend fun getSeriesTimeline(type: Int, before: Int = 6, after: Int = 6) =
         delegate.getSeriesTimeline(type, before, after)
+
+    suspend fun getRelatedRecommend(seasonId: Long): Result<RelatedRecommendResult> =
+        delegate.getRelatedRecommend(seasonId)
 }

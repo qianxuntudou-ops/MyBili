@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.tutu.myblbl.model.series.EpisodeProgressModel
 import com.tutu.myblbl.model.series.EpisodesDetailModel
 import com.tutu.myblbl.model.series.FollowSeriesResult
+import com.tutu.myblbl.model.series.SeriesModel
 import com.tutu.myblbl.R
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.SeriesRepository
@@ -39,6 +40,9 @@ class SeriesDetailViewModel(
     private val _isFollowed = MutableStateFlow(false)
     val isFollowed: StateFlow<Boolean> = _isFollowed.asStateFlow()
 
+    private val _recommendItems = MutableStateFlow<List<SeriesModel>>(emptyList())
+    val recommendItems: StateFlow<List<SeriesModel>> = _recommendItems.asStateFlow()
+
     private val _messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 1)
     val messages: SharedFlow<UiMessage> = _messages.asSharedFlow()
     
@@ -58,6 +62,7 @@ class SeriesDetailViewModel(
                     detail.userStatus?.let { status ->
                         _isFollowed.value = status.follow == 1
                     }
+                    loadRecommend(currentSeasonId)
                 },
                 onFailure = { e ->
                     _error.value = e.message ?: "加载番剧详情失败"
@@ -102,6 +107,16 @@ class SeriesDetailViewModel(
                 }
             )
             isFollowActionRunning = false
+        }
+    }
+
+    private fun loadRecommend(seasonId: Long) {
+        if (seasonId <= 0) return
+        viewModelScope.launch {
+            repository.getRelatedRecommend(seasonId).onSuccess { result ->
+                _recommendItems.value = (result.relates + result.season)
+                    .filter { it.seasonId > 0 && it.cover.isNotBlank() }
+            }
         }
     }
 
