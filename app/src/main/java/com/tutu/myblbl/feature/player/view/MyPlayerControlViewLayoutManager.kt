@@ -8,13 +8,14 @@ import com.tutu.myblbl.R
 import com.tutu.myblbl.core.common.log.AppLog
 
 class MyPlayerControlViewLayoutManager(
-    private val playerControlView: MyPlayerControlView
+    private val playerControlView: MyPlayerControlView,
+    private val uiCoordinator: com.tutu.myblbl.feature.player.PlaybackUiCoordinator? = null
 ) {
 
     companion object {
         private const val ANIMATION_DURATION_MS = 250L
         private const val OVERFLOW_ANIMATION_DURATION_MS = 220L
-        private const val PROGRESS_ONLY_DURATION_MS = 2000L
+        private const val PROGRESS_ONLY_DURATION_MS = 1000L
         private const val UX_STATE_ALL_VISIBLE = 0
         private const val UX_STATE_ONLY_PROGRESS_VISIBLE = 1
         private const val UX_STATE_NONE_VISIBLE = 2
@@ -240,6 +241,39 @@ class MyPlayerControlViewLayoutManager(
         playerControlView.removeOnLayoutChangeListener(onLayoutChangeListener)
         removeHideCallbacks()
         cancelAllAnimations()
+    }
+
+    /**
+     * 进入 seek 模式：只显示进度条+时间，隐藏其他 UI。
+     * 无论当前处于什么状态都可以调用。
+     */
+    fun enterSeekProgressOnly() {
+        cancelAllAnimations()
+        removeHideCallbacks()
+        playerControlView.visibility = View.VISIBLE
+        controlsBackground.visibility = View.INVISIBLE
+        centerControls.visibility = View.INVISIBLE
+        titleView.visibility = View.INVISIBLE
+        bottomBarController.visibility = View.INVISIBLE
+        bottomBar.visibility = View.VISIBLE
+        bottomBar.translationY = 0f
+        bottomBar.alpha = 1f
+        timeBar.showScrubber()
+        // 不启动 progressRunnable，避免与 beginSeekPreview() 冲突导致进度条头乱跳
+        // 位置由 beginSeekPreview() 通过 seek tick 驱动
+        setUxState(UX_STATE_ONLY_PROGRESS_VISIBLE)
+    }
+
+    /**
+     * 退出 seek 模式：立刻隐藏进度条和整个控制器，不闪现其他 UI。
+     */
+    fun exitSeekProgressOnly() {
+        if (uxState == UX_STATE_ONLY_PROGRESS_VISIBLE) {
+            cancelAllAnimations()
+            playerControlView.stopProgressUpdates()
+            playerControlView.visibility = View.GONE
+            setUxState(UX_STATE_NONE_VISIBLE)
+        }
     }
 
     fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -732,6 +766,29 @@ class MyPlayerControlViewLayoutManager(
         }
         if (oldState != newState) {
             playerControlView.notifyOnVisibilityChange()
+        }
+        uiCoordinator?.let { coord ->
+            when (newState) {
+                UX_STATE_ALL_VISIBLE -> {
+                    coord.transition(com.tutu.myblbl.feature.player.UiEvent.ChromeShowAll)
+                }
+                UX_STATE_ONLY_PROGRESS_VISIBLE -> {
+                    if (coord.chromeState != com.tutu.myblbl.feature.player.PlaybackUiCoordinator.ChromeState.ProgressOnly) {
+                        coord.withState { c ->
+                            c.chromeState = com.tutu.myblbl.feature.player.PlaybackUiCoordinator.ChromeState.ProgressOnly
+                            c.bottomOccupant = com.tutu.myblbl.feature.player.PlaybackUiCoordinator.BottomOccupant.FullChrome
+                            c.hudState = com.tutu.myblbl.feature.player.PlaybackUiCoordinator.HudState.Chrome
+                        }
+                    }
+                }
+                UX_STATE_NONE_VISIBLE -> {
+                    coord.withState { c ->
+                        c.chromeState = com.tutu.myblbl.feature.player.PlaybackUiCoordinator.ChromeState.Hidden
+                        c.bottomOccupant = com.tutu.myblbl.feature.player.PlaybackUiCoordinator.BottomOccupant.SlimTimeline
+                        c.hudState = com.tutu.myblbl.feature.player.PlaybackUiCoordinator.HudState.Ambient
+                    }
+                }
+            }
         }
     }
 }

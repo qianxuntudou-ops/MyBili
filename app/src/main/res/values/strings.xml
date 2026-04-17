@@ -107,6 +107,7 @@
     <string name="entainment">娱乐</string>
     <string name="episodes">正片剧集</string>
     <string name="extra_content">扩展内容</string>
+    <string name="related_recommend">相关推荐</string>
     <string name="error_a11y_label">Error: invalid</string>
     <string name="error_icon_content_description">Error</string>
     <string name="exo_controls_cc_disabled_description">Enable subtitles</string>

@@ -52,6 +52,7 @@ class SeriesDetailFragment : Fragment() {
     private var pendingPrimaryFocus = true
     private var lastFocusedArea = FocusArea.HEADER_CONTINUE
     private var lastContentStructureKey: String? = null
+    private var lastRecommendKey: String? = null
     private var pendingHeaderFocusAnchorX: Int? = null
     private var pendingHeaderFocusRetries: Int = 0
     private val appEventHub: AppEventHub by inject()
@@ -163,6 +164,15 @@ class SeriesDetailFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.recommendItems.collect { items ->
+                    contentAdapter.setRecommendItems(items)
+                    renderContent()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.messages.collect { message ->
                     when (message) {
                         is SeriesDetailViewModel.UiMessage.Res -> {
@@ -198,9 +208,14 @@ class SeriesDetailFragment : Fragment() {
     private fun renderContent() {
         val detail = currentDetail
         val contentStructureKey = detail?.contentStructureKey()
-        if (detail == null || contentStructureKey != lastContentStructureKey || contentAdapter.itemCount == 0) {
+        val recommendKey = viewModel.recommendItems.value.joinToString(",") { it.seasonId.toString() }
+        val structureChanged = contentStructureKey != lastContentStructureKey
+            || recommendKey != lastRecommendKey
+            || contentAdapter.itemCount == 0
+        if (detail == null || structureChanged) {
             contentAdapter.submit(detail, currentFollowed)
             lastContentStructureKey = contentStructureKey
+            lastRecommendKey = recommendKey
         } else {
             contentAdapter.updateHeader(detail, currentFollowed)
         }

@@ -40,6 +40,7 @@ import com.tutu.myblbl.model.series.CheckUserSeriesResult
 import com.tutu.myblbl.model.series.EpisodesDetailModel
 import com.tutu.myblbl.model.series.FollowSeriesResult
 import com.tutu.myblbl.model.series.MyFollowingResponseWrapper
+import com.tutu.myblbl.model.series.RelatedRecommendResult
 import com.tutu.myblbl.model.series.SeasonSectionResult
 import com.tutu.myblbl.model.series.timeline.GetTimeLineWrapper
 import com.tutu.myblbl.network.response.Base2Response
@@ -462,6 +463,11 @@ interface ApiService {
     suspend fun getVideoEpisodeSections(
         @Query("season_id") seasonId: Long
     ): Base2Response<SeasonSectionResult>
+
+    @GET("pgc/season/web/related/recommend")
+    suspend fun getRelatedRecommend(
+        @Query("season_id") seasonId: Long
+    ): BaseResponse<RelatedRecommendResult>
 
     @GET("pgc/player/web/playurl")
     suspend fun getVideoPlayPgcInfo(

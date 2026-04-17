@@ -4,6 +4,7 @@ import android.util.Log
 import com.tutu.myblbl.model.series.EpisodesDetailModel
 import com.tutu.myblbl.model.series.FollowSeriesResult
 import com.tutu.myblbl.model.series.MyFollowingResponseWrapper
+import com.tutu.myblbl.model.series.RelatedRecommendResult
 import com.tutu.myblbl.model.series.timeline.TimeLineADayModel
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.session.NetworkSessionGateway
@@ -127,6 +128,17 @@ class SeriesRepository(
                 }
             } else {
                 throw IllegalStateException(response.message.ifEmpty { "时间线加载失败" })
+            }
+        }
+    }
+
+    suspend fun getRelatedRecommend(seasonId: Long): Result<RelatedRecommendResult> {
+        return runCatching {
+            val response = apiService.getRelatedRecommend(seasonId)
+            if (response.isSuccess && response.data != null) {
+                response.data
+            } else {
+                throw IllegalStateException(response.errorMessage.ifEmpty { "推荐加载失败" })
             }
         }
     }
