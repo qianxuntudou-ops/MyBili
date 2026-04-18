@@ -10,12 +10,14 @@ class VideoPlayerProgressCoordinator(
     private val publishProgressStateProvider: () -> Boolean,
     private val onProgressPublished: (positionMs: Long, durationMs: Long, publishProgressState: Boolean) -> Unit,
     private val onPlaybackPositionChanged: (positionMs: Long) -> Unit,
-    private val onPlaybackStalled: (positionMs: Long, stalledMs: Long) -> Unit = { _, _ -> }
+    private val onPlaybackStalled: (positionMs: Long, stalledMs: Long) -> Unit = { _, _ -> },
+    private val onHeartbeatTick: (() -> Unit)? = null
 ) {
     companion object {
         private const val PROGRESS_POLL_INTERVAL_MS = 500L
         private const val PLAYBACK_STALL_THRESHOLD_MS = 2500L
         private const val PLAYBACK_STALL_RECOVERY_COOLDOWN_MS = 5000L
+        private const val HEARTBEAT_INTERVAL_MS = 15_000L
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -26,11 +28,13 @@ class VideoPlayerProgressCoordinator(
     private var stallTrackedPositionMs: Long = -1L
     private var stallStartedAtElapsedMs: Long = 0L
     private var lastStallRecoveryAtElapsedMs: Long = 0L
+    private var lastHeartbeatAtElapsedMs: Long = 0L
 
     private val progressRunnable = object : Runnable {
         override fun run() {
             val player = playerProvider() ?: return
             sync(player, publishProgressStateProvider())
+            maybeFireHeartbeat()
             if (player.isPlaying) {
                 handler.postDelayed(this, PROGRESS_POLL_INTERVAL_MS)
             }
@@ -59,6 +63,7 @@ class VideoPlayerProgressCoordinator(
         stallTrackedPositionMs = -1L
         stallStartedAtElapsedMs = 0L
         lastStallRecoveryAtElapsedMs = 0L
+        lastHeartbeatAtElapsedMs = 0L
     }
 
     private fun sync(player: Player, publishProgressState: Boolean) {
@@ -116,6 +121,19 @@ class VideoPlayerProgressCoordinator(
         ) {
             lastStallRecoveryAtElapsedMs = nowElapsedMs
             onPlaybackStalled(positionMs, stalledMs)
+        }
+    }
+
+    private fun maybeFireHeartbeat() {
+        val callback = onHeartbeatTick ?: return
+        val now = SystemClock.elapsedRealtime()
+        if (lastHeartbeatAtElapsedMs == 0L) {
+            lastHeartbeatAtElapsedMs = now
+            return
+        }
+        if (now - lastHeartbeatAtElapsedMs >= HEARTBEAT_INTERVAL_MS) {
+            lastHeartbeatAtElapsedMs = now
+            callback.invoke()
         }
     }
 

@@ -129,7 +129,7 @@ internal class BottomRetainer(endRatio: Float) : DanmakuRetainer {
               return@forEach
             }
             willHit = holder.item.willCollision(
-              holder.item,
+              drawItem,
               displayer,
               currentTimeMills,
               config.durationMs

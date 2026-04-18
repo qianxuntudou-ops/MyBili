@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -715,6 +716,11 @@ class VideoPlayerViewModel(
         _isLoading.value = loading
     }
 
+    fun resetPlaybackProgress() {
+        _currentPosition.value = 0L
+        _duration.value = 0L
+    }
+
     fun setErrorMessage(message: String?) {
         _error.value = message
     }
@@ -782,7 +788,9 @@ class VideoPlayerViewModel(
         val aid = currentAid
         val bvid = currentBvid
         val cid = currentCid
-        val positionSec = ((_currentPosition.value ?: pendingSeekPositionMs).coerceAtLeast(0L)) / 1000L
+        val rawPositionMs = _currentPosition.value.coerceAtLeast(0L)
+        val positionMs = rawPositionMs.takeIf { it > 0L } ?: pendingSeekPositionMs.coerceAtLeast(0L)
+        val positionSec = positionMs / 1000L
         val csrf = sessionGateway.getCsrfToken()
         if ((aid == null || aid <= 0L) && bvid.isNullOrBlank()) {
             return
@@ -797,29 +805,38 @@ class VideoPlayerViewModel(
         val startTimestamp = sessionStartTimestampMs.takeIf { it > 0L } ?: System.currentTimeMillis()
 
         viewModelScope.launch {
-            runCatching {
-                val params = linkedMapOf(
-                    "played_time" to positionSec.toString(),
-                    "realtime" to positionSec.toString(),
-                    "start_ts" to startTimestamp.toString(),
-                    "type" to "3",
-                    "refer_url" to "https://www.bilibili.com/",
-                    "play_type" to playType.toString(),
-                    "csrf" to csrf
-                )
-                aid?.takeIf { it > 0L }?.let { params["aid"] = it.toString() }
-                bvid?.takeIf { it.isNotBlank() }?.let { params["bvid"] = it }
-                params["cid"] = cid.toString()
-                sessionGateway.getUserInfo()
-                    ?.mid
-                    ?.takeIf { it > 0L }
-                    ?.let { params["mid"] = it.toString() }
-                sessionGateway.syncAuthState(
-                    apiService.playVideoHeartbeat(params),
-                    source = "player.playVideoHeartbeat"
-                )
-            }.onFailure { throwable ->
-                AppLog.e(TAG, "reportPlaybackHeartbeat failed: ${throwable.message}", throwable)
+            val params = linkedMapOf(
+                "played_time" to positionSec.toString(),
+                "realtime" to positionSec.toString(),
+                "start_ts" to startTimestamp.toString(),
+                "type" to "3",
+                "refer_url" to "https://www.bilibili.com/",
+                "play_type" to playType.toString(),
+                "csrf" to csrf
+            )
+            aid?.takeIf { it > 0L }?.let { params["aid"] = it.toString() }
+            bvid?.takeIf { it.isNotBlank() }?.let { params["bvid"] = it }
+            params["cid"] = cid.toString()
+            sessionGateway.getUserInfo()
+                ?.mid
+                ?.takeIf { it > 0L }
+                ?.let { params["mid"] = it.toString() }
+            var attempt = 0
+            while (attempt < 2) {
+                val result = runCatching {
+                    sessionGateway.syncAuthState(
+                        apiService.playVideoHeartbeat(params),
+                        source = "player.playVideoHeartbeat"
+                    )
+                }
+                if (result.isSuccess) break
+                attempt++
+                if (attempt < 2) {
+                    AppLog.w(TAG, "reportPlaybackHeartbeat attempt $attempt failed, retrying: ${result.exceptionOrNull()?.message}")
+                    delay(2000L)
+                } else {
+                    AppLog.e(TAG, "reportPlaybackHeartbeat failed after retries: ${result.exceptionOrNull()?.message}", result.exceptionOrNull())
+                }
             }
         }
     }

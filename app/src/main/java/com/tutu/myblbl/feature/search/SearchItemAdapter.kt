@@ -277,6 +277,24 @@ class SearchItemAdapter(
                 longPressRunnable = null
                 showCardMenu()
                 true
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                when (event.action) {
+                    KeyEvent.ACTION_DOWN -> {
+                        if (event.repeatCount == 0) {
+                            longPressTriggered = false
+                            longPressRunnable = Runnable {
+                                longPressTriggered = true
+                                showCardMenu()
+                            }
+                            handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
+                        }
+                    }
+                    KeyEvent.ACTION_UP -> {
+                        longPressRunnable?.let { handler.removeCallbacks(it) }
+                        longPressRunnable = null
+                    }
+                }
+                false
             } else {
                 false
             }

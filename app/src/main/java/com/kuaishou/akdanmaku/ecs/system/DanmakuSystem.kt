@@ -84,6 +84,13 @@ internal class DanmakuSystem(context: DanmakuContext) : DanmakuEntitySystem(cont
         config.updateVisibility()
         config.updateRetainer()
       }
+      if (currentConfig.durationMs != config.durationMs ||
+        currentConfig.rollingDurationMs != config.rollingDurationMs) {
+        Log.w(DanmakuEngine.TAG, "[Config] duration change from ${currentConfig.rollingDurationMs} to ${config.rollingDurationMs}")
+        config.updateRetainer()
+        config.updateLayout()
+      }
+
       if (currentConfig.layoutFilter.size != config.layoutFilter.size ||
         currentConfig.filterGeneration != config.filterGeneration) {
         config.updateFilter()

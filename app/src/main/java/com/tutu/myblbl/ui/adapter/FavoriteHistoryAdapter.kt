@@ -122,6 +122,18 @@ class FavoriteHistoryAdapter(
             if (keyCode == KeyEvent.KEYCODE_MENU && event.action == KeyEvent.ACTION_UP) {
                 showCardMenu()
                 true
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                when (event.action) {
+                    KeyEvent.ACTION_DOWN -> {
+                        if (event.repeatCount == 0) {
+                            startLongPress()
+                        }
+                    }
+                    KeyEvent.ACTION_UP -> {
+                        cancelLongPress()
+                    }
+                }
+                false
             } else {
                 false
             }

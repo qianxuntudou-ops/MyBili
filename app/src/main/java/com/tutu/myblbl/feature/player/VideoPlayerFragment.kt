@@ -184,6 +184,9 @@ class VideoPlayerFragment : Fragment() {
         },
         onPlaybackStalled = { positionMs, stalledMs ->
             recoverFromPlaybackStall(positionMs, stalledMs)
+        },
+        onHeartbeatTick = {
+            viewModel.reportPlaybackHeartbeat()
         }
     )
 
@@ -634,6 +637,12 @@ class VideoPlayerFragment : Fragment() {
                 progressCoordinator.reset()
                 if (!playbackRequest.replaceInPlace) {
                     playerView.prepareForPlaybackTransition()
+                    viewModel.resetPlaybackProgress()
+                    latestPlaybackPositionMs = 0L
+                    latestPlaybackDurationMs = 0L
+                    if (::slimTimelineRenderer.isInitialized) {
+                        slimTimelineRenderer.show(0L, 0L)
+                    }
                 }
                 startupTrace = StartupTrace(
                     sequence = ++startupTraceSequence,

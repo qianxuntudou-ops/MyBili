@@ -25,23 +25,24 @@ package com.kuaishou.akdanmaku.layout.retainer
 
 import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.data.DanmakuItemData
-import com.kuaishou.akdanmaku.collection.OrderedRangeList
 import com.kuaishou.akdanmaku.data.DanmakuItem
 import com.kuaishou.akdanmaku.ext.*
 import com.kuaishou.akdanmaku.ui.DanmakuDisplayer
 
-/**
- * 顶部维持器，用来持有顶端对齐的弹幕（Top/Rolling）的垂直位置，并给出适当的高度
- *
- * @author Xana
- * @since 2021-07-05
- */
 internal class AkTopRetainer(
   private val startRatio: Float = 1f,
   private val endRatio: Float = 1f
 ) : DanmakuRetainer {
 
-  private val ranges = OrderedRangeList<DanmakuItem>(0, 0)
+  private class Row(
+    val top: Int,
+    val bottom: Int,
+    val items: MutableList<DanmakuItem> = mutableListOf()
+  )
+
+  private var maxEnd = 0
+  private val rows = mutableListOf<Row>()
+  private val itemToRow = mutableMapOf<DanmakuItem, Row>()
 
   override fun layout(
     drawItem: DanmakuItem,
@@ -58,34 +59,66 @@ internal class AkTopRetainer(
       return -1f
     }
     val needRelayout = drawState.layoutGeneration != config.layoutGeneration
-    val isRunning = ranges.contains(drawItem)
+    val isRunning = itemToRow.containsKey(drawItem)
     val topPos: Int
     val visibility: Boolean
     if (needRelayout && !isRunning) {
-      var holder = ranges.find(drawState.height.toInt()) {
-        it == null || !it.willCollision(
-          drawItem,
-          displayer,
-          currentTimeMills,
-          duration
-        )
-      }
+      val itemHeight = drawState.height.toInt()
 
-      if (holder.isEmpty()) {
-        if (config.allowOverlap) {
-          // empty and allow overlap means clean all holder and rearrange it from beginning
-          ranges.clear()
-          holder = ranges.find(drawState.height.toInt()) { it == null }
-        } else if (drawItem.data.isImportant) {
-          holder = ranges.min(drawState.height.toInt()) { (it?.drawState?.rect?.left ?: displayer.width).toInt() }
+      var foundRow: Row? = null
+      for (row in rows) {
+        if (itemHeight > row.bottom - row.top) continue
+        val hasCollision = row.items.any { existing ->
+          existing.willCollision(drawItem, displayer, currentTimeMills, duration)
+        }
+        if (!hasCollision) {
+          foundRow = row
+          break
         }
       }
-      visibility = if (holder.isEmpty()) {
-        topPos = -1
-        false
+
+      if (foundRow != null) {
+        foundRow.items.add(drawItem)
+        itemToRow[drawItem] = foundRow
+        topPos = foundRow.top
+        visibility = true
       } else {
-        topPos = holder.first().start
-        ranges.add(holder, topPos, topPos + drawState.height.toInt(), drawItem)
+        val gapTop = findGap(itemHeight)
+        if (gapTop >= 0) {
+          val newRow = Row(gapTop, gapTop + itemHeight, mutableListOf(drawItem))
+          insertRowSorted(newRow)
+          itemToRow[drawItem] = newRow
+          topPos = gapTop
+          visibility = true
+        } else if (config.allowOverlap) {
+          clear()
+          if (itemHeight <= maxEnd) {
+            val newRow = Row(0, itemHeight, mutableListOf(drawItem))
+            rows.add(newRow)
+            itemToRow[drawItem] = newRow
+            topPos = 0
+            visibility = true
+          } else {
+            topPos = -1
+            visibility = false
+          }
+        } else if (drawItem.data.isImportant) {
+          val bestRow = rows.minByOrNull { row ->
+            row.items.minOfOrNull { (it.drawState.rect.left).toInt() } ?: displayer.width
+          }
+          if (bestRow != null) {
+            bestRow.items.add(drawItem)
+            itemToRow[drawItem] = bestRow
+            topPos = bestRow.top
+            visibility = true
+          } else {
+            topPos = -1
+            visibility = false
+          }
+        } else {
+          topPos = -1
+          visibility = false
+        }
       }
     } else {
       visibility = drawState.visibility
@@ -99,16 +132,45 @@ internal class AkTopRetainer(
     return topPos.toFloat()
   }
 
+  private fun findGap(itemHeight: Int): Int {
+    if (itemHeight <= 0 || maxEnd <= 0) return -1
+    if (rows.isEmpty()) {
+      return if (itemHeight <= maxEnd) 0 else -1
+    }
+    if (rows.first().top >= itemHeight) return 0
+    for (i in 0 until rows.size - 1) {
+      val gapStart = rows[i].bottom
+      val gapSize = rows[i + 1].top - gapStart
+      if (gapSize >= itemHeight) return gapStart
+    }
+    val afterLast = rows.last().bottom
+    return if (afterLast + itemHeight <= maxEnd) afterLast else -1
+  }
+
+  private fun insertRowSorted(row: Row) {
+    val idx = rows.binarySearchBy(row.top) { it.top }.let { if (it < 0) -(it + 1) else it }
+    rows.add(idx, row)
+  }
+
   override fun clear() {
-    ranges.clear()
+    rows.clear()
+    itemToRow.clear()
   }
 
   override fun remove(item: DanmakuItem) {
-    ranges.remove(item)
+    val row = itemToRow.remove(item) ?: return
+    row.items.remove(item)
+    if (row.items.isEmpty()) {
+      rows.remove(row)
+    }
   }
 
   override fun update(start: Int, end: Int) {
-    com.kuaishou.akdanmaku.ext.AkLog.w("DanmakuEngine", "[AkTopRetainer] update: start=$start, end=$end, startRatio=$startRatio, endRatio=$endRatio -> effective [${(start * startRatio).toInt()}, ${(end * endRatio).toInt()}]")
-    ranges.update((start * startRatio).toInt(), (end * endRatio).toInt())
+    com.kuaishou.akdanmaku.ext.AkLog.w(
+      "DanmakuEngine",
+      "[AkTopRetainer] update: start=$start, end=$end, startRatio=$startRatio, endRatio=$endRatio -> effective [${(start * startRatio).toInt()}, ${(end * endRatio).toInt()}]"
+    )
+    maxEnd = (end * endRatio).toInt()
+    clear()
   }
 }
