@@ -463,6 +463,11 @@ interface ApiService {
         @Query("ep_id") epId: Long?
     ): Base2Response<EpisodesDetailModel>
 
+    @GET("pgc/season/episode/web/info")
+    suspend fun getPgcEpisodeInfo(
+        @Query("ep_id") epId: Long
+    ): BaseResponse<JsonObject>
+
     @GET("pgc/web/season/section")
     suspend fun getVideoEpisodeSections(
         @Query("season_id") seasonId: Long

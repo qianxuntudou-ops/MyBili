@@ -1079,7 +1079,9 @@ class VideoPlayerViewModel(
 
         val episodeItems = episodeCatalogBuilder.buildUgcEpisodes(detail)
         _episodes.value = episodeItems
-        val selectedIndex = episodeItems.indexOfFirst { it.cid == currentCid }.takeIf { it >= 0 } ?: 0
+        val selectedIndex = episodeItems.indexOfFirst {
+            it.cid == currentCid || (it.bvid.isNotBlank() && it.bvid == currentBvid)
+        }.takeIf { it >= 0 } ?: 0
         _selectedEpisodeIndex.value = selectedIndex
         val selectedEpisode = episodeItems.getOrNull(selectedIndex)
         currentCid = selectedEpisode?.cid

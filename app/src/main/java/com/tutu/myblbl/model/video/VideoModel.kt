@@ -259,8 +259,8 @@ data class Stat(
     @SerializedName("view")
     val view: Long = 0,
     
-    @SerializedName("danmaku")
-    val danmaku: Long = 0,
+    @SerializedName(value = "danmaku", alternate = ["dm", "danmakus"])
+    var danmaku: Long = 0,
     
     @SerializedName("reply")
     val reply: Long = 0,

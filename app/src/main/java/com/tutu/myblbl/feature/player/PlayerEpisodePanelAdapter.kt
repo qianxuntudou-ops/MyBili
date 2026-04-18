@@ -71,10 +71,15 @@ class PlayerEpisodePanelAdapter(
             binding.iconPlaying.visibility = if (isSelected) View.VISIBLE else View.GONE
             binding.clickView.isSelected = isSelected
             binding.root.isSelected = isSelected
-            binding.textTitle.isSelected = isSelected
             binding.clickView.setOnClickListener { onClick() }
             binding.clickView.isFocusable = true
             binding.clickView.isClickable = true
+            // Enable marquee for focused items AND the currently playing episode
+            binding.clickView.setOnFocusChangeListener { _, hasFocus ->
+                binding.textTitle.isSelected = hasFocus || isSelected
+            }
+            // Set initial marquee state (handles recycled views that already have focus)
+            binding.textTitle.isSelected = binding.clickView.hasFocus() || isSelected
         }
     }
 }

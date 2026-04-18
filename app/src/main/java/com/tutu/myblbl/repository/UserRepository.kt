@@ -16,6 +16,8 @@ import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.BaseBaseResponse
 import com.tutu.myblbl.core.common.log.AppLog
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 
 class UserRepository(
@@ -73,10 +75,14 @@ class UserRepository(
 
     suspend fun getLaterWatch(): Result<BaseResponse<LaterWatchWrapper>> =
         runCatching {
-            sessionGateway.syncAuthState(
+            val response = sessionGateway.syncAuthState(
                 apiService.getLaterWatch(),
                 source = "getLaterWatch"
             )
+            if (response.isSuccess && response.data != null) {
+                enrichPgcDanmakuCount(response.data.list)
+            }
+            response
         }
 
     suspend fun getFollowing(
@@ -209,6 +215,46 @@ class UserRepository(
             return block(retryParams)
         }
         return response
+    }
+
+    private suspend fun enrichPgcDanmakuCount(list: List<com.tutu.myblbl.model.video.VideoModel>) {
+        val candidates = list.filter { it.danmakuCount == 0L && it.viewCount > 0L }
+        if (candidates.isEmpty()) return
+        try {
+            coroutineScope {
+                candidates.map { video ->
+                    async {
+                        try {
+                            val detailResponse = apiService.getVideoDetail(video.aid, video.bvid)
+                            if (!detailResponse.isSuccess) return@async
+                            val redirectUrl = detailResponse.data?.view?.redirectUrl.orEmpty()
+                            val epId = parseEpIdFromBangumiUrl(redirectUrl)
+                            if (epId <= 0L) return@async
+                            val pgcResponse = apiService.getPgcEpisodeInfo(epId)
+                            if (pgcResponse.isSuccess) {
+                                val dm = pgcResponse.data
+                                    ?.getAsJsonObject("stat")
+                                    ?.get("dm")?.asLong ?: 0L
+                                if (dm > 0) {
+                                    video.stat?.let { it.danmaku = dm }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            AppLog.w("UserRepository", "enrichPgcDanmakuCount failed for aid=${video.aid}: ${e.message}")
+                        }
+                    }
+                }.forEach { it.await() }
+            }
+        } catch (e: Exception) {
+            AppLog.w("UserRepository", "enrichPgcDanmakuCount scope failed: ${e.message}")
+        }
+    }
+
+    private fun parseEpIdFromBangumiUrl(url: String): Long {
+        if (!url.contains("/bangumi/play/ep")) return 0L
+        return url.substringAfter("/bangumi/play/ep", "")
+            .takeWhile { it.isDigit() }
+            .toLongOrNull() ?: 0L
     }
 
     private suspend fun ensureWbiKeysIfNeeded() {

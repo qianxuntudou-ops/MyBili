@@ -81,6 +81,26 @@ internal class DataSystem(context: DanmakuContext) :
     sortedData.clear()
   }
 
+  fun clearAllData() {
+    synchronized(this) {
+      pendingAddItems.clear()
+      pendingCreateItems.clear()
+      pendingUpdateItems.clear()
+    }
+    sortedData.clear()
+    idSet.clear()
+    currentData.data.clear()
+    currentData.startIndex = -1
+    currentData.endIndex = -1
+    currentData.shouldSort = false
+    holdingItem = null
+    shouldSort = false
+    forceUpdate = true
+    for (entity in getEntities().toList()) {
+      engine.removeEntity(entity)
+    }
+  }
+
   override fun update(deltaTime: Float) {
     withTrace("DataSystem_update") {
       withTrace("DataSystem_processEntity") {

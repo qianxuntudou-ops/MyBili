@@ -64,6 +64,18 @@ class VideoPlayerOverlayController(
         val recyclerView = dialog.findViewById<RecyclerView>(R.id.recyclerView)
         val titleView = dialog.findViewById<TextView>(R.id.top_title)
         val moreInfoButton = dialog.findViewById<TextView>(R.id.button_more_info)
+        val targetIndex = selectedEpisodeIndex
+
+        dialog.window?.decorView?.viewTreeObserver?.addOnWindowFocusChangeListener(
+            object : ViewTreeObserver.OnWindowFocusChangeListener {
+                override fun onWindowFocusChanged(hasFocus: Boolean) {
+                    if (hasFocus) {
+                        recyclerView?.viewTreeObserver?.removeOnWindowFocusChangeListener(this)
+                        focusTargetEpisode(recyclerView, targetIndex)
+                    }
+                }
+            }
+        )
         val catalogSource = episodes.firstOrNull()?.source ?: VideoPlayerViewModel.EpisodeCatalogSource.PAGES
         val currentVideoInfo = resolveCurrentVideoInfo()
 
@@ -97,14 +109,6 @@ class VideoPlayerOverlayController(
         recyclerView?.apply {
             layoutManager = WrapContentGridLayoutManager(activity, 2)
             adapter = episodeDialogAdapter
-            post {
-                if (selectedEpisodeIndex in episodes.indices) {
-                    scrollToPosition(selectedEpisodeIndex)
-                    focusEpisodeItem(this, selectedEpisodeIndex)
-                } else {
-                    requestFocus()
-                }
-            }
         }
 
         dialog.setOnDismissListener {
@@ -114,6 +118,49 @@ class VideoPlayerOverlayController(
             }
         }
         dialog.show()
+    }
+
+    /**
+     * Called when the episode dialog window actually gains focus.
+     * Tries to focus the target item synchronously (layout is done by this point).
+     * Falls back to a double-post if the ViewHolder isn't available yet.
+     */
+    private fun focusTargetEpisode(recyclerView: RecyclerView?, targetIndex: Int) {
+        val rv = recyclerView ?: return
+        // Fast path: items should already be laid out when the window gets focus
+        val holder = rv.findViewHolderForAdapterPosition(targetIndex)
+        if (holder?.itemView != null) {
+            holder.itemView.requestFocus()
+            // Center in next frame (doesn't affect focus)
+            rv.post {
+                centerItemInView(rv, targetIndex)
+            }
+            return
+        }
+        // Slow path: target item is off-screen, scroll to it first then focus after layout
+        if (targetIndex in 0 until (rv.adapter?.itemCount ?: 0)) {
+            rv.scrollToPosition(targetIndex)
+        }
+        rv.post {
+            // First post: layout pass after scrollToPosition
+            rv.post {
+                // Second post: ViewHolder should now be available
+                val h = rv.findViewHolderForAdapterPosition(targetIndex)
+                if (h?.itemView != null) {
+                    h.itemView.requestFocus()
+                    centerItemInView(rv, targetIndex)
+                }
+            }
+        }
+    }
+
+    private fun centerItemInView(rv: RecyclerView, position: Int) {
+        val lm = rv.layoutManager as? WrapContentGridLayoutManager ?: return
+        val holder = rv.findViewHolderForAdapterPosition(position) ?: return
+        if (rv.height > 0 && holder.itemView.height > 0) {
+            val centerOffset = (rv.height - holder.itemView.height) / 2
+            lm.scrollToPositionWithOffset(position, centerOffset)
+        }
     }
 
     private var relatedPanelFocusListener: ViewTreeObserver.OnGlobalFocusChangeListener? = null
@@ -337,19 +384,6 @@ class VideoPlayerOverlayController(
         playerView.showController()
         overlayCoordinator.restoreFocus(playerView)
         playerView.resetControllerHideCallbacks()
-    }
-
-    private fun focusEpisodeItem(recyclerView: RecyclerView, position: Int, retries: Int = 6) {
-        val holder = recyclerView.findViewHolderForAdapterPosition(position)
-        if (holder?.itemView != null) {
-            holder.itemView.requestFocus()
-            return
-        }
-        if (retries > 0) {
-            recyclerView.post { focusEpisodeItem(recyclerView, position, retries - 1) }
-        } else {
-            recyclerView.requestFocus()
-        }
     }
 
     private fun setupRelatedPanelFocusTrap() {

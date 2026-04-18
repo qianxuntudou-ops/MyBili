@@ -3,7 +3,7 @@
     android:id="@+id/dialog_root"
     android:background="@drawable/dialog_background"
     android:clickable="true"
-    android:focusable="true"
+    android:focusable="false"
     android:layout_width="@dimen/px1000"
     android:layout_height="@dimen/px615">
     <androidx.appcompat.widget.AppCompatTextView
@@ -11,6 +11,7 @@
         android:textStyle="bold"
         android:textColor="@color/textColor"
         android:id="@+id/top_title"
+        android:focusable="false"
         android:paddingTop="@dimen/px20"
         android:paddingBottom="@dimen/px20"
         android:layout_width="wrap_content"
@@ -44,12 +45,14 @@
         app:layout_constraintTop_toTopOf="parent"/>
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
+        android:focusable="false"
         android:paddingBottom="@dimen/px35"
         android:nextFocusUp="@+id/button_more_info"
         android:clipToPadding="false"
-        android:descendantFocusability="beforeDescendants"
+        android:descendantFocusability="afterDescendants"
         android:layout_width="@dimen/px1000"
-        android:layout_height="@dimen/px600"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/top_title"/>

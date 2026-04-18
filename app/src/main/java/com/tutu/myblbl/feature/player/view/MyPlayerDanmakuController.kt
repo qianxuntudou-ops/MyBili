@@ -247,6 +247,7 @@ class MyPlayerDanmakuController(
                 preparedDanmakuCount = preparedData.size
                 val existingPlayer = danmakuPlayer
                 if (existingPlayer != null) {
+                    existingPlayer.clearData()
                     existingPlayer.updateData(danmakuData)
                     if (danmakuPositionMs > 0L) {
                         seekPlayerTo(

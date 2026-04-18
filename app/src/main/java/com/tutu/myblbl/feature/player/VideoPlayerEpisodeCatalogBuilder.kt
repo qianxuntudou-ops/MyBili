@@ -22,19 +22,8 @@ class VideoPlayerEpisodeCatalogBuilder(
     ): List<VideoPlayerViewModel.PlayableEpisode> {
         val view = detail.view ?: return emptyList()
 
-        val pages = view.pages.orEmpty().ifEmpty {
-            runCatching { apiService.getVideoPv(view.aid, view.bvid) }
-                .getOrNull()
-                ?.data
-                .orEmpty()
-        }
-
-        if (pages.isNotEmpty()) {
-            return pages.mapIndexed { index, page ->
-                page.toPlayableEpisode(index, view)
-            }
-        }
-
+        // Check ugcSeason (合集) FIRST: if the video belongs to a collection,
+        // show all videos in the collection rather than just the current video's pages.
         val ugcEpisodes = view.ugcSeason?.sections
             .orEmpty()
             .flatMap { it.episodes.orEmpty() }
@@ -47,6 +36,14 @@ class VideoPlayerEpisodeCatalogBuilder(
 
         if (ugcEpisodes.isNotEmpty()) {
             return ugcEpisodes
+        }
+
+        // Fallback: show individual pages (分P) of the current video
+        val pages = view.pages.orEmpty().ifEmpty {
+            runCatching { apiService.getVideoPv(view.aid, view.bvid) }
+                .getOrNull()
+                ?.data
+                .orEmpty()
         }
 
         return pages.mapIndexed { index, page ->

@@ -275,6 +275,10 @@ class DanmakuPlayer(renderer: DanmakuRenderer, dataSource: DataSource? = null) {
     engine.updateTimerFactor(speed)
   }
 
+  fun clearData() {
+    dataSystem?.clearAllData()
+  }
+
   fun updateData(dataList: List<DanmakuItemData>): List<DanmakuItem> {
     val items = dataList.map { obtainItem(it) }
     dataSystem?.addItems(items)
