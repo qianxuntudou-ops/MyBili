@@ -106,6 +106,9 @@ interface ApiService {
     @GET("x/space/wbi/acc/info")
     suspend fun getUserSpace(@QueryMap params: Map<String, String>): BaseResponse<UserSpaceInfo>
 
+    @GET("x/space/acc/info")
+    suspend fun getUserSpaceNoWbi(@Query("mid") mid: Long): BaseResponse<UserSpaceInfo>
+
     @GET("x/web-interface/index/top/feed/rcmd")
     suspend fun getRecommendList(
         @Query("fresh_idx") freshIdx: Int,

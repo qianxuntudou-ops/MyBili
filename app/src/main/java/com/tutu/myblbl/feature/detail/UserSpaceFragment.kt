@@ -220,7 +220,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
                             loadRelationState()
                         }
                     }
-                } else {
+                } else if (response.code != -101) {
                     Toast.makeText(requireContext(), response.errorMessage, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {

@@ -23,6 +23,8 @@ interface NetworkSessionGateway {
 
     fun handleAuthFailureCode(code: Int, source: String)
 
+    suspend fun prewarmWebSession(forceUaRefresh: Boolean = false): Boolean
+
     fun syncUserSession(
         response: BaseResponse<UserDetailInfoModel>,
         source: String
@@ -63,6 +65,10 @@ class NetworkManagerSessionGateway : NetworkSessionGateway {
 
     override fun handleAuthFailureCode(code: Int, source: String) {
         NetworkManager.handleAuthFailureCode(code, source)
+    }
+
+    override suspend fun prewarmWebSession(forceUaRefresh: Boolean): Boolean {
+        return NetworkManager.prewarmWebSession(forceUaRefresh)
     }
 
     override fun syncUserSession(

@@ -70,8 +70,13 @@ class NetworkSessionStore(
             return userInfo
         }
         if (isAuthInvalid(response.code)) {
+            val wasLoggedIn = userInfo != null
             clearUserSession()
-            onAuthInvalid?.invoke()
+            // Extract WBI keys from -101 response if available (nav returns wbi_img even for unauthenticated users)
+            extractWbiKeysFromData(response.data)
+            if (wasLoggedIn) {
+                onAuthInvalid?.invoke()
+            }
         }
         return null
     }
@@ -81,8 +86,11 @@ class NetworkSessionStore(
         onAuthInvalid: (() -> Unit)? = null
     ) {
         if (isAuthInvalid(code)) {
+            val wasLoggedIn = userInfo != null
             clearUserSession()
-            onAuthInvalid?.invoke()
+            if (wasLoggedIn) {
+                onAuthInvalid?.invoke()
+            }
         }
     }
 
@@ -118,5 +126,15 @@ class NetworkSessionStore(
 
     private fun isAuthInvalid(code: Int): Boolean {
         return code == authInvalidCode
+    }
+
+    private fun extractWbiKeysFromData(data: UserDetailInfoModel?) {
+        data?.wbiImg?.let { wbiImg ->
+            val imgKey = WbiGenerator.extractKeyFromUrl(wbiImg.imgUrl)
+            val subKey = WbiGenerator.extractKeyFromUrl(wbiImg.subUrl)
+            if (imgKey.isNotBlank() && subKey.isNotBlank()) {
+                setWbiInfo(imgKey, subKey)
+            }
+        }
     }
 }

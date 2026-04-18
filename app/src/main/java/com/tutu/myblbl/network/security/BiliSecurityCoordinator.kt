@@ -188,7 +188,25 @@ class BiliSecurityCoordinator(
 
     suspend fun ensureWbiKeys() {
         wbiKeysMutex.withLock {
+            ensureWebFingerprintCookies()
             ensureBiliTicket()
+            ensureWbiKeysFromNav()
+        }
+    }
+
+    private suspend fun ensureWbiKeysFromNav() {
+        runCatching {
+            val navResponse = apiService.getUserDetailInfo()
+            if (navResponse.data != null) {
+                val imgKey = navResponse.data.wbiImg?.imgUrl?.let(WbiGenerator::extractKeyFromUrl).orEmpty()
+                val subKey = navResponse.data.wbiImg?.subUrl?.let(WbiGenerator::extractKeyFromUrl).orEmpty()
+                if (imgKey.isNotBlank() && subKey.isNotBlank()) {
+                    updateWbiKeys(imgKey, subKey)
+                    AppLog.d(tag, "ensureWbiKeysFromNav: got keys img=${imgKey.take(8)}.. sub=${subKey.take(8)}..")
+                }
+            }
+        }.onFailure {
+            AppLog.w(tag, "ensureWbiKeysFromNav failed: ${it.message}")
         }
     }
 
@@ -286,7 +304,6 @@ class BiliSecurityCoordinator(
                     val subKey = WbiGenerator.extractKeyFromUrl(nav.optString("sub", ""))
                     if (imgKey.isNotBlank() && subKey.isNotBlank()) {
                         updateWbiKeys(imgKey, subKey)
-                        AppLog.d(tag, "ensureBiliTicket: updated WBI keys from GenWebTicket response")
                     }
                 }
             }.onFailure {

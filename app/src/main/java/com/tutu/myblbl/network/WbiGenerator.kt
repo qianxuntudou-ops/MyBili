@@ -1,18 +1,16 @@
 package com.tutu.myblbl.network
 
-import java.net.URLEncoder
 import java.security.MessageDigest
-import java.util.TreeMap
 
 object WbiGenerator {
-    
+
     private val mixinKeyEncTab = intArrayOf(
         46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
         27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13,
         37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4,
         22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52
     )
-    
+
     fun generateWbiParams(
         params: Map<String, String>,
         imgKey: String,
@@ -25,27 +23,21 @@ object WbiGenerator {
         val mixinKey = getMixinKey(imgKey + subKey)
         val wts = System.currentTimeMillis() / 1000
 
-        val cleanParams = params.filterKeys { it.isNotBlank() }
-        val sortedParams = TreeMap(cleanParams)
-        sortedParams["wts"] = wts.toString()
+        val withWts = params.toMutableMap()
+        withWts["wts"] = wts.toString()
 
-        val filteredParams = mutableMapOf<String, String>()
-        sortedParams.forEach { (key, value) ->
-            if (key.isNotBlank()) {
-                val filteredValue = filterSpecialChars(value)
-                filteredParams[key] = filteredValue
-            }
-        }
+        val sorted = withWts.entries.sortedBy { it.key }
+            .associate { it.key to filterValue(it.value) }
+        val query = sorted.entries
+            .joinToString("&") { (k, v) -> "${percentEncodeUtf8(k)}=${percentEncodeUtf8(v)}" }
+        val wRid = md5(query + mixinKey)
 
-        val query = filteredParams.entries
-            .sortedBy { it.key }
-            .joinToString("&") { (key, value) ->
-                "${URLEncoder.encode(key, "UTF-8").replace("+", "%20")}=${URLEncoder.encode(value, "UTF-8").replace("+", "%20")}"
-            }
-
-        return filteredParams + ("w_rid" to md5(query + mixinKey))
+        val result = params.toMutableMap()
+        result["wts"] = wts.toString()
+        result["w_rid"] = wRid
+        return result
     }
-    
+
     private fun getMixinKey(originKey: String): String {
         val sb = StringBuilder()
         for (i in mixinKeyEncTab.indices) {
@@ -56,18 +48,43 @@ object WbiGenerator {
         }
         return sb.toString().take(32)
     }
-    
-    private fun filterSpecialChars(str: String): String {
-        val specialChars = setOf('!', '\'', '(', ')', '*')
-        return str.filter { char -> char !in specialChars }
+
+    private fun filterValue(v: String): String = v.filterNot { it in "!\'()*" }
+
+    private fun percentEncodeUtf8(s: String): String {
+        val bytes = s.toByteArray(Charsets.UTF_8)
+        val sb = StringBuilder(bytes.size * 3)
+        for (b in bytes) {
+            val c = b.toInt() and 0xFF
+            val isUnreserved = c in 'a'.code..'z'.code ||
+                c in 'A'.code..'Z'.code ||
+                c in '0'.code..'9'.code ||
+                c == '-'.code || c == '_'.code || c == '.'.code || c == '~'.code
+            if (isUnreserved) {
+                sb.append(c.toChar())
+            } else {
+                sb.append('%')
+                sb.append("0123456789ABCDEF"[c ushr 4])
+                sb.append("0123456789ABCDEF"[c and 0x0F])
+            }
+        }
+        return sb.toString()
     }
-    
+
     private fun md5(input: String): String {
         val md = MessageDigest.getInstance("MD5")
         val digest = md.digest(input.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
     }
-    
+
+    // dm_* anti-bot params from browser capture
+    fun getSpaceDmParams(): Map<String, String> = mapOf(
+        "dm_img_list" to "[]",
+        "dm_img_str" to "V2ViR0wgMS4wIChPcGVuR0wgRVMgMi4wIENocm9taXVtKQ",
+        "dm_cover_img_str" to "QU5HTEUgKEludGVsLCBJbnRlbChSKSBJcmlzKFIpIFhlIEdyYXBoaWNzICgweDAwMDA0NkE2KSBEaXJlY3QzRDExIHZzXzVfMCBwc181XzAsIEQzRDExKUdvb2dsZSBJbmMuIChJbnRlbC",
+        "dm_img_inter" to "{\"ds\":[],\"wh\":[5032,6004,10],\"of\":[425,850,425]}"
+    )
+
     fun extractKeyFromUrl(url: String): String {
         val wbiIndex = url.indexOf("wbi/")
         if (wbiIndex == -1) return ""

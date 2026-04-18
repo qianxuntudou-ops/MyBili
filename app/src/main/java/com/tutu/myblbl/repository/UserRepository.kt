@@ -15,6 +15,8 @@ import com.tutu.myblbl.network.WbiGenerator
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.BaseBaseResponse
+import com.tutu.myblbl.core.common.log.AppLog
+import kotlinx.coroutines.delay
 
 class UserRepository(
     private val apiService: ApiService,
@@ -38,14 +40,23 @@ class UserRepository(
     }
     
     suspend fun getUserSpace(mid: Long): BaseResponse<UserSpaceInfo> {
-        ensureWbiKeysIfNeeded()
-        val params = mapOf("mid" to mid.toString())
-        val wbiKeys = sessionGateway.getWbiKeys()
-        val signedParams = WbiGenerator.generateWbiParams(params, wbiKeys.first, wbiKeys.second)
-        return sessionGateway.syncAuthState(
-            apiService.getUserSpace(signedParams),
-            source = "getUserSpace"
+        if (!isLoggedIn()) {
+            return apiService.getUserSpaceNoWbi(mid)
+        }
+        val params = mutableMapOf(
+            "mid" to mid.toString(),
+            "token" to "",
+            "platform" to "web",
+            "web_location" to "1550101"
         )
+        params.putAll(WbiGenerator.getSpaceDmParams())
+        val response = doWbiRequest(params, "getUserSpace") { signedParams ->
+            sessionGateway.syncAuthState(
+                apiService.getUserSpace(signedParams),
+                source = "getUserSpace"
+            )
+        }
+        return response
     }
     
     fun isLoggedIn(): Boolean {
@@ -124,18 +135,27 @@ class UserRepository(
         pageSize: Int = 20
     ): Result<BaseResponse<UserDynamicResponse>> =
         runCatching {
-            ensureWbiKeysIfNeeded()
-            val params = mapOf(
-                "mid" to mid.toString(),
-                "pn" to page.toString(),
-                "ps" to pageSize.toString()
-            )
-            val wbiKeys = sessionGateway.getWbiKeys()
-            val signedParams = WbiGenerator.generateWbiParams(params, wbiKeys.first, wbiKeys.second)
-            sessionGateway.syncAuthState(
-                apiService.getUserArcSearch(signedParams),
-                source = "getUserDynamic"
-            )
+            if (isLoggedIn()) {
+                val params = mutableMapOf(
+                    "mid" to mid.toString(),
+                    "pn" to page.toString(),
+                    "ps" to pageSize.toString(),
+                    "order" to "pubdate",
+                    "platform" to "web",
+                    "web_location" to "333.1387",
+                    "order_avoided" to "true",
+                    "index" to "1"
+                )
+                params.putAll(WbiGenerator.getSpaceDmParams())
+                doWbiRequest(params, "getUserDynamic") { signedParams ->
+                    sessionGateway.syncAuthState(
+                        apiService.getUserArcSearch(signedParams),
+                        source = "getUserDynamic"
+                    )
+                }
+            } else {
+                apiService.getUserDynamic(mid, page, pageSize)
+            }
         }
 
     suspend fun getAllDynamic(
@@ -169,6 +189,27 @@ class UserRepository(
                 ?: refreshCurrentUserInfo().getOrThrow().mid.takeIf { it > 0L }
                 ?: throw IllegalStateException("未获取到当前用户信息")
         }
+
+    private suspend fun <T> doWbiRequest(
+        params: Map<String, String>,
+        source: String,
+        block: suspend (Map<String, String>) -> BaseResponse<T>
+    ): BaseResponse<T> {
+        ensureWbiKeysIfNeeded()
+        val wbiKeys = sessionGateway.getWbiKeys()
+        val signedParams = WbiGenerator.generateWbiParams(params, wbiKeys.first, wbiKeys.second)
+        val response = block(signedParams)
+        if (response.code == -352) {
+            AppLog.w("UserRepository", "$source hit -352 risk control, retrying with prewarm")
+            delay(1500L)
+            sessionGateway.prewarmWebSession(forceUaRefresh = true)
+            ensureWbiKeysIfNeeded()
+            val newKeys = sessionGateway.getWbiKeys()
+            val retryParams = WbiGenerator.generateWbiParams(params, newKeys.first, newKeys.second)
+            return block(retryParams)
+        }
+        return response
+    }
 
     private suspend fun ensureWbiKeysIfNeeded() {
         val keys = sessionGateway.getWbiKeys()
