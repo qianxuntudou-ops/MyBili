@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +20,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.BuildConfig
 import com.tutu.myblbl.R
 import com.tutu.myblbl.core.common.media.VideoCodecSupport
+import com.tutu.myblbl.core.common.update.ApkUpdater
 import com.tutu.myblbl.databinding.FragmentSettingsBinding
 import com.tutu.myblbl.model.SettingModel
 import com.tutu.myblbl.ui.adapter.SettingAdapter
@@ -34,6 +36,13 @@ import com.tutu.myblbl.feature.player.cache.PlayerMediaCache
 import com.tutu.myblbl.core.common.ext.normalizeDanmakuSmartFilterValue
 import com.tutu.myblbl.network.cookie.CookieManager
 import com.tutu.myblbl.ui.activity.GaiaVgateActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import java.util.Locale
 
@@ -45,6 +54,15 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         const val CATEGORY_PLAY = 1
         const val CATEGORY_DM = 2
         const val CATEGORY_DEVICE = 3
+
+        private const val DEVICE_POSITION_VERSION = 0
+        private const val DEVICE_POSITION_CHECK_UPDATE = 1
+        private const val DEVICE_POSITION_DEVICE_MODEL = 2
+        private const val DEVICE_POSITION_SYSTEM_VERSION = 3
+        private const val DEVICE_POSITION_SDK_VERSION = 4
+        private const val DEVICE_POSITION_CPU_ABI = 5
+        private const val DEVICE_POSITION_SCREEN = 6
+        private const val DEVICE_POSITION_CODEC = 7
 
         private const val KEY_CACHE_LIMIT = "cache_limit"
         private const val KEY_DEFAULT_START_PAGE = "default_start_page"
@@ -96,6 +114,18 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
     private val deviceSettings = mutableListOf<SettingModel>()
     private val appSettings: AppSettingsDataStore by inject()
     private val cookieManager: CookieManager by inject()
+
+    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val updateCheckState = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
+    private var downloadJob: Job? = null
+
+    private sealed interface UpdateCheckState {
+        data object Idle : UpdateCheckState
+        data object Checking : UpdateCheckState
+        data class Latest(val latestVersion: String) : UpdateCheckState
+        data class UpdateAvailable(val latestVersion: String) : UpdateCheckState
+        data class Error(val message: String) : UpdateCheckState
+    }
 
     private lateinit var adapter: SettingAdapter
     private var currentCategory = -1
@@ -182,6 +212,8 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             SettingModel(getString(R.string.dm_merge_duplicate), "开")
         )
 
+        deviceSettings.add(SettingModel("应用版本", BuildConfig.VERSION_NAME))
+        deviceSettings.add(SettingModel("检查更新", "点击检查"))
         deviceSettings.add(SettingModel("设备型号", Build.MODEL))
         deviceSettings.add(SettingModel("系统版本", "Android ${Build.VERSION.RELEASE}"))
         deviceSettings.add(SettingModel("SDK版本", Build.VERSION.SDK_INT.toString()))
@@ -264,6 +296,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             CATEGORY_COMMON -> handleCommonSettingClick(position, item)
             CATEGORY_PLAY -> handlePlayerSettingClick(position, item)
             CATEGORY_DM -> handleDmSettingClick(position, item)
+            CATEGORY_DEVICE -> handleDeviceSettingClick(position)
         }
     }
 
@@ -329,6 +362,255 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
                 appSettings.putStringAsync(KEY_DM_MERGE_DUPLICATE, value)
             }
         }
+    }
+
+    private fun handleDeviceSettingClick(position: Int) {
+        when (position) {
+            DEVICE_POSITION_CHECK_UPDATE -> checkForUpdate()
+        }
+    }
+
+    private var cachedReleaseInfo: ApkUpdater.ReleaseInfo? = null
+
+    private fun checkForUpdate() {
+        val cooldown = ApkUpdater.cooldownLeftMs()
+        if (cooldown > 0) {
+            Toast.makeText(requireContext(), "请稍后再试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        ApkUpdater.markStarted()
+        updateCheckState.value = UpdateCheckState.Checking
+        updateUpdateEntry()
+
+        updateScope.launch {
+            try {
+                val releaseInfo = ApkUpdater.fetchLatestRelease()
+                cachedReleaseInfo = releaseInfo
+                if (ApkUpdater.isRemoteNewer(releaseInfo.versionName)) {
+                    updateCheckState.value = UpdateCheckState.UpdateAvailable(releaseInfo.versionName)
+                    updateUpdateEntry()
+                    showUpdateConfirmDialog(releaseInfo)
+                } else {
+                    updateCheckState.value = UpdateCheckState.Latest(releaseInfo.versionName)
+                    updateUpdateEntry()
+                }
+            } catch (e: Exception) {
+                AppLog.e("SettingsFragment", "check update failed", e)
+                updateCheckState.value = UpdateCheckState.Error(e.message ?: "未知错误")
+                updateUpdateEntry()
+            }
+        }
+    }
+
+    private fun updateUpdateEntry() {
+        if (!isAdded) return
+        val info = when (val state = updateCheckState.value) {
+            is UpdateCheckState.Idle -> "点击检查"
+            is UpdateCheckState.Checking -> "检查中…"
+            is UpdateCheckState.Latest -> "已是最新版（${state.latestVersion}）"
+            is UpdateCheckState.UpdateAvailable -> "新版本 ${state.latestVersion}"
+            is UpdateCheckState.Error -> "检查失败"
+        }
+        deviceSettings.getOrNull(DEVICE_POSITION_CHECK_UPDATE)?.info = info
+        if (currentCategory == CATEGORY_DEVICE) {
+            adapter.notifyItemChanged(DEVICE_POSITION_CHECK_UPDATE)
+        }
+    }
+
+    private fun showUpdateConfirmDialog(releaseInfo: ApkUpdater.ReleaseInfo) {
+        val px40 = resources.getDimensionPixelSize(R.dimen.px40)
+        val px35 = resources.getDimensionPixelSize(R.dimen.px35)
+        val px20 = resources.getDimensionPixelSize(R.dimen.px20)
+        val px18 = resources.getDimensionPixelSize(R.dimen.px18)
+        val px16 = resources.getDimensionPixelSize(R.dimen.px16)
+        val px14 = resources.getDimensionPixelSize(R.dimen.px14)
+        val px10 = resources.getDimensionPixelSize(R.dimen.px10)
+        val textColor = resources.getColor(R.color.textColor, null)
+
+        val dialog = AppCompatDialog(requireContext(), R.style.DialogTheme)
+        dialog.setCanceledOnTouchOutside(true)
+
+        val root = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.dialog_background)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { dialog.dismiss() }
+        }
+
+        root.addView(TextView(requireContext()).apply {
+            text = "发现新版本"
+            setTextColor(textColor)
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px40, px35, px40, px20)
+            layoutParams = lp
+        })
+
+        root.addView(View(requireContext()).apply {
+            setBackgroundColor(0x1FFFFFFF)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, resources.getDimensionPixelSize(R.dimen.px2))
+            lp.setMargins(px18, 0, px18, 0)
+            layoutParams = lp
+        })
+
+        root.addView(TextView(requireContext()).apply {
+            val notes = if (releaseInfo.releaseNotes.isNotBlank()) {
+                "\n\n更新内容：\n${releaseInfo.releaseNotes.take(300)}"
+            } else ""
+            text = "当前版本：${BuildConfig.VERSION_NAME}\n最新版本：${releaseInfo.versionName}$notes\n\n是否立即下载更新？"
+            setTextColor(textColor)
+            textSize = 12f
+            setLineSpacing(resources.getDimension(R.dimen.px6), 1f)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px40, px20, px40, 0)
+            layoutParams = lp
+        })
+
+        val actionContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.END
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px18, px20, px18, px18)
+            layoutParams = lp
+        }
+
+        listOf("取消" to { dialog.dismiss() }, "下载更新" to {
+            dialog.dismiss()
+            val apkUrl = cachedReleaseInfo?.apkUrl
+            if (apkUrl != null) startDownloadApk(apkUrl)
+        }).forEach { (text, action) ->
+            actionContainer.addView(TextView(requireContext()).apply {
+                this.text = text
+                setTextColor(textColor)
+                textSize = 12f
+                setPadding(px16, px14, px16, px14)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { action() }
+                setBackgroundResource(R.drawable.bg_dialog_button)
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(px10, 0, px10, 0)
+            })
+        }
+
+        root.addView(actionContainer)
+        dialog.setContentView(root)
+        dialog.show()
+    }
+
+    private fun startDownloadApk(apkUrl: String) {
+        val px40 = resources.getDimensionPixelSize(R.dimen.px40)
+        val px35 = resources.getDimensionPixelSize(R.dimen.px35)
+        val px20 = resources.getDimensionPixelSize(R.dimen.px20)
+        val px18 = resources.getDimensionPixelSize(R.dimen.px18)
+        val px14 = resources.getDimensionPixelSize(R.dimen.px14)
+        val textColor = resources.getColor(R.color.textColor, null)
+
+        val dialog = AppCompatDialog(requireContext(), R.style.DialogTheme)
+        dialog.setCancelable(false)
+        dialog.setCanceledOnTouchOutside(false)
+
+        val root = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.dialog_background)
+        }
+
+        val titleView = TextView(requireContext()).apply {
+            text = "正在下载更新"
+            setTextColor(textColor)
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px40, px35, px40, px20)
+            layoutParams = lp
+        }
+        root.addView(titleView)
+
+        root.addView(View(requireContext()).apply {
+            setBackgroundColor(0x1FFFFFFF)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, resources.getDimensionPixelSize(R.dimen.px2))
+            lp.setMargins(px18, 0, px18, 0)
+            layoutParams = lp
+        })
+
+        val progressBar = ProgressBar(requireContext(), null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = 0
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, resources.getDimensionPixelSize(R.dimen.px20))
+            lp.setMargins(px40, px20, px40, 0)
+            layoutParams = lp
+        }
+        root.addView(progressBar)
+
+        val progressText = TextView(requireContext()).apply {
+            text = "连接中…"
+            setTextColor(textColor)
+            textSize = 11f
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px40, px14, px40, 0)
+            layoutParams = lp
+        }
+        root.addView(progressText)
+
+        val cancelButton = TextView(requireContext()).apply {
+            text = "取消"
+            setTextColor(textColor)
+            textSize = 12f
+            setPadding(resources.getDimensionPixelSize(R.dimen.px16), px14, resources.getDimensionPixelSize(R.dimen.px16), px14)
+            isClickable = true
+            isFocusable = true
+            setBackgroundResource(R.drawable.bg_dialog_button)
+            setOnClickListener {
+                downloadJob?.cancel()
+                dialog.dismiss()
+                updateCheckState.value = UpdateCheckState.Idle
+                updateUpdateEntry()
+            }
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px18, px20, px18, px18)
+            lp.gravity = android.view.Gravity.END
+            layoutParams = lp
+        }
+        root.addView(cancelButton)
+
+        dialog.setContentView(root)
+        dialog.show()
+
+        downloadJob = updateScope.launch {
+            try {
+                val apkFile = ApkUpdater.downloadApkToCache(requireContext(), apkUrl) { progress ->
+                    when (progress) {
+                        is ApkUpdater.Progress.Connecting -> {
+                            progressText.text = "连接中…"
+                            progressBar.isIndeterminate = true
+                        }
+                        is ApkUpdater.Progress.Downloading -> {
+                            progressBar.isIndeterminate = false
+                            progress.percent?.let { progressBar.progress = it }
+                            progressText.text = progress.hint
+                        }
+                        is ApkUpdater.Progress.Done -> {}
+                    }
+                }
+                dialog.dismiss()
+                ApkUpdater.installApk(requireContext(), apkFile)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) return@launch
+                dialog.dismiss()
+                AppLog.e("SettingsFragment", "download apk failed", e)
+                Toast.makeText(requireContext(), "下载失败：${e.message}", Toast.LENGTH_LONG).show()
+                updateCheckState.value = UpdateCheckState.Idle
+                updateUpdateEntry()
+            }
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        downloadJob?.cancel()
+        updateScope.cancel()
     }
 
     private fun clearCache() {
