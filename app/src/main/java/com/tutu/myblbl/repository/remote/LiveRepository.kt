@@ -312,8 +312,4 @@ class LiveRepository(
         val index: Int
     )
 
-    private fun buildWbiParams(params: Map<String, String>): Map<String, String> {
-        val (imgKey, subKey) = sessionGateway.getWbiKeys()
-        return com.tutu.myblbl.network.WbiGenerator.generateWbiParams(params, imgKey, subKey)
-    }
 }

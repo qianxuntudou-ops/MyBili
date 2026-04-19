@@ -72,7 +72,4 @@ class RecommendViewModel(
         }
     }
 
-    fun refresh(pageSize: Int) {
-        loadRecommendList(1, pageSize)
-    }
 }

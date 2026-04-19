@@ -1,12 +1,9 @@
 package com.tutu.myblbl.network.http
 
 import okhttp3.Call
-import okhttp3.Connection
 import okhttp3.EventListener
 import okhttp3.Handshake
-import okhttp3.HttpUrl
 import okhttp3.Protocol
-import okhttp3.Request
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -31,37 +28,7 @@ class DebugNetworkEventListener : EventListener() {
         var errorMessage: String? = null
     )
 
-    companion object {
-        private val HOST_CATEGORIES = mapOf(
-            "api.bilibili.com" to "api",
-            "app.bilibili.com" to "api",
-            "grpc.bilibili.com" to "api",
-            "passport.bilibili.com" to "api",
-            "api.vc.bilibili.com" to "api"
-        )
-
-        private fun categorizeHost(host: String): String {
-            return HOST_CATEGORIES[host]
-                ?: when {
-                    host.contains("bilivideo") -> "media"
-                    host.contains("akamaized") -> "media"
-                    host.contains("mcdn") -> "media"
-                    host.contains("vod") -> "media"
-                    else -> "other"
-                }
-        }
-    }
-
     private val traces = ConcurrentHashMap<Call, TraceState>()
-
-    private fun urlOf(call: Call): HttpUrl = call.request().url
-
-    private fun hostOf(call: Call): String = urlOf(call).host
-
-    private fun pathOf(call: Call): String {
-        val url = urlOf(call)
-        return "${url.encodedPath}${url.encodedQuery?.let { "?$it" }.orEmpty()}"
-    }
 
     override fun callStart(call: Call) {
         traces[call] = TraceState(callStartMs = System.currentTimeMillis())

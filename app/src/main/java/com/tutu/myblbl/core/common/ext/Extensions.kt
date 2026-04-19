@@ -11,7 +11,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
-import com.tutu.myblbl.MyBLBLApplication
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import org.koin.mp.KoinPlatform
 import java.io.Serializable
@@ -20,8 +19,6 @@ private const val VALUE_ON = "开"
 private const val VALUE_OFF = "关"
 private const val VALUE_FILTER_LEVEL_MIN = 1
 private const val VALUE_FILTER_LEVEL_MAX = 10
-private val DEFAULT_START_PAGE_OPTIONS = arrayOf("推荐", "热门", "番剧", "影视")
-
 private val appSettings: AppSettingsDataStore
     get() = KoinPlatform.getKoin().get()
 
@@ -37,26 +34,6 @@ fun Context.isOpenDetailFirstEnabled(): Boolean {
     return getToggleSetting("show_video_detail", false)
 }
 
-fun Context.getDefaultStartPageIndex(): Int {
-    val savedLabel = appSettings.getCachedString("default_start_page")
-    val resolvedIndex = DEFAULT_START_PAGE_OPTIONS.indexOf(savedLabel)
-        .takeIf { it >= 0 } ?: 0
-    appSettings.putIntAsync("defaultStartPage", resolvedIndex)
-    return resolvedIndex
-}
-
-fun Context.isAppFullscreenEnabled(): Boolean {
-    return getToggleSetting("fullscreen_app", true)
-}
-
-fun Context.shouldShowPlayerDebugInfo(): Boolean {
-    return getToggleSetting("show_debug", false)
-}
-
-fun Context.isSimpleOperationKeyEnabled(): Boolean {
-    return getToggleSetting("simple_key_press", false)
-}
-
 fun Context.getDanmakuSmartFilterLevel(): Int {
     val raw = appSettings.getCachedString("dm_filter_weight")?.trim() ?: return 0
     val parsed = raw.toIntOrNull()
@@ -70,10 +47,6 @@ fun Context.getDanmakuSmartFilterLevel(): Int {
         VALUE_ON -> 1
         else -> 0
     }
-}
-
-fun Context.isDanmakuSmartFilterEnabled(): Boolean {
-    return getDanmakuSmartFilterLevel() > 0
 }
 
 fun normalizeDanmakuSmartFilterValue(value: String?): String {

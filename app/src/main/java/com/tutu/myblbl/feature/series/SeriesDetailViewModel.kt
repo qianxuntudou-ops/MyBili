@@ -120,9 +120,6 @@ class SeriesDetailViewModel(
         }
     }
 
-    fun playEpisode(@Suppress("UNUSED_PARAMETER") epId: Long, @Suppress("UNUSED_PARAMETER") cid: Long) {
-    }
-
     fun updateEpisodeProgress(epId: Long, timeMs: Long, epIndex: String) {
         val detail = _seriesDetail.value ?: return
         val userStatus = detail.userStatus ?: return

@@ -20,8 +20,4 @@ class AuthRepository(
         runCatching {
             apiService.checkSignInResult(qrcodeKey)
         }
-
-    fun getCsrfToken(): String = sessionGateway.getCsrfToken()
-
-    fun isLoggedIn(): Boolean = sessionGateway.isLoggedIn()
 }

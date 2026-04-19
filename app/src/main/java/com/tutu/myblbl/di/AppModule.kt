@@ -42,7 +42,6 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
-@OptIn(UnstableApi::class)
 val networkModule = module {
     single<ApiService> { NetworkManager.apiService }
     single<OkHttpClient> { NetworkManager.getOkHttpClient() }
@@ -53,17 +52,15 @@ val networkModule = module {
     factory(named("noCookie")) { NetworkManager.noCookieApiService }
 }
 
-@OptIn(UnstableApi::class)
 val repositoryModule = module {
     single { com.tutu.myblbl.repository.remote.AllSeriesRepository(get()) }
     single { com.tutu.myblbl.repository.remote.AuthRepository(get(), get()) }
     single { com.tutu.myblbl.repository.remote.FavoriteRepository(get(), get()) }
-    single { com.tutu.myblbl.repository.remote.HomeLaneRepository(get(), get(), get(), get()) }
+    single { com.tutu.myblbl.repository.remote.HomeLaneRepository(get(), get(), get()) }
     single { com.tutu.myblbl.repository.remote.LiveRepository(get(), get()) }
     single { com.tutu.myblbl.repository.remote.SearchRepository(get(), get()) }
     single { com.tutu.myblbl.repository.remote.SeriesRepository(get(), get()) }
-    single { com.tutu.myblbl.repository.remote.UserRepository(get(), get()) }
-    single { com.tutu.myblbl.repository.remote.VideoRepository(get(), get(), get(), get()) }
+    single { com.tutu.myblbl.repository.remote.VideoRepository(get(), get(), get()) }
     single { AllSeriesRepository(get()) }
     single { AuthRepository(get()) }
     single { FavoriteRepository(get()) }

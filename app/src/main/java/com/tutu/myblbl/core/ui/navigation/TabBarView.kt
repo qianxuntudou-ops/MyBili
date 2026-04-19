@@ -21,9 +21,6 @@ class TabBarView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    companion object {
-    }
-
     private val buttonSearch: AppCompatImageView
     private val buttonHome: AppCompatImageView
     private val buttonCategory: AppCompatImageView

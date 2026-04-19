@@ -2,7 +2,6 @@ package com.tutu.myblbl.ui.activity
 
 import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -36,7 +35,6 @@ import com.tutu.myblbl.core.ui.base.BaseActivity
 import com.tutu.myblbl.core.ui.system.ViewUtils
 import com.tutu.myblbl.databinding.FragmentVideoPlayerBinding
 import com.tutu.myblbl.event.AppEventHub
-import com.tutu.myblbl.feature.player.CdnLatencyProfile
 import com.tutu.myblbl.feature.player.PlayerInstancePool
 import com.tutu.myblbl.feature.player.PlaybackUiCoordinator
 import com.tutu.myblbl.feature.player.UiEvent
@@ -142,6 +140,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         ) {
             start(
                 context = context,
+                aid = 0L,
                 bvid = bvid,
                 cid = cid,
                 epId = epId,

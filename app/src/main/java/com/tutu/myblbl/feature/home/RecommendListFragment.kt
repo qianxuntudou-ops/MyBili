@@ -165,7 +165,6 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.error.collectLatest { error ->
                     error?.let {
-                        AppLog.e(TAG, "error observer update: $it")
                         waitingForFirstLoad = false
                         isLoading = false
                         setRefreshing(false)

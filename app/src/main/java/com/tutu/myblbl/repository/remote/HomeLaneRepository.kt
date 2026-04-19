@@ -3,7 +3,6 @@ package com.tutu.myblbl.repository.remote
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import com.google.gson.JsonParser
 import com.tutu.myblbl.model.lane.HomeLaneHeader
 import com.tutu.myblbl.model.lane.HomeLanePage
 import com.tutu.myblbl.model.lane.HomeLaneSection
@@ -18,14 +17,9 @@ import com.tutu.myblbl.model.series.timeline.TimeLineADayModel
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.core.common.log.AppLog
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 class HomeLaneRepository(
     private val apiService: ApiService,
-    private val okHttpClient: OkHttpClient,
     private val seriesRepository: SeriesRepository,
     private val userRepository: UserRepository
 ) {
@@ -34,8 +28,6 @@ class HomeLaneRepository(
         private const val TAG = "HomeLaneRepository"
         const val TYPE_ANIMATION = 1
         const val TYPE_CINEMA = 2
-        private const val INITIAL_STATE_MARKER = "window.__INITIAL_STATE__="
-        private const val WEB_REFERER = "https://www.bilibili.com/"
         private const val FOLLOW_SECTION_PAGE_SIZE = 12
     }
 
@@ -239,18 +231,6 @@ class HomeLaneRepository(
         )
     }
 
-    private fun List<HomeLaneSection>.insertTimelineSection(section: HomeLaneSection): List<HomeLaneSection> {
-        if (isEmpty()) {
-            return this
-        }
-        val originalSections = this
-        return buildList(originalSections.size + 1) {
-            add(originalSections.first())
-            add(section)
-            addAll(originalSections.drop(1))
-        }
-    }
-
     private fun parseMoreSeasonType(url: String): Int? {
         if (!url.contains("index_type")) {
             return null
@@ -272,168 +252,6 @@ class HomeLaneRepository(
             }
         }
         return indexType
-    }
-
-    private suspend fun parseAnimeHomePage(): List<HomeLaneSection> {
-        val state = fetchInitialState("https://www.bilibili.com/anime/")
-        val modules = state.getAsJsonObject("modules")
-        val sections = mutableListOf<HomeLaneSection>()
-        var timelineSection: HomeLaneSection? = null
-        modules.arrayOrNull("ext")?.forEach { moduleElement ->
-            val module = moduleElement.asJsonObject
-            val style = module.string("style")
-            when (style) {
-                "web_timeline_v3" -> {
-                    val timelineDays = parseTimelineDays(module.arrayOrNull("items"))
-                    if (timelineDays.isNotEmpty()) {
-                        timelineSection = HomeLaneSection(
-                            title = "",
-                            headers = parseHeaders(module.arrayOrNull("headers")),
-                            timelineDays = timelineDays,
-                            style = style
-                        )
-                    }
-                }
-
-                "web_rank_v3",
-                "web_hot_v3" -> {
-                    val items = parseSeriesCards(module.arrayOrNull("items"))
-                    val headers = parseHeaders(module.arrayOrNull("headers"))
-                    val headerMoreUrl = headers.lastOrNull()?.url.orEmpty()
-                    if (items.isNotEmpty()) {
-                        sections += HomeLaneSection(
-                            title = module.string("title"),
-                            headers = headers,
-                            items = items.take(18),
-                            moreSeasonType = parseMoreSeasonType(headerMoreUrl)
-                                ?: SeriesType.ANIME,
-                            moreUrl = headerMoreUrl,
-                            style = style
-                        )
-                    }
-                }
-
-                "web_feed_v3" -> {
-                    val items = parseFeedSeriesCards(module.arrayOrNull("items"))
-                    if (items.isNotEmpty()) {
-                        sections += HomeLaneSection(
-                            title = module.string("title"),
-                            items = items.take(12),
-                            moreSeasonType = SeriesType.ANIME,
-                            style = style
-                        )
-                    }
-                }
-
-                else -> {
-                    val items = parseSeriesCards(module.arrayOrNull("items"))
-                    val headers = parseHeaders(module.arrayOrNull("headers"))
-                    val headerMoreUrl = headers.lastOrNull()?.url.orEmpty()
-                    if (items.isNotEmpty()) {
-                        sections += HomeLaneSection(
-                            title = module.string("title"),
-                            headers = headers,
-                            items = items.take(18),
-                            moreSeasonType = parseMoreSeasonType(headerMoreUrl)
-                                ?: SeriesType.ANIME,
-                            moreUrl = headerMoreUrl,
-                            style = style
-                        )
-                    }
-                }
-            }
-        }
-        return timelineSection?.let { sections.insertTimelineSection(it) } ?: sections
-    }
-
-    private suspend fun parseCinemaHomePage(): List<HomeLaneSection> {
-        val state = fetchInitialState("https://www.bilibili.com/cinema/")
-        val sections = mutableListOf<HomeLaneSection>()
-
-        val featured = buildList {
-            addAll(parseCinemaCards(state.arrayOrNull("hotRecomList")))
-            addAll(parseCinemaCards(state.arrayOrNull("hotRecomRight")))
-        }.distinctBy { it.seasonId to it.oid }
-        if (featured.isNotEmpty()) {
-            sections += HomeLaneSection(
-                title = "热播推荐",
-                items = featured,
-                moreSeasonType = SeriesType.MOVIE
-            )
-        }
-
-        val carousel = parseCinemaCards(state.arrayOrNull("carouselList"))
-        if (carousel.isNotEmpty()) {
-            sections += HomeLaneSection(
-                title = "焦点推荐",
-                items = carousel,
-                moreSeasonType = SeriesType.MOVIE
-            )
-        }
-        return sections
-    }
-
-    private suspend fun fetchInitialState(url: String): JsonObject {
-        return withContext(Dispatchers.IO) {
-            val request = Request.Builder()
-                .url(url)
-                .header("Referer", WEB_REFERER)
-                .header(
-                    "Accept",
-                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-                )
-                .build()
-            val response = okHttpClient.newCall(request).execute()
-            response.use { call ->
-                if (!call.isSuccessful) {
-                    throw IllegalStateException("Failed to load page: $url")
-                }
-                val html = call.body?.string().orEmpty()
-                JsonParser.parseString(extractInitialStateJson(html, url)).asJsonObject
-            }
-        }
-    }
-
-    private fun extractInitialStateJson(html: String, url: String): String {
-        val markerIndex = html.indexOf(INITIAL_STATE_MARKER)
-        if (markerIndex < 0) {
-            throw IllegalStateException("Missing initial state: $url")
-        }
-
-        val jsonStart = html.indexOf('{', markerIndex + INITIAL_STATE_MARKER.length)
-        if (jsonStart < 0) {
-            throw IllegalStateException("Invalid initial state: $url")
-        }
-
-        var depth = 0
-        var inString = false
-        var escaped = false
-        for (index in jsonStart until html.length) {
-            val ch = html[index]
-            if (inString) {
-                if (escaped) {
-                    escaped = false
-                } else if (ch == '\\') {
-                    escaped = true
-                } else if (ch == '"') {
-                    inString = false
-                }
-                continue
-            }
-
-            when (ch) {
-                '"' -> inString = true
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) {
-                        return html.substring(jsonStart, index + 1)
-                    }
-                }
-            }
-        }
-
-        throw IllegalStateException("Broken initial state: $url")
     }
 
     private fun parseHeaders(headers: JsonArray?): List<HomeLaneHeader> {
@@ -625,106 +443,6 @@ class HomeLaneRepository(
         return this?.toList().orEmpty()
     }
 
-    private fun mergeReferenceSections(
-        type: Int,
-        followSection: HomeLaneSection?,
-        legacySections: List<HomeLaneSection>,
-        webSections: List<HomeLaneSection>
-    ): List<HomeLaneSection> {
-        if (followSection == null && legacySections.isEmpty() && webSections.isEmpty()) {
-            return emptyList()
-        }
-        if (followSection == null && webSections.isEmpty()) {
-            return legacySections.normalizeForReference(type)
-        }
-        if (followSection == null && legacySections.isEmpty()) {
-            return webSections.normalizeForReference(type)
-        }
-
-        val orderedSections = buildList {
-            followSection?.let(::add)
-            addAll(legacySections.filter { it.isFollowSection() })
-            addAll(webSections)
-            addAll(legacySections.filterNot { it.isFollowSection() })
-        }
-        val merged = LinkedHashMap<String, HomeLaneSection>()
-        orderedSections.forEach { section ->
-            val key = section.referenceKey()
-            val existing = merged[key]
-            merged[key] = if (existing == null) {
-                section
-            } else {
-                chooseRicherSection(existing, section)
-            }
-        }
-        return merged.values.toList().normalizeForReference(type)
-    }
-
-    private fun chooseRicherSection(
-        current: HomeLaneSection,
-        incoming: HomeLaneSection
-    ): HomeLaneSection {
-        val currentScore = current.richnessScore()
-        val incomingScore = incoming.richnessScore()
-        return if (incomingScore > currentScore) incoming else current
-    }
-
-    private fun HomeLaneSection.richnessScore(): Int {
-        return when {
-            timelineDays.isNotEmpty() -> 10_000 + timelineDays.sumOf { it.episodes.size }
-            else -> items.size * 100 + headers.size * 10 + if (isFollowSection()) 1_000 else 0
-        }
-    }
-
-    private fun HomeLaneSection.referenceKey(): String {
-        if (timelineDays.isNotEmpty()) {
-            return "timeline"
-        }
-        if (isFollowSection()) {
-            return "follow:${followSectionKind()}"
-        }
-
-        val normalizedTitle = title.replace(" ", "").trim()
-        val normalizedStyle = style.trim().lowercase()
-        val itemKey = items.take(3).joinToString(separator = "|") { item ->
-            listOf(item.seasonId, item.oid, item.title.trim()).joinToString(separator = ":")
-        }
-        return listOf(normalizedTitle, normalizedStyle, moreSeasonType?.toString().orEmpty(), itemKey)
-            .joinToString(separator = "#")
-    }
-
-    private fun List<HomeLaneSection>.normalizeForReference(type: Int): List<HomeLaneSection> {
-        if (isEmpty()) {
-            return this
-        }
-        val followSections = filter { it.isFollowSection() }
-        val timelineSections = filter { it.timelineDays.isNotEmpty() }
-        val normalSections = filterNot { it.isFollowSection() || it.timelineDays.isNotEmpty() }
-
-        return buildList(size) {
-            if (followSections.isNotEmpty()) {
-                addAll(followSections)
-                if (type == TYPE_ANIMATION) {
-                    addAll(timelineSections)
-                }
-                addAll(normalSections)
-            } else {
-                if (normalSections.isNotEmpty()) {
-                    add(normalSections.first())
-                    if (type == TYPE_ANIMATION) {
-                        addAll(timelineSections)
-                    }
-                    addAll(normalSections.drop(1))
-                } else {
-                    addAll(timelineSections)
-                }
-            }
-            if (type != TYPE_ANIMATION) {
-                addAll(timelineSections)
-            }
-        }
-    }
-
     private fun HomeLaneSection.isFollowSection(): Boolean {
         if (style.equals("follow", ignoreCase = true)) {
             return true
@@ -747,24 +465,6 @@ class HomeLaneRepository(
                 signal.contains("追番") ||
                 signal.contains("追剧") ||
                 signal.contains("follow", ignoreCase = true)
-        }
-    }
-
-    private fun HomeLaneSection.followSectionKind(): String {
-        val signals = buildList {
-            add(title)
-            headers.forEach { header ->
-                add(header.title)
-                add(header.url)
-            }
-        }.map { signal ->
-            signal.replace(" ", "").trim()
-        }
-
-        return when {
-            signals.any { it.contains("追剧") } -> "cinema"
-            signals.any { it.contains("追番") } -> "anime"
-            else -> moreSeasonType?.toString() ?: "generic"
         }
     }
 }

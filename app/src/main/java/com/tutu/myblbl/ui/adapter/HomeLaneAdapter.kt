@@ -2,7 +2,6 @@ package com.tutu.myblbl.ui.adapter
 
 import android.content.Context
 import android.content.ContextWrapper
-import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.view.KeyEvent
 import android.view.View

@@ -27,8 +27,6 @@ class AppSettingsDataStore(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val cache = ConcurrentHashMap<String, Any?>()
 
-    val isCacheReady: Boolean get() = cache.isNotEmpty()
-
     fun initCache() {
         runBlocking {
             val prefs = dataStore.data.first()

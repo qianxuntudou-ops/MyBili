@@ -51,10 +51,6 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
         }
     }
 
-    fun requestFocusOnFirstItem() {
-        focusedView?.requestFocus()
-    }
-
     fun getItem(position: Int): MODEL? {
         return if (position in items.indices) items[position] else null
     }

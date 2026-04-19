@@ -1,6 +1,5 @@
 package com.tutu.myblbl.core.ui.decoration
 
-import android.content.Context
 import android.graphics.Rect
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView

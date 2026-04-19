@@ -6,11 +6,8 @@ import com.tutu.myblbl.model.common.GiveCoinResultModel
 import com.tutu.myblbl.model.common.TripleActionResultModel
 import com.tutu.myblbl.model.recommend.RecommendListDataModel
 import com.tutu.myblbl.model.video.GetVideoByChannelWrapper
-import com.tutu.myblbl.model.video.RegionVideoListWrapper
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
-import com.tutu.myblbl.model.video.VideoPvModel
-import com.tutu.myblbl.model.player.PlayInfoModel
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.WbiGenerator
 import com.tutu.myblbl.network.response.BaseBaseResponse
@@ -18,14 +15,12 @@ import com.tutu.myblbl.network.security.NetworkSecurityGateway
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.ListDataModel
 import com.tutu.myblbl.core.common.log.AppLog
-import com.tutu.myblbl.network.cookie.CookieManager
 import kotlinx.coroutines.delay
 
 class VideoRepository(
     private val apiService: ApiService,
     private val sessionGateway: NetworkSessionGateway,
-    private val securityGateway: NetworkSecurityGateway,
-    private val cookieManager: CookieManager
+    private val securityGateway: NetworkSecurityGateway
 ) {
 
     private var watchLaterCache: List<VideoModel>? = null
@@ -86,15 +81,6 @@ class VideoRepository(
             }
         }
 
-    suspend fun getRegionLatestVideos(
-        rid: Int,
-        page: Int,
-        pageSize: Int
-    ): Result<BaseResponse<RegionVideoListWrapper>> =
-        runCatching {
-            apiService.getRegionLatestVideos(rid = rid, page = page, pageSize = pageSize)
-        }
-
     suspend fun getVideoByChannel(
         channelId: Long,
         offset: String,
@@ -111,21 +97,6 @@ class VideoRepository(
     suspend fun getVideoDetail(aid: Long?, bvid: String?): Result<BaseResponse<VideoDetailModel>> =
         runCatching {
             apiService.getVideoDetail(aid, bvid)
-        }
-
-    suspend fun getVideoPv(aid: Long?, bvid: String?): Result<BaseResponse<List<VideoPvModel>>> =
-        runCatching {
-            apiService.getVideoPv(aid, bvid)
-        }
-
-    suspend fun getVideoPlayInfo(aid: Long?, bvid: String?, cid: Long): Result<BaseResponse<PlayInfoModel>> =
-        runCatching {
-            apiService.getVideoPlayInfo(aid, bvid, cid)
-        }
-
-    suspend fun getRelated(aid: Long?, bvid: String?): Result<BaseResponse<List<VideoModel>>> =
-        runCatching {
-            apiService.getRelated(aid, bvid)
         }
 
     suspend fun like(avid: Long?, bvid: String?, like: Int, csrf: String): Result<BaseResponse<Int>> =

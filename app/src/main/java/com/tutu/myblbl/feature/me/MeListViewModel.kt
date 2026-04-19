@@ -29,14 +29,6 @@ class MeListViewModel(
 
     fun isLoggedIn(): Boolean = userRepository.isLoggedIn()
 
-    fun loadFavorites(@Suppress("UNUSED_PARAMETER") page: Int, @Suppress("UNUSED_PARAMETER") pageSize: Int) {
-        viewModelScope.launch {
-            _loading.value = true
-            _error.value = null
-            _loading.value = false
-        }
-    }
-
     fun loadHistory(page: Int, pageSize: Int) {
         viewModelScope.launch {
             if (_loading.value) {
@@ -115,14 +107,6 @@ class MeListViewModel(
                     _error.value = exception.message
                 }
 
-            _loading.value = false
-        }
-    }
-
-    fun loadFollowing(@Suppress("UNUSED_PARAMETER") page: Int, @Suppress("UNUSED_PARAMETER") pageSize: Int) {
-        viewModelScope.launch {
-            _loading.value = true
-            _error.value = null
             _loading.value = false
         }
     }

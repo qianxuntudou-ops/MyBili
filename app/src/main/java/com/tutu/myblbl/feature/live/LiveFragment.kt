@@ -19,7 +19,6 @@ import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
 import com.tutu.myblbl.core.ui.tab.enableTouchNavigation
 import com.tutu.myblbl.core.ui.tab.focusNearestTabTo
-import com.tutu.myblbl.core.ui.tab.focusSelectedTab
 import com.tutu.myblbl.core.common.ext.toast
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch

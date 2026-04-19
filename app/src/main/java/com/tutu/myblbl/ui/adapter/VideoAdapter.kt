@@ -25,7 +25,6 @@ class VideoAdapter(
     private val onItemClick: (VideoModel) -> Unit = {},
     private val onTopEdgeUp: (() -> Boolean)? = null,
     private val onBottomEdgeDown: (() -> Boolean)? = null,
-    private val focusDebugTag: String? = null,
     private val onItemFocused: ((Int) -> Unit)? = null
 ) : BaseAdapter<VideoModel, VideoAdapter.VideoViewHolder>() {
 
@@ -96,7 +95,6 @@ class VideoAdapter(
             clickLambda,
             onTopEdgeUp,
             onBottomEdgeDown,
-            focusDebugTag,
             { view, position, hasFocus ->
                 if (hasFocus) {
                     rememberItemInteraction(view, position)
@@ -164,7 +162,6 @@ class VideoAdapter(
         private val onItemClick: (View, VideoModel) -> Unit,
         onTopEdgeUp: (() -> Boolean)?,
         onBottomEdgeDown: (() -> Boolean)?,
-        private val focusDebugTag: String? = null,
         onFocusChange: ((View, Int, Boolean) -> Unit)? = null,
         private val onItemInteracted: ((View, Int) -> Unit)? = null,
         private val onItemDisliked: ((VideoModel) -> Unit)? = null,
@@ -250,13 +247,10 @@ class VideoAdapter(
             VideoCardFocusHelper.bindSidebarExit(
                 view = binding.root,
                 onTopEdgeUp = onTopEdgeUp,
-                onBottomEdgeDown = onBottomEdgeDown,
-                debugTag = focusDebugTag
+                onBottomEdgeDown = onBottomEdgeDown
             )
             if (onFocusChange != null) {
                 binding.root.setOnFocusChangeListener { view, hasFocus ->
-                    focusDebugTag?.let {
-                    }
                     onFocusChange.invoke(view, bindingAdapterPosition, hasFocus)
                 }
             }

@@ -13,7 +13,6 @@ import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
 import com.tutu.myblbl.core.common.ext.serializableCompat
-import androidx.recyclerview.widget.RecyclerView
 
 class LiveAreaFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveTabPage {
 

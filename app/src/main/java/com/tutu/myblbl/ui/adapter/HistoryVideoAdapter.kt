@@ -8,7 +8,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
-import android.widget.Toast
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -55,14 +54,6 @@ class HistoryVideoAdapter(
             .filter { incoming -> currentList.none { existing -> itemKey(existing) == itemKey(incoming) } }
         if (deduplicated.isEmpty()) return
         submitList(currentList + deduplicated)
-    }
-
-    fun updateProgress(aid: Long, progress: Long, duration: Long) {
-        if (aid <= 0L) return
-        submitList(currentList.map {
-            if ((it.history?.oid ?: 0L) == aid) it.copy(progress = progress, duration = duration)
-            else it
-        })
     }
 
     fun updateProgressFromPlayer(

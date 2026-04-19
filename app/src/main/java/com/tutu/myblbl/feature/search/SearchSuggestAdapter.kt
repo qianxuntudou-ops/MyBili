@@ -34,17 +34,6 @@ class SearchSuggestAdapter(
         submitList(list)
     }
 
-    fun setKeywords(keywords: List<String>, isHistory: Boolean = false) {
-        val keywordRows = keywords.mapIndexed { index, keyword ->
-            if (isHistory) {
-                HotWordModel.createHistory(keyword, index)
-            } else {
-                HotWordModel.createSuggest(keyword)
-            }
-        }
-        submitList(keywordRows)
-    }
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = CellSearchRecentlyBinding.inflate(
             LayoutInflater.from(parent.context),

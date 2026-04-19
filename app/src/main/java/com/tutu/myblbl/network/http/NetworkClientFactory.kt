@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit
 import okhttp3.Cache
 import okhttp3.Dns
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -34,9 +33,6 @@ object NetworkClientFactory {
         val builder = OkHttpClient.Builder()
             .cookieJar(cookieManager)
             .dns(ipv4OnlyDns(ipv4OnlyEnabled))
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.NONE
-            })
             .addInterceptor(
                 HeaderInterceptor(
                     userAgentProvider = userAgentProvider,

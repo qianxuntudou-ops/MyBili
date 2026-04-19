@@ -1,7 +1,6 @@
 package com.tutu.myblbl.ui.activity
 
 import android.os.Bundle
-import android.os.SystemClock
 import android.view.View
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -53,7 +52,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     )
 
     companion object {
-        private const val TAG = "MainEntryFocus"
         private const val SETTINGS_OVERLAY_TAG = "settings"
         private const val SETTINGS_OVERLAY_EXIT_ANIM_MS = 275L
         private const val SEARCH_TAB_INDEX = 5
@@ -593,29 +591,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
             .asReversed()
             .firstOrNull { it.isVisible }
             ?.tag == tag
-    }
-
-    private fun buildVideoPlayerTag(
-        aid: Long,
-        bvid: String,
-        cid: Long,
-        epId: Long,
-        seasonId: Long
-    ): String {
-        return buildString {
-            append("video_player:")
-            append(aid)
-            append(':')
-            append(bvid.ifBlank { "_" })
-            append(':')
-            append(cid)
-            append(':')
-            append(epId)
-            append(':')
-            append(seasonId)
-            append(':')
-            append(SystemClock.uptimeMillis())
-        }
     }
 
     private fun focusCurrentMainContent(

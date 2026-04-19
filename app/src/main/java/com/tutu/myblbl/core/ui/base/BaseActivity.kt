@@ -65,12 +65,6 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         }
     }
 
-    protected fun <T : Any?> runOnUiThread(action: () -> T) {
-        if (!isFinishing) {
-            runOnUiThread { action() }
-        }
-    }
-
     private fun configureFullscreenWindow() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes = window.attributes.apply {

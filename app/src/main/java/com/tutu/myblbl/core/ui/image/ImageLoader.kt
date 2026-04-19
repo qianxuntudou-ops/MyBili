@@ -2,11 +2,8 @@ package com.tutu.myblbl.core.ui.image
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Outline
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.view.View
-import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
@@ -222,16 +219,6 @@ object ImageLoader {
         }.start()
     }
 
-    private fun applyRoundedClip(imageView: ImageView, radius: Int) {
-        imageView.clipToOutline = true
-        imageView.outlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(view: View, outline: Outline) {
-                outline.setRoundRect(0, 0, view.width, view.height, radius.toFloat())
-            }
-        }
-        imageView.invalidateOutline()
-    }
-
     private fun normalizeUrl(url: String?): String {
         if (url.isNullOrBlank()) {
             return ""
@@ -336,14 +323,6 @@ object ImageLoader {
             "低尺寸" -> 0
             "高尺寸" -> 2
             else -> 1
-        }
-    }
-
-    private fun levelToQualityLabel(level: Int): String {
-        return when (level) {
-            0 -> "低尺寸"
-            2 -> "高尺寸"
-            else -> "中尺寸"
         }
     }
 

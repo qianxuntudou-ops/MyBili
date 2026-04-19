@@ -9,7 +9,6 @@ import com.tutu.myblbl.model.search.SearchCategoryItem
 import com.tutu.myblbl.model.search.SearchItemModel
 import com.tutu.myblbl.model.search.SearchType
 import com.tutu.myblbl.model.search.SearchVideoOrder
-import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.repository.SearchRepository
 import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.Job
@@ -32,9 +31,6 @@ class SearchViewModel(
     private val _hotSearchWords = MutableStateFlow<List<HotWordModel>>(emptyList())
     val hotSearchWords: StateFlow<List<HotWordModel>> = _hotSearchWords.asStateFlow()
 
-    private val _searchResults = MutableStateFlow<List<VideoModel>>(emptyList())
-    val searchResults: StateFlow<List<VideoModel>> = _searchResults.asStateFlow()
-
     private val _suggestWords = MutableStateFlow<List<HotWordModel>>(emptyList())
     val suggestWords: StateFlow<List<HotWordModel>> = _suggestWords.asStateFlow()
 
@@ -50,9 +46,6 @@ class SearchViewModel(
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    private val _hasMore = MutableStateFlow(true)
-    val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
-
     private var searchAllJob: Job? = null
     private val pageJobs = mutableMapOf<SearchType, Job>()
     private var suggestJob: Job? = null
@@ -62,38 +55,6 @@ class SearchViewModel(
         viewModelScope.launch {
             _hotSearchWords.value = searchRepository.loadHotSearchWords()
                 .getOrDefault(emptyList())
-        }
-    }
-
-    fun search(
-        keyword: String,
-        page: Int,
-        pageSize: Int,
-        order: SearchVideoOrder = SearchVideoOrder.TotalRank
-    ) {
-        viewModelScope.launch {
-            _loading.value = true
-
-            val result = searchRepository.search(keyword, page, pageSize, order)
-
-            result.fold(
-                onSuccess = { videos ->
-                    _searchResults.value = if (page == 1) {
-                        videos
-                    } else {
-                        _searchResults.value + videos
-                    }
-                    _hasMore.value = videos.size >= pageSize
-                },
-                onFailure = {
-                    if (page == 1) {
-                        _searchResults.value = emptyList()
-                    }
-                    _hasMore.value = false
-                }
-            )
-            
-            _loading.value = false
         }
     }
 

@@ -36,7 +36,7 @@ class AllSeriesFilterAdapter(
     private var expanded = false
     private var focusedPosition = RecyclerView.NO_POSITION
     private var pendingFocusPosition = RecyclerView.NO_POSITION
-    var focusedView: android.view.View? = null
+    var focusedView: View? = null
         private set
 
     fun setData(data: List<AllSeriesFilterModel>) {
@@ -110,7 +110,7 @@ class AllSeriesFilterAdapter(
         }
     }
 
-    private fun holderBindingAdapterPosition(view: android.view.View): Int {
+    private fun holderBindingAdapterPosition(view: View): Int {
         return (view.parent as? RecyclerView)?.getChildAdapterPosition(view) ?: RecyclerView.NO_POSITION
     }
 
@@ -118,11 +118,11 @@ class AllSeriesFilterAdapter(
         private val binding: CellSeriesFilterBinding,
         private val onItemClick: (Int) -> Unit,
         private val onTopEdgeUp: (() -> Boolean)?,
-        private val onFocused: (android.view.View) -> Unit
+        private val onFocused: (View) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        var onLeftEdge: ((android.view.View) -> Boolean)? = null
-        var onRightEdge: ((android.view.View) -> Boolean)? = null
+        var onLeftEdge: ((View) -> Boolean)? = null
+        var onRightEdge: ((View) -> Boolean)? = null
         private val accentColor = TypedValue()
         private val defaultTextColor = TypedValue()
 

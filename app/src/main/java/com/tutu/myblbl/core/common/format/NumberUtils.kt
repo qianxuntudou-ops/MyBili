@@ -5,7 +5,6 @@ import java.util.Locale
 
 object NumberUtils {
     
-    private val decimalFormat = DecimalFormat("#.#")
     private val wanFormat = DecimalFormat("#.#万")
     private val yiFormat = DecimalFormat("#.#亿")
     private val commaFormat = DecimalFormat("#,###")
@@ -35,17 +34,5 @@ object NumberUtils {
         }
     }
     
-    fun formatTimestamp(timestamp: Long): String {
-        val now = System.currentTimeMillis()
-        val diff = now - timestamp
-        
-        return when {
-            diff < 60000 -> "刚刚"
-            diff < 3600000 -> "${diff / 60000}分钟前"
-            diff < 86400000 -> "${diff / 3600000}小时前"
-            diff < 2592000000L -> "${diff / 86400000}天前"
-            diff < 31536000000L -> "${diff / 2592000000L}个月前"
-            else -> "${diff / 31536000000L}年前"
-        }
-    }
+
 }

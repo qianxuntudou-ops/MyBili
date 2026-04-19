@@ -20,8 +20,7 @@ class HomeDataProbeTest {
             RemoteVideoRepository(
                 NetworkManager.apiService,
                 sessionGateway,
-                securityGateway,
-                NetworkManager.getCookieManager()
+                securityGateway
             ),
             sessionGateway
         )
@@ -42,7 +41,6 @@ class HomeDataProbeTest {
 
         val homeLaneRepository = HomeLaneRepository(
             apiService = NetworkManager.apiService,
-            okHttpClient = NetworkManager.getOkHttpClient(),
             seriesRepository = RemoteSeriesRepository(NetworkManager.apiService, sessionGateway),
             userRepository = UserRepository(NetworkManager.apiService, sessionGateway)
         )

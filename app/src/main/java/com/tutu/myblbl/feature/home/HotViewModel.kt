@@ -52,7 +52,4 @@ class HotViewModel(
         }
     }
 
-    fun refresh(pageSize: Int) {
-        loadHotList(1, pageSize)
-    }
 }

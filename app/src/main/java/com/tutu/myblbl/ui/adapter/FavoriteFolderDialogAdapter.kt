@@ -3,7 +3,6 @@ package com.tutu.myblbl.ui.adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellFavoriteChoiceBinding

@@ -13,9 +13,6 @@ class LiveViewModel(
     private val liveRepository: LiveRepository
 ) : ViewModel() {
 
-    companion object {
-    }
-
     private var lastLoadedAt = 0L
 
     private val _categories = MutableStateFlow<List<LiveAreaCategoryParent>>(emptyList())

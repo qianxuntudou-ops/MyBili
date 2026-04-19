@@ -1,7 +1,6 @@
 package com.tutu.myblbl.repository
 
 import com.tutu.myblbl.model.BaseResponse
-import com.tutu.myblbl.model.user.UserInfoModel
 import com.tutu.myblbl.model.user.UserStatModel
 import com.tutu.myblbl.model.user.UserSpaceInfo
 import com.tutu.myblbl.model.user.UserDetailInfoModel

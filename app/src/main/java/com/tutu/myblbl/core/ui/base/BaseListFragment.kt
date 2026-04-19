@@ -262,13 +262,6 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
         super.onDestroyView()
     }
 
-    private fun describeView(view: View?): String {
-        if (view == null) {
-            return "null"
-        }
-        return "${view.javaClass.simpleName}(hash=${System.identityHashCode(view)})"
-    }
-
     private fun View.isDescendantOf(ancestor: View): Boolean {
         var current: View? = this
         while (current != null) {

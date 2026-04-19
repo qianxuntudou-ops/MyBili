@@ -125,14 +125,6 @@ class DynamicUpAdapter(
             }
         }
 
-        private fun keyName(keyCode: Int): String {
-            return when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP -> "UP"
-                KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
-                KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
-                KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
-                else -> keyCode.toString()
-            }
-        }
+
     }
 }

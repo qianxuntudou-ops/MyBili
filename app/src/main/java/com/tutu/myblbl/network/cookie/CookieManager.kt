@@ -21,7 +21,6 @@ class CookieManager : CookieJar {
     private val cookieCache = ConcurrentHashMap<String, MutableList<Cookie>>()
     
     companion object {
-        private const val PREF_NAME = "CookiePersistence"
         private const val KEY_COOKIES = "cookies"
     }
     

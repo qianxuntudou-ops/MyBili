@@ -1,8 +1,6 @@
 package com.tutu.myblbl.model.video
 
 import com.google.gson.annotations.SerializedName
-import com.tutu.myblbl.model.video.Owner
-import com.tutu.myblbl.model.video.Stat
 
 data class VideoPvModel(
     @SerializedName("cid")
@@ -27,5 +25,5 @@ data class VideoPvModel(
     val weblink: String = "",
     
     @SerializedName("dimension")
-    val dimension: com.tutu.myblbl.model.video.Dimension? = null
+    val dimension: Dimension? = null
 )

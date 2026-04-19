@@ -33,17 +33,6 @@ class HotSearchAdapter(
         submitList(list)
     }
 
-    fun setKeywords(keywords: List<String>) {
-        val keywordRows = keywords.mapIndexed { index, keyword ->
-            HotWordModel.createHot(
-                keyword = keyword,
-                showName = keyword,
-                pos = index + 1
-            )
-        }
-        submitList(keywordRows)
-    }
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = CellSearchRecentlyBinding.inflate(
             LayoutInflater.from(parent.context),

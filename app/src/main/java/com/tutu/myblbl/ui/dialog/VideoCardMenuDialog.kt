@@ -131,7 +131,6 @@ class VideoCardMenuDialog(
     }
 
     private fun dislikeVideo(reasonId: Int) {
-        val csrf = sessionGateway.getCsrfToken()
         scope.launch {
             runCatching {
                 videoRepository.dislikeFeed(video, reasonId)

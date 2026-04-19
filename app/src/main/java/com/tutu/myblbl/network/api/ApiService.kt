@@ -6,8 +6,6 @@ import com.tutu.myblbl.model.common.CollectionResultModel
 import com.tutu.myblbl.model.common.GiveCoinResultModel
 import com.tutu.myblbl.model.common.CheckGiveCoinModel
 import com.tutu.myblbl.model.common.TripleActionResultModel
-import com.tutu.myblbl.model.common.ZoneModel
-import com.tutu.myblbl.model.user.UserInfoModel
 import com.tutu.myblbl.model.user.UserStatModel
 import com.tutu.myblbl.model.user.UserSpaceInfo
 import com.tutu.myblbl.model.user.UserDetailInfoModel
@@ -67,9 +65,6 @@ interface ApiService {
     suspend fun getRelationStat(
         @Query("vmid") vmid: Long
     ): BaseResponse<UserStatModel>
-
-    @GET("x/member/web/account")
-    suspend fun getUserInfo(): BaseResponse<UserInfoModel>
 
     @GET("x/relation/followings")
     suspend fun getFollowing(
@@ -282,13 +277,6 @@ interface ApiService {
         @FieldMap form: Map<String, String>
     ): BaseBaseResponse
 
-    @POST("x/web-interface/feedback/dislike/cancel")
-    @FormUrlEncoded
-    suspend fun cancelDislikeFeed(
-        @QueryMap params: Map<String, String>,
-        @FieldMap form: Map<String, String>
-    ): BaseBaseResponse
-
     @GET("x/v2/history/toview")
     suspend fun getLaterWatch(): BaseResponse<LaterWatchWrapper>
 
@@ -306,9 +294,6 @@ interface ApiService {
         @Field("aid") aid: Long,
         @Field("csrf") csrf: String
     ): BaseBaseResponse
-
-    @GET("x/web-interface/zone")
-    suspend fun getZoneInfo(): BaseResponse<ZoneModel>
 
     @POST("x/relation/modify")
     @FormUrlEncoded
@@ -548,14 +533,6 @@ interface ApiService {
     @FormUrlEncoded
     suspend fun cancelFollowSeries(
         @Field("season_id") seasonId: Long,
-        @Field("csrf") csrf: String
-    ): BaseBaseResponse
-
-    @POST("pgc/web/follow/status/update")
-    @FormUrlEncoded
-    suspend fun checkSeriesUserStat(
-        @Field("season_id") seasonId: Long,
-        @Field("status") status: Int,
         @Field("csrf") csrf: String
     ): BaseBaseResponse
 

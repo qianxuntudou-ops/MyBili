@@ -16,8 +16,7 @@ object VideoCardFocusHelper {
         onTopEdgeUp: (() -> Boolean)? = null,
         onLeftEdge: (() -> Boolean)? = null,
         onRightEdge: (() -> Boolean)? = null,
-        onBottomEdgeDown: (() -> Boolean)? = null,
-        debugTag: String? = null
+        onBottomEdgeDown: (() -> Boolean)? = null
     ) {
         view.setOnKeyListener { target, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) {
@@ -27,54 +26,38 @@ object VideoCardFocusHelper {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     val atLeftEdge = isAtLeftEdge(target)
-                    debugTag?.let {
-                    }
                     if (!atLeftEdge) {
                         return@setOnKeyListener false
                     }
                     val handled = onLeftEdge?.invoke()
                         ?: (target.context.findMainActivity()?.focusLeftFunctionArea() == true)
-                    debugTag?.let {
-                    }
                     handled
                 }
 
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     val atRightEdge = isAtRightEdge(target)
-                    debugTag?.let {
-                    }
                     if (!atRightEdge) {
                         return@setOnKeyListener false
                     }
                     val handled = onRightEdge?.invoke() ?: true
-                    debugTag?.let {
-                    }
                     handled
                 }
 
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     val atTopEdge = isAtTopEdge(target)
-                    debugTag?.let {
-                    }
                     if (onTopEdgeUp == null || !atTopEdge) {
                         return@setOnKeyListener false
                     }
                     val handled = onTopEdgeUp()
-                    debugTag?.let {
-                    }
                     handled
                 }
 
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     val atBottomEdge = isAtBottomEdge(target)
-                    debugTag?.let {
-                    }
                     if (onBottomEdgeDown == null || !atBottomEdge) {
                         return@setOnKeyListener false
                     }
                     val handled = onBottomEdgeDown()
-                    debugTag?.let {
-                    }
                     handled
                 }
 

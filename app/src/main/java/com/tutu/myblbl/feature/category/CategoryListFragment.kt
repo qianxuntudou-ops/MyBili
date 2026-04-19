@@ -48,8 +48,7 @@ class CategoryListFragment : BaseListFragment<VideoModel>() {
         return VideoAdapter(
             onItemClick = ::onVideoClick,
             onTopEdgeUp = ::focusTopTab,
-            onBottomEdgeDown = ::keepCurrentFocus,
-            focusDebugTag = TAG
+            onBottomEdgeDown = ::keepCurrentFocus
         )
     }
 
@@ -201,13 +200,5 @@ class CategoryListFragment : BaseListFragment<VideoModel>() {
         return true
     }
 
-    private fun directionName(direction: Int): String {
-        return when (direction) {
-            View.FOCUS_UP, KeyEvent.KEYCODE_DPAD_UP -> "UP"
-            View.FOCUS_DOWN, KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
-            View.FOCUS_LEFT, KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
-            View.FOCUS_RIGHT, KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
-            else -> direction.toString()
-        }
-    }
+
 }

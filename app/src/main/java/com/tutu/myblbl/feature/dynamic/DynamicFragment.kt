@@ -1,6 +1,5 @@
 package com.tutu.myblbl.feature.dynamic
 
-import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -116,19 +115,9 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
                 lastFocusedVideoPosition = position
                 preferredContentFocusTarget = ContentFocusTarget.RIGHT_VIDEO_LIST
             },
-            onLeftEdge = { focusSelectedUpItem() },
-            debugTag = null
+            onLeftEdge = { focusSelectedUpItem() }
         )
-        binding.recyclerViewRight.layoutManager = object : WrapContentGridLayoutManager(requireContext(), 3) {
-            override fun onFocusSearchFailed(
-                focused: View,
-                direction: Int,
-                recycler: RecyclerView.Recycler,
-                state: RecyclerView.State
-            ): View? {
-                return super.onFocusSearchFailed(focused, direction, recycler, state)
-            }
-        }
+        binding.recyclerViewRight.layoutManager = WrapContentGridLayoutManager(requireContext(), 3)
         binding.recyclerViewRight.adapter = videoAdapter
         binding.recyclerViewRight.setOnKeyListener { _, _, _ ->
             false
@@ -630,13 +619,5 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
         }
     }
 
-    private fun directionName(direction: Int): String {
-        return when (direction) {
-            View.FOCUS_UP, KeyEvent.KEYCODE_DPAD_UP -> "UP"
-            View.FOCUS_DOWN, KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
-            View.FOCUS_LEFT, KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
-            View.FOCUS_RIGHT, KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
-            else -> direction.toString()
-        }
-    }
+
 }

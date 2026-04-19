@@ -24,8 +24,7 @@ import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
 class DynamicVideoAdapter(
     private val onItemClick: (VideoModel) -> Unit,
     private val onItemFocused: (Int) -> Unit,
-    private val onLeftEdge: () -> Boolean = { false },
-    private val debugTag: String? = null
+    private val onLeftEdge: () -> Boolean = { false }
 ) : ListAdapter<VideoModel, DynamicVideoAdapter.ViewHolder>(DiffCallback) {
 
     var focusedView: View? = null
@@ -138,8 +137,7 @@ class DynamicVideoAdapter(
             }
             VideoCardFocusHelper.bindSidebarExit(
                 view = binding.root,
-                onLeftEdge = onLeftEdge,
-                debugTag = debugTag
+                onLeftEdge = onLeftEdge
             )
         }
 
@@ -224,24 +222,7 @@ class DynamicVideoAdapter(
             }
         }
 
-        private fun currentTitle(): String {
-            val position = bindingAdapterPosition
-            if (position == NO_POSITION || position !in currentList.indices) {
-                return ""
-            }
-            val item = getItem(position)
-            return item.bangumi?.longTitle?.takeIf { it.isNotBlank() } ?: item.title
-        }
 
-        private fun keyName(keyCode: Int): String {
-            return when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP -> "UP"
-                KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
-                KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
-                KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
-                else -> keyCode.toString()
-            }
-        }
     }
 
     companion object {
