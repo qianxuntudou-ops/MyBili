@@ -100,7 +100,11 @@ object VideoCardFocusHelper {
         }
         return when (layoutManager) {
             is GridLayoutManager -> {
-                layoutManager.spanSizeLookup.getSpanIndex(position, layoutManager.spanCount) == 0
+                if (layoutManager.orientation == RecyclerView.HORIZONTAL) {
+                    position == 0
+                } else {
+                    layoutManager.spanSizeLookup.getSpanIndex(position, layoutManager.spanCount) == 0
+                }
             }
             is LinearLayoutManager -> layoutManager.orientation == RecyclerView.VERTICAL
             else -> false
@@ -130,16 +134,21 @@ object VideoCardFocusHelper {
     private fun isAtRightEdge(view: View): Boolean {
         val recyclerView = view.findParentRecyclerView() ?: return false
         val layoutManager = recyclerView.layoutManager ?: return false
+        val adapter = recyclerView.adapter ?: return false
         val position = recyclerView.getChildAdapterPosition(view)
         if (position == RecyclerView.NO_POSITION) {
             return false
         }
         return when (layoutManager) {
             is GridLayoutManager -> {
-                val spanCount = layoutManager.spanCount
-                val spanIndex = layoutManager.spanSizeLookup.getSpanIndex(position, spanCount)
-                val spanSize = layoutManager.spanSizeLookup.getSpanSize(position)
-                spanIndex + spanSize == spanCount
+                if (layoutManager.orientation == RecyclerView.HORIZONTAL) {
+                    position == adapter.itemCount - 1
+                } else {
+                    val spanCount = layoutManager.spanCount
+                    val spanIndex = layoutManager.spanSizeLookup.getSpanIndex(position, spanCount)
+                    val spanSize = layoutManager.spanSizeLookup.getSpanSize(position)
+                    spanIndex + spanSize == spanCount
+                }
             }
             is LinearLayoutManager -> layoutManager.orientation == RecyclerView.VERTICAL
             else -> false

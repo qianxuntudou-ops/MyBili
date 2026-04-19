@@ -1,6 +1,5 @@
 package com.tutu.myblbl.feature.player
 
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.animation.Animation
@@ -175,7 +174,6 @@ class VideoPlayerOverlayController(
         recyclerViewRelated.layoutManager =
             GridLayoutManager(activity, 1, RecyclerView.HORIZONTAL, false)
         recyclerViewRelated.adapter = relatedAdapter
-        setupRelatedHorizontalNavigation()
         if (viewRelated.isVisible) {
             recyclerViewRelated.requestFocus()
             return
@@ -390,10 +388,10 @@ class VideoPlayerOverlayController(
     }
 
     private fun restoreControllerAfterRelatedPanel() {
-        playerView.showController()
-        // showController() posts requestPlayPauseFocus() for the next frame.
-        // Post the remembered focus restore after that so it wins.
-        playerView.post { playerView.restoreRememberedFocus() }
+        // Controller was kept visible via keepControllerVisibleForOverlay() while the panel was open.
+        // Only restore focus and reset auto-hide timers — avoid calling showController() which
+        // posts requestPlayPauseFocus() and causes a visible focus flicker.
+        playerView.restoreRememberedFocus()
         playerView.resetControllerHideCallbacks()
     }
 
@@ -420,35 +418,5 @@ class VideoPlayerOverlayController(
             }
         }
         relatedPanelFocusListener = null
-    }
-
-    private fun setupRelatedHorizontalNavigation() {
-        recyclerViewRelated.setOnKeyListener { _, keyCode, event ->
-            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-            if (keyCode != KeyEvent.KEYCODE_DPAD_LEFT && keyCode != KeyEvent.KEYCODE_DPAD_RIGHT) {
-                return@setOnKeyListener false
-            }
-            val focused = recyclerViewRelated.focusedChild ?: return@setOnKeyListener false
-            val pos = recyclerViewRelated.getChildAdapterPosition(focused)
-            if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-
-            val adapter = recyclerViewRelated.adapter ?: return@setOnKeyListener false
-            val nextPos = if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) pos + 1 else pos - 1
-            if (nextPos < 0 || nextPos >= adapter.itemCount) return@setOnKeyListener false
-
-            recyclerViewRelated.post {
-                val vh = recyclerViewRelated.findViewHolderForAdapterPosition(nextPos)
-                if (vh != null) {
-                    vh.itemView.requestFocus()
-                } else {
-                    recyclerViewRelated.smoothScrollToPosition(nextPos)
-                    recyclerViewRelated.post {
-                        val vh2 = recyclerViewRelated.findViewHolderForAdapterPosition(nextPos)
-                        vh2?.itemView?.requestFocus()
-                    }
-                }
-            }
-            true
-        }
     }
 }
