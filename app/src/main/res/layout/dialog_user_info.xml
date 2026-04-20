@@ -2,7 +2,7 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="@android:color/transparent"
     android:clickable="true"
-    android:focusable="true"
+    android:focusable="false"
     android:layout_width="@dimen/px500"
     android:layout_height="@dimen/px600">
     <View
@@ -118,6 +118,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
             android:gravity="center"
             android:text="@string/dynamic_count_"
             android:textColor="@color/textColor"

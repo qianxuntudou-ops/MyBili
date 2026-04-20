@@ -77,6 +77,12 @@ class UserInfoDialog(context: Context) : AppCompatDialog(context, R.style.Dialog
                 )
             }
         }
+        binding.textDynamic.setOnClickListener {
+            val mid = sessionGateway.getUserInfo()?.mid ?: 0L
+            if (mid > 0L) {
+                openOverlay(UserSpaceFragment.newInstance(mid), "user_space")
+            }
+        }
         binding.buttonSignOut.setOnClickListener {
             sessionGateway.clearUserSession(reason = "userInfoDialog.signOut")
             appEventHub.dispatch(AppEventHub.Event.UserSessionChanged)
