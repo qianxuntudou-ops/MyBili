@@ -2,6 +2,8 @@ package com.tutu.myblbl.network.http
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.google.gson.ExclusionStrategy
+import com.google.gson.FieldAttributes
 import com.tutu.myblbl.BuildConfig
 import com.tutu.myblbl.model.adapter.FlexibleIntAdapter
 import com.tutu.myblbl.model.adapter.FlexibleLongAdapter
@@ -65,6 +67,8 @@ object NetworkClientFactory {
             .registerTypeAdapter(Long::class.javaObjectType, FlexibleLongAdapter())
             .registerTypeAdapter(Int::class.javaPrimitiveType, FlexibleIntAdapter())
             .registerTypeAdapter(Int::class.javaObjectType, FlexibleIntAdapter())
+            .addSerializationExclusionStrategy(LazyExclusionStrategy)
+            .addDeserializationExclusionStrategy(LazyExclusionStrategy)
             .create()
     }
 
@@ -92,4 +96,13 @@ object NetworkClientFactory {
                 throw UnknownHostException("No IPv4 address for $host")
             }
         }
+
+    private object LazyExclusionStrategy : ExclusionStrategy {
+        override fun shouldSkipField(f: FieldAttributes): Boolean {
+            return f.declaredType == Lazy::class.java
+        }
+        override fun shouldSkipClass(clazz: Class<*>): Boolean {
+            return clazz == Lazy::class.java
+        }
+    }
 }
