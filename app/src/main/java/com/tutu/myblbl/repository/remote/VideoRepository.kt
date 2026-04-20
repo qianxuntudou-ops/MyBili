@@ -27,6 +27,11 @@ class VideoRepository(
     private var watchLaterCacheTimeMs: Long = 0L
     private val watchLaterCacheTtlMs = 5L * 60L * 1000L
 
+    private fun invalidateWatchLaterCache() {
+        watchLaterCache = null
+        watchLaterCacheTimeMs = 0L
+    }
+
     private suspend fun getWatchLaterList(): List<VideoModel> {
         val now = System.currentTimeMillis()
         val cached = watchLaterCache
@@ -153,20 +158,24 @@ class VideoRepository(
 
     suspend fun addWatchLater(aid: Long?, bvid: String?, csrf: String): Result<BaseBaseResponse> =
         runCatching {
-            sessionGateway.syncAuthState(
+            val result = sessionGateway.syncAuthState(
                 apiService.addWatchLater(aid, bvid, csrf),
                 source = "video.addWatchLater"
             )
+            if (result.isSuccess) invalidateWatchLaterCache()
+            result
         }
 
     suspend fun removeWatchLater(aid: Long?, bvid: String?, csrf: String): Result<BaseBaseResponse> =
         runCatching {
             val resolvedAid = resolveWatchLaterAid(aid, bvid)
                 ?: error("缺少稍后再看视频标识")
-            sessionGateway.syncAuthState(
+            val result = sessionGateway.syncAuthState(
                 apiService.removeWatchLater(resolvedAid, csrf),
                 source = "video.removeWatchLater"
             )
+            if (result.isSuccess) invalidateWatchLaterCache()
+            result
         }
 
     suspend fun checkWatchLater(aid: Long?, bvid: String?): Result<Boolean> =
