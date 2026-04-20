@@ -190,7 +190,11 @@ class FollowUserListFragment : BaseFragment<FragmentFollowUserListBinding>() {
             showListContent()
             if (!hasRequestedInitialFocus && currentPage == 1) {
                 hasRequestedInitialFocus = true
-                requestBackFocus()
+                if (adapter.itemCount > 0) {
+                    requestItemFocus(0)
+                } else {
+                    requestBackFocus()
+                }
             } else if (lastFocusedPosition != RecyclerView.NO_POSITION) {
                 restoreFocus()
             }
