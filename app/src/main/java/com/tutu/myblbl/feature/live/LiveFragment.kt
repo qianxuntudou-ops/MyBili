@@ -37,6 +37,7 @@ class LiveFragment : BaseFragment<FragmentLiveBinding>(), MainTabFocusTarget {
     private lateinit var viewPager: ViewPager2
     private lateinit var adapter: LiveFragmentAdapter
     private val categories = mutableListOf<LiveAreaCategoryParent>()
+    private var tabSelectedListener: TabLayout.OnTabSelectedListener? = null
 
     override fun getViewBinding(
         inflater: LayoutInflater,
@@ -62,7 +63,7 @@ class LiveFragment : BaseFragment<FragmentLiveBinding>(), MainTabFocusTarget {
             viewPager = viewPager,
             onNavigateDown = ::focusCurrentPagePrimaryContent
         )
-        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+        tabSelectedListener = object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) = Unit
 
             override fun onTabUnselected(tab: TabLayout.Tab) = Unit
@@ -75,7 +76,7 @@ class LiveFragment : BaseFragment<FragmentLiveBinding>(), MainTabFocusTarget {
                     )
                 )
             }
-        })
+        }.also { tabLayout.addOnTabSelectedListener(it) }
     }
 
     override fun initData() {
@@ -165,6 +166,8 @@ class LiveFragment : BaseFragment<FragmentLiveBinding>(), MainTabFocusTarget {
     }
 
     override fun onDestroyView() {
+        tabSelectedListener?.let { tabLayout.removeOnTabSelectedListener(it) }
+        tabSelectedListener = null
         binding.viewPager.adapter = null
         super.onDestroyView()
     }

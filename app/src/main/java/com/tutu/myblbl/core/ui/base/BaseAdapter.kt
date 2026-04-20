@@ -1,11 +1,19 @@
 package com.tutu.myblbl.core.ui.base
 
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.Adapter<VH>() {
 
@@ -13,6 +21,9 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
     internal var showLoadMore = true
     internal var focusedView: View? = null
     internal var rememberedPosition: Int = RecyclerView.NO_POSITION
+
+    private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     protected open fun areItemsSame(old: MODEL, new: MODEL): Boolean = old == new
     protected open fun areContentsSame(old: MODEL, new: MODEL): Boolean = old == new
@@ -65,17 +76,49 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
             .takeIf { it != RecyclerView.NO_POSITION && it < data.size }
             ?: RecyclerView.NO_POSITION
         val oldItems = items.toList()
-        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize() = oldItems.size
-            override fun getNewListSize() = data.size
-            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
-                areItemsSame(oldItems[oldPos], data[newPos])
-            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
-                areContentsSame(oldItems[oldPos], data[newPos])
-        })
-        items.clear()
-        items.addAll(data)
-        diffResult.dispatchUpdatesTo(this)
+        adapterScope.launch {
+            val diffResult = withContext(Dispatchers.Default) {
+                DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                    override fun getOldListSize() = oldItems.size
+                    override fun getNewListSize() = data.size
+                    override fun areItemsTheSame(oldPos: Int, newPos: Int) =
+                        areItemsSame(oldItems[oldPos], data[newPos])
+                    override fun areContentsTheSame(oldPos: Int, newPos: Int) =
+                        areContentsSame(oldItems[oldPos], data[newPos])
+                })
+            }
+            items.clear()
+            items.addAll(data)
+            diffResult.dispatchUpdatesTo(this@BaseAdapter)
+        }
+    }
+
+    /**
+     * 在后台线程计算 diff 并在主线程 dispatch 更新，完成后执行 [onComplete]。
+     */
+    internal fun submitItemsInBackground(
+        newItems: List<MODEL>,
+        areItemsTheSame: (old: MODEL, new: MODEL) -> Boolean,
+        areContentsTheSame: (old: MODEL, new: MODEL) -> Boolean,
+        onComplete: (() -> Unit)? = null
+    ) {
+        val oldItems = items.toList()
+        adapterScope.launch {
+            val diffResult = withContext(Dispatchers.Default) {
+                DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                    override fun getOldListSize() = oldItems.size
+                    override fun getNewListSize() = newItems.size
+                    override fun areItemsTheSame(oldPos: Int, newPos: Int) =
+                        areItemsTheSame(oldItems[oldPos], newItems[newPos])
+                    override fun areContentsTheSame(oldPos: Int, newPos: Int) =
+                        areContentsTheSame(oldItems[oldPos], newItems[newPos])
+                })
+            }
+            items.clear()
+            items.addAll(newItems)
+            diffResult.dispatchUpdatesTo(this@BaseAdapter)
+            onComplete?.invoke()
+        }
     }
 
     fun clear() {

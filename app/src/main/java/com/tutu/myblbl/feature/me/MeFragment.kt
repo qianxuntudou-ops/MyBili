@@ -45,6 +45,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
     private lateinit var viewPager: ViewPager2
     private lateinit var adapter: MeFragmentAdapter
     private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
+    private var tabSelectedListener: TabLayout.OnTabSelectedListener? = null
     private var pendingRefreshAfterLogin = false
 
     override fun getViewBinding(
@@ -76,7 +77,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
             viewPager = viewPager,
             onNavigateDown = ::focusCurrentPagePrimaryContent
         )
-        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+        tabSelectedListener = object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) = Unit
 
             override fun onTabUnselected(tab: TabLayout.Tab) = Unit
@@ -84,7 +85,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
             override fun onTabReselected(tab: TabLayout.Tab) {
                 notifyCurrentTab { it.onTabReselected() }
             }
-        })
+        }.also { tabLayout.addOnTabSelectedListener(it) }
 
         pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
@@ -304,6 +305,8 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
     override fun onDestroyView() {
         pageChangeCallback?.let(viewPager::unregisterOnPageChangeCallback)
         pageChangeCallback = null
+        tabSelectedListener?.let { tabLayout.removeOnTabSelectedListener(it) }
+        tabSelectedListener = null
         binding.viewPager.adapter = null
         super.onDestroyView()
     }

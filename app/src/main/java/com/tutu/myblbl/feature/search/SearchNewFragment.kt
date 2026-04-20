@@ -41,6 +41,8 @@ import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import com.tutu.myblbl.core.ui.tab.focusNearestTabTo
 import com.tutu.myblbl.core.ui.tab.focusSelectedTab
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.androidx.viewmodel.ext.android.viewModel
@@ -63,6 +65,7 @@ class SearchNewFragment :
     private var latestSuggests: List<HotWordModel> = emptyList()
     private var pendingHistoryKeyword: String? = null
     private var suppressTextWatcher = false
+    private var suggestDebounceJob: Job? = null
     private val pageSize = 20
     private var currentOrder = SearchVideoOrder.TotalRank
     private var isResultPanelVisible = false
@@ -222,10 +225,13 @@ class SearchNewFragment :
                 if (suppressTextWatcher) {
                     return
                 }
-                handleInputChanged(
-                    text = s?.toString().orEmpty(),
-                    requestSuggest = !isResultPanelVisible
-                )
+                val text = s?.toString().orEmpty()
+                val requestSuggest = !isResultPanelVisible
+                suggestDebounceJob?.cancel()
+                suggestDebounceJob = viewLifecycleOwner.lifecycleScope.launch {
+                    delay(300)
+                    handleInputChanged(text = text, requestSuggest = requestSuggest)
+                }
             }
 
             override fun afterTextChanged(s: Editable?) = Unit
@@ -268,7 +274,7 @@ class SearchNewFragment :
         )
         resultPagerAdapter.setPages(emptyList())
         binding.viewPagerResult.adapter = resultPagerAdapter
-        binding.viewPagerResult.offscreenPageLimit = 1
+        binding.viewPagerResult.offscreenPageLimit = 2
         binding.viewPagerResult.registerOnPageChangeCallback(pageChangeCallback)
 
         tabMediator?.detach()

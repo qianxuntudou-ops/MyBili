@@ -34,6 +34,8 @@ class CategoryFragment : BaseFragment<FragmentCategoryBinding>(), MainTabFocusTa
     private lateinit var viewPager: ViewPager2
     private lateinit var adapter: CategoryFragmentAdapter
     private val categories = mutableListOf<CategoryModel>()
+    private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
+    private var tabSelectedListener: TabLayout.OnTabSelectedListener? = null
     private val mainNavigationViewModel: MainNavigationViewModel by activityViewModels()
 
     override fun getViewBinding(
@@ -60,19 +62,19 @@ class CategoryFragment : BaseFragment<FragmentCategoryBinding>(), MainTabFocusTa
             viewPager = viewPager,
             onNavigateDown = ::focusCurrentPagePrimaryContent
         )
-        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+        tabSelectedListener = object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) = Unit
 
             override fun onTabUnselected(tab: TabLayout.Tab) = Unit
 
             override fun onTabReselected(tab: TabLayout.Tab) = Unit
-        })
+        }.also { tabLayout.addOnTabSelectedListener(it) }
 
-        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+        pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 notifyTabSelected(position)
             }
-        })
+        }.also { viewPager.registerOnPageChangeCallback(it) }
 
         initCategories()
     }
@@ -157,6 +159,10 @@ class CategoryFragment : BaseFragment<FragmentCategoryBinding>(), MainTabFocusTa
     }
 
     override fun onDestroyView() {
+        pageChangeCallback?.let { viewPager.unregisterOnPageChangeCallback(it) }
+        pageChangeCallback = null
+        tabSelectedListener?.let { tabLayout.removeOnTabSelectedListener(it) }
+        tabSelectedListener = null
         binding.viewPager.adapter = null
         super.onDestroyView()
     }

@@ -36,6 +36,7 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
     private lateinit var adapter: HomeFragmentStateAdapter
     private var tabMediator: TabLayoutMediator? = null
     private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
+    private var tabSelectedListener: TabLayout.OnTabSelectedListener? = null
     private var lastTabSelectedPosition = -1
     private var lastTabSelectedTime = 0L
 
@@ -52,7 +53,7 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
         super.onViewCreated(view, savedInstanceState)
         adapter = HomeFragmentStateAdapter(childFragmentManager, viewLifecycleOwner.lifecycle)
         binding.viewPager.adapter = adapter
-        binding.viewPager.offscreenPageLimit = 1
+        binding.viewPager.offscreenPageLimit = 2
         tabMediator = TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = adapter.getPageTitle(position)
         }.also { it.attach() }
@@ -62,7 +63,7 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
             onNavigateLeft = ::focusLeftFunctionArea
         )
 
-        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+        tabSelectedListener = object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 lastTabSelectedPosition = tab.position
                 lastTabSelectedTime = System.currentTimeMillis()
@@ -78,7 +79,7 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
                 }
                 postTopTabEvent(tab.position)
             }
-        })
+        }.also { binding.tabLayout.addOnTabSelectedListener(it) }
         pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 notifyTabSelected(position)
@@ -108,6 +109,8 @@ class HomeFragment : Fragment(), MainTabFocusTarget {
     override fun onDestroyView() {
         pageChangeCallback?.let { binding.viewPager.unregisterOnPageChangeCallback(it) }
         pageChangeCallback = null
+        tabSelectedListener?.let { binding.tabLayout.removeOnTabSelectedListener(it) }
+        tabSelectedListener = null
         tabMediator?.detach()
         tabMediator = null
         binding.viewPager.adapter = null

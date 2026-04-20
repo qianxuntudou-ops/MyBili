@@ -1,5 +1,6 @@
 package com.tutu.myblbl.core.ui.image
 
+import android.app.ActivityManager
 import android.content.Context
 import com.bumptech.glide.Glide
 import com.bumptech.glide.GlideBuilder
@@ -18,7 +19,10 @@ import java.io.InputStream
 class MyBLBLGlideModule : AppGlideModule() {
 
     override fun applyOptions(context: Context, builder: GlideBuilder) {
-        builder.setMemoryCache(LruResourceCache(256L * 1024 * 1024))
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memoryClass = activityManager.memoryClass // MB
+        val cacheSize = (memoryClass * 1024L * 1024 * 0.15).toLong() // 可用内存的15%
+        builder.setMemoryCache(LruResourceCache(cacheSize))
         val cacheDir = File(context.externalCacheDir ?: context.cacheDir, "glide_cache")
         builder.setDiskCache(DiskLruCacheFactory(cacheDir.absolutePath, 512L * 1024 * 1024))
     }

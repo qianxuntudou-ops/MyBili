@@ -127,33 +127,36 @@ class VideoAdapter(
     }
 
     private fun submitItems(newItems: List<VideoModel>) {
-        val oldItems = items.toList()
-        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize() = oldItems.size
-            override fun getNewListSize() = newItems.size
-            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
-                DIFF_CALLBACK.areItemsTheSame(oldItems[oldPos], newItems[newPos])
-            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
-                DIFF_CALLBACK.areContentsTheSame(oldItems[oldPos], newItems[newPos])
-        })
-        items.clear()
-        items.addAll(newItems)
-        diffResult.dispatchUpdatesTo(this)
+        submitItemsInBackground(
+            newItems = newItems,
+            areItemsTheSame = { old, new -> DIFF_CALLBACK.areItemsTheSame(old, new) },
+            areContentsTheSame = { old, new -> DIFF_CALLBACK.areContentsTheSame(old, new) }
+        )
     }
 
     private fun removeDislikedItem(video: VideoModel) {
         val key = videoKey(video)
         val filtered = items.filter { videoKey(it) != key }
         if (filtered.size == items.size) return
-        submitItems(filtered)
-        focusedView?.requestFocus()
+        val viewToFocus = focusedView
+        submitItemsInBackground(
+            newItems = filtered,
+            areItemsTheSame = { old, new -> DIFF_CALLBACK.areItemsTheSame(old, new) },
+            areContentsTheSame = { old, new -> DIFF_CALLBACK.areContentsTheSame(old, new) },
+            onComplete = { viewToFocus?.requestFocus() }
+        )
     }
 
     private fun removeDislikedUpItems(upName: String) {
         val filtered = items.filter { !it.authorName.equals(upName, ignoreCase = true) }
         if (filtered.size == items.size) return
-        submitItems(filtered)
-        focusedView?.requestFocus()
+        val viewToFocus = focusedView
+        submitItemsInBackground(
+            newItems = filtered,
+            areItemsTheSame = { old, new -> DIFF_CALLBACK.areItemsTheSame(old, new) },
+            areContentsTheSame = { old, new -> DIFF_CALLBACK.areContentsTheSame(old, new) },
+            onComplete = { viewToFocus?.requestFocus() }
+        )
     }
 
     class VideoViewHolder(
