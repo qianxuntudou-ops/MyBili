@@ -92,7 +92,7 @@ class VideoCardMenuDialog(
 
         binding.buttonWatchLater.setOnClickListener {
             if (isActionInProgress) return@setOnClickListener
-            if (!checkLogin()) return@setOnClickListener
+            if (!checkCsrfAndLogin()) return@setOnClickListener
             setActionInProgress(true)
             if (isInWatchLater) {
                 removeWatchLater()
@@ -103,27 +103,27 @@ class VideoCardMenuDialog(
 
         binding.buttonFavorite.setOnClickListener {
             if (isActionInProgress) return@setOnClickListener
-            if (!checkLogin()) return@setOnClickListener
+            if (!checkCsrfAndLogin()) return@setOnClickListener
             setActionInProgress(true)
             toggleFavorite()
         }
 
         binding.buttonFavorite.setOnLongClickListener {
-            if (!checkLogin()) return@setOnLongClickListener true
+            if (!checkCsrfAndLogin()) return@setOnLongClickListener true
             showFavoriteFolderDialog()
             true
         }
 
         binding.buttonDislikeVideo.setOnClickListener {
             if (isActionInProgress) return@setOnClickListener
-            if (!checkLogin()) return@setOnClickListener
+            if (!checkCsrfAndLogin()) return@setOnClickListener
             setActionInProgress(true)
             dislikeVideo(REASON_ID_NOT_INTERESTED)
         }
 
         binding.buttonDislikeUp.setOnClickListener {
             if (isActionInProgress) return@setOnClickListener
-            if (!checkLogin()) return@setOnClickListener
+            if (!checkCsrfAndLogin()) return@setOnClickListener
             if (!canDislikeUp()) return@setOnClickListener
             setActionInProgress(true)
             dislikeVideo(REASON_ID_DISLIKE_UP)
@@ -209,7 +209,10 @@ class VideoCardMenuDialog(
                     dismiss()
                 } else {
                     val msg = response.errorMessage
-                    if (msg.contains("90001") || msg.contains("上限") || msg.contains("已满")) {
+                    if (isCsrfError(response.code, msg)) {
+                        toast(context.getString(R.string.toast_need_login))
+                        dismiss()
+                    } else if (msg.contains("90001") || msg.contains("上限") || msg.contains("已满")) {
                         toast(context.getString(R.string.toast_watch_later_full))
                     } else {
                         toast(context.getString(R.string.toast_add_watch_later_failed))
@@ -310,7 +313,12 @@ class VideoCardMenuDialog(
                     }
                     dismiss()
                 } else {
-                    toast(response.errorMessage)
+                    if (isCsrfError(response.code, response.errorMessage)) {
+                        toast(context.getString(R.string.toast_need_login))
+                        dismiss()
+                    } else {
+                        toast(response.errorMessage)
+                    }
                 }
                 setActionInProgress(false)
             }.onFailure {
@@ -535,6 +543,21 @@ class VideoCardMenuDialog(
             return false
         }
         return true
+    }
+
+    private fun checkCsrfAndLogin(): Boolean {
+        if (!checkLogin()) return false
+        if (sessionGateway.getCsrfToken().isBlank()) {
+            toast(context.getString(R.string.toast_need_login))
+            dismiss()
+            return false
+        }
+        return true
+    }
+
+    private fun isCsrfError(code: Int, message: String?): Boolean {
+        if (code == -101 || code == -111) return true
+        return message.orEmpty().contains("csrf")
     }
 
     private fun canDislikeUp(): Boolean {
