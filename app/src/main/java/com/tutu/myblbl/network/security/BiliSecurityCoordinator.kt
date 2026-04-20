@@ -20,6 +20,8 @@ import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PSource
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -55,6 +57,7 @@ class BiliSecurityCoordinator(
     private val prewarmMutex = Mutex()
     private val ensureHealthyMutex = Mutex()
     private val wbiKeysMutex = Mutex()
+    private val cookieRefreshMutex = Mutex()
 
     private var lastPrewarmTimestampMs: Long = 0L
     private var lastEnsureHealthyForPlayMs: Long = 0L
@@ -101,19 +104,26 @@ class BiliSecurityCoordinator(
             if (forceUaRefresh) {
                 refreshUserAgent()
             }
-            val mainPageLoaded = runCatching {
-                apiService.getMainPage().use { body ->
-                    body.source().request(1)
+            val (mainPageLoaded, navSuccess) = coroutineScope {
+                val mainPageDeferred = async {
+                    runCatching {
+                        apiService.getMainPage().use { body ->
+                            body.source().request(1)
+                        }
+                    }.onFailure { throwable ->
+                        AppLog.e(tag, "prewarmWebSession main page failed: ${throwable.message}", throwable)
+                    }.isSuccess
                 }
-            }.onFailure { throwable ->
-                AppLog.e(tag, "prewarmWebSession main page failed: ${throwable.message}", throwable)
-            }.isSuccess
-            val navSuccess = runCatching {
-                val navResponse = apiService.getUserDetailInfo()
-                syncUserSession(navResponse, "prewarmWebSession") != null
-            }.onFailure { throwable ->
-                AppLog.e(tag, "prewarmWebSession nav failed: ${throwable.message}", throwable)
-            }.getOrDefault(false)
+                val navDeferred = async {
+                    runCatching {
+                        val navResponse = apiService.getUserDetailInfo()
+                        syncUserSession(navResponse, "prewarmWebSession") != null
+                    }.onFailure { throwable ->
+                        AppLog.e(tag, "prewarmWebSession nav failed: ${throwable.message}", throwable)
+                    }.getOrDefault(false)
+                }
+                mainPageDeferred.await() to navDeferred.await()
+            }
             val success = mainPageLoaded || navSuccess
             if (mainPageLoaded) {
                 cookieManager.syncFromWebView()
@@ -385,97 +395,110 @@ class BiliSecurityCoordinator(
         val epochDay = System.currentTimeMillis() / 86_400_000L
         if (cookieRefreshCheckedDay == epochDay) return
 
-        runCatching {
-            val oldRefreshToken = refreshTokenProvider()
-            if (oldRefreshToken.isNullOrBlank()) {
-                AppLog.w(tag, "refreshCookie: no refresh_token stored, skipping")
-                cookieRefreshCheckedDay = epochDay
-                return@runCatching
-            }
+        // 尝试获取锁，如果已被其他协程持有则跳过（使用旧 cookie）
+        if (!cookieRefreshMutex.tryLock()) {
+            AppLog.d(tag, "refreshCookie: another refresh is in progress, skipping")
+            return
+        }
 
-            val ts = System.currentTimeMillis()
-            val correspondPath = getCorrespondPath(ts)
-            val correspondUrl = "https://www.bilibili.com/correspond/1/$correspondPath"
-            val correspondRequest = okhttp3.Request.Builder()
-                .url(correspondUrl)
-                .header("User-Agent", userAgentProvider())
-                .header("Referer", "https://www.bilibili.com")
-                .build()
-            val html = withContext(Dispatchers.IO) {
-                okHttpClient.newCall(correspondRequest).execute().use { resp ->
-                    resp.body?.string().orEmpty()
-                }
-            }
-            val csrfMatch = Regex("<div\\s+id=\"1-name\">\\s*([0-9a-fA-F]{16,})\\s*</div>")
-                .find(html)
-            val refreshCsrf = csrfMatch?.groupValues?.get(1)?.trim().orEmpty()
-            if (refreshCsrf.isBlank()) {
-                AppLog.w(tag, "refreshCookie: no csrf found in correspond page")
-                cookieRefreshCheckedDay = epochDay
-                return@runCatching
-            }
-
-            val csrf = cookieManager.getCsrfToken()
-            if (csrf.isBlank()) {
-                AppLog.w(tag, "refreshCookie: no bili_jct found")
-                cookieRefreshCheckedDay = epochDay
-                return@runCatching
-            }
-
-            val formBody = FormBody.Builder()
-                .add("csrf", csrf)
-                .add("refresh_csrf", refreshCsrf)
-                .add("source", "main_web")
-                .add("refresh_token", oldRefreshToken)
-                .build()
-            val refreshRequest = okhttp3.Request.Builder()
-                .url("https://passport.bilibili.com/x/passport-login/web/cookie/refresh")
-                .header("User-Agent", userAgentProvider())
-                .header("Referer", "https://www.bilibili.com")
-                .post(formBody)
-                .build()
-            val refreshBody = withContext(Dispatchers.IO) {
-                okHttpClient.newCall(refreshRequest).execute().use { resp ->
-                    resp.body?.string().orEmpty()
-                }
-            }
-            val refreshJson = JSONObject(refreshBody)
-            if (refreshJson.optInt("code", -1) != 0) {
-                AppLog.w(tag, "refreshCookie failed: code=${refreshJson.optInt("code")} msg=${refreshJson.optString("message")}")
-                cookieRefreshCheckedDay = epochDay
-                return@runCatching
-            }
-
-            val newRefreshToken = refreshJson.optJSONObject("data")
-                ?.optString("refresh_token", "").orEmpty().trim()
-            if (newRefreshToken.isNotBlank()) {
-                refreshTokenSaver(newRefreshToken)
-            }
+        try {
+            // Double-check after acquiring lock
+            if (cookieRefreshCheckedDay == epochDay) return
 
             runCatching {
-                val newCsrf = cookieManager.getCsrfToken()
-                val confirmForm = FormBody.Builder()
-                    .add("csrf", newCsrf)
-                    .add("refresh_token", oldRefreshToken)
-                    .build()
-                val confirmRequest = okhttp3.Request.Builder()
-                    .url("https://passport.bilibili.com/x/passport-login/web/confirm/refresh")
+                val oldRefreshToken = refreshTokenProvider()
+                if (oldRefreshToken.isNullOrBlank()) {
+                    AppLog.w(tag, "refreshCookie: no refresh_token stored, skipping")
+                    cookieRefreshCheckedDay = epochDay
+                    return@runCatching
+                }
+
+                val ts = System.currentTimeMillis()
+                val correspondPath = getCorrespondPath(ts)
+                val correspondUrl = "https://www.bilibili.com/correspond/1/$correspondPath"
+                val correspondRequest = okhttp3.Request.Builder()
+                    .url(correspondUrl)
                     .header("User-Agent", userAgentProvider())
                     .header("Referer", "https://www.bilibili.com")
-                    .post(confirmForm)
                     .build()
-                withContext(Dispatchers.IO) {
-                    okHttpClient.newCall(confirmRequest).execute().use { resp ->
-                        resp.body?.string()
+                val html = withContext(Dispatchers.IO) {
+                    okHttpClient.newCall(correspondRequest).execute().use { resp ->
+                        resp.body?.string().orEmpty()
                     }
                 }
-            }.onFailure {
-                AppLog.w(tag, "refreshCookie confirm failed: ${it.message}")
-            }
+                val csrfMatch = Regex("<div\\s+id=\"1-name\">\\s*([0-9a-fA-F]{16,})\\s*</div>")
+                    .find(html)
+                val refreshCsrf = csrfMatch?.groupValues?.get(1)?.trim().orEmpty()
+                if (refreshCsrf.isBlank()) {
+                    AppLog.w(tag, "refreshCookie: no csrf found in correspond page")
+                    cookieRefreshCheckedDay = epochDay
+                    return@runCatching
+                }
 
-            cookieRefreshCheckedDay = epochDay
-        }.onFailure {
-            AppLog.w(tag, "refreshCookie failed: ${it.message}")
+                val csrf = cookieManager.getCsrfToken()
+                if (csrf.isBlank()) {
+                    AppLog.w(tag, "refreshCookie: no bili_jct found")
+                    cookieRefreshCheckedDay = epochDay
+                    return@runCatching
+                }
+
+                val formBody = FormBody.Builder()
+                    .add("csrf", csrf)
+                    .add("refresh_csrf", refreshCsrf)
+                    .add("source", "main_web")
+                    .add("refresh_token", oldRefreshToken)
+                    .build()
+                val refreshRequest = okhttp3.Request.Builder()
+                    .url("https://passport.bilibili.com/x/passport-login/web/cookie/refresh")
+                    .header("User-Agent", userAgentProvider())
+                    .header("Referer", "https://www.bilibili.com")
+                    .post(formBody)
+                    .build()
+                val refreshBody = withContext(Dispatchers.IO) {
+                    okHttpClient.newCall(refreshRequest).execute().use { resp ->
+                        resp.body?.string().orEmpty()
+                    }
+                }
+                val refreshJson = JSONObject(refreshBody)
+                if (refreshJson.optInt("code", -1) != 0) {
+                    AppLog.w(tag, "refreshCookie failed: code=${refreshJson.optInt("code")} msg=${refreshJson.optString("message")}")
+                    cookieRefreshCheckedDay = epochDay
+                    return@runCatching
+                }
+
+                val newRefreshToken = refreshJson.optJSONObject("data")
+                    ?.optString("refresh_token", "").orEmpty().trim()
+                if (newRefreshToken.isNotBlank()) {
+                    refreshTokenSaver(newRefreshToken)
+                }
+
+                runCatching {
+                    val newCsrf = cookieManager.getCsrfToken()
+                    val confirmForm = FormBody.Builder()
+                        .add("csrf", newCsrf)
+                        .add("refresh_token", oldRefreshToken)
+                        .build()
+                    val confirmRequest = okhttp3.Request.Builder()
+                        .url("https://passport.bilibili.com/x/passport-login/web/confirm/refresh")
+                        .header("User-Agent", userAgentProvider())
+                        .header("Referer", "https://www.bilibili.com")
+                        .post(confirmForm)
+                        .build()
+                    withContext(Dispatchers.IO) {
+                        okHttpClient.newCall(confirmRequest).execute().use { resp ->
+                            resp.body?.string()
+                        }
+                    }
+                }.onFailure {
+                    AppLog.w(tag, "refreshCookie confirm failed: ${it.message}")
+                }
+
+                cookieRefreshCheckedDay = epochDay
+            }.onFailure {
+                AppLog.w(tag, "refreshCookie failed: ${it.message}")
+            }
+        } finally {
+            cookieRefreshMutex.unlock()
         }
     }
 

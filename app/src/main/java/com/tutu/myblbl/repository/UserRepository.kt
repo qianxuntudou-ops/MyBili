@@ -18,11 +18,17 @@ import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 class UserRepository(
     private val apiService: ApiService,
     private val sessionGateway: NetworkSessionGateway
 ) {
+
+    private val detailCache = mutableMapOf<String, Any>()
+    private val detailSemaphore = Semaphore(3)
     
     suspend fun getUserDetailInfo(): BaseResponse<UserDetailInfoModel> {
         return apiService.getUserDetailInfo().also { response ->
@@ -216,26 +222,49 @@ class UserRepository(
         return response
     }
 
+    @Suppress("UNCHECKED_CAST")
     private suspend fun enrichPgcDanmakuCount(list: List<com.tutu.myblbl.model.video.VideoModel>) {
         val candidates = list.filter { it.danmakuCount == 0L && it.viewCount > 0L }
         if (candidates.isEmpty()) return
         try {
-            coroutineScope {
+            supervisorScope {
                 candidates.map { video ->
                     async {
+                        val cacheKey = if (video.bvid.isNotBlank()) "bvid_${video.bvid}" else "aid_${video.aid}"
                         try {
-                            val detailResponse = apiService.getVideoDetail(video.aid, video.bvid)
-                            if (!detailResponse.isSuccess) return@async
-                            val redirectUrl = detailResponse.data?.view?.redirectUrl.orEmpty()
-                            val epId = parseEpIdFromBangumiUrl(redirectUrl)
-                            if (epId <= 0L) return@async
-                            val pgcResponse = apiService.getPgcEpisodeInfo(epId)
-                            if (pgcResponse.isSuccess) {
-                                val dm = pgcResponse.data
-                                    ?.getAsJsonObject("stat")
-                                    ?.get("dm")?.asLong ?: 0L
+                            // 先检查缓存
+                            val cached = detailCache[cacheKey]
+                            if (cached != null) {
+                                val dm = cached as Long
                                 if (dm > 0) {
                                     video.stat?.let { it.danmaku = dm }
+                                }
+                                return@async
+                            }
+
+                            detailSemaphore.withPermit {
+                                val detailResponse = apiService.getVideoDetail(video.aid, video.bvid)
+                                if (!detailResponse.isSuccess) {
+                                    detailCache[cacheKey] = 0L
+                                    return@async
+                                }
+                                val redirectUrl = detailResponse.data?.view?.redirectUrl.orEmpty()
+                                val epId = parseEpIdFromBangumiUrl(redirectUrl)
+                                if (epId <= 0L) {
+                                    detailCache[cacheKey] = 0L
+                                    return@async
+                                }
+                                val pgcResponse = apiService.getPgcEpisodeInfo(epId)
+                                if (pgcResponse.isSuccess) {
+                                    val dm = pgcResponse.data
+                                        ?.getAsJsonObject("stat")
+                                        ?.get("dm")?.asLong ?: 0L
+                                    detailCache[cacheKey] = dm
+                                    if (dm > 0) {
+                                        video.stat?.let { it.danmaku = dm }
+                                    }
+                                } else {
+                                    detailCache[cacheKey] = 0L
                                 }
                             }
                         } catch (e: Exception) {

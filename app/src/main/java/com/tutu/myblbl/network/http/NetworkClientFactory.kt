@@ -14,6 +14,7 @@ import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import okhttp3.Cache
+import okhttp3.ConnectionPool
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -40,6 +41,7 @@ object NetworkClientFactory {
                 )
             )
             .addInterceptor(HttpCacheInterceptor(cookieManager))
+            .connectionPool(ConnectionPool(5, 5, TimeUnit.MINUTES))
             .retryOnConnectionFailure(true)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)

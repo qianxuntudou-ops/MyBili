@@ -4,6 +4,9 @@ import java.security.MessageDigest
 
 object WbiGenerator {
 
+    private var cachedOriginKey: String? = null
+    private var cachedMixinKey: String? = null
+
     private val mixinKeyEncTab = intArrayOf(
         46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
         27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13,
@@ -20,7 +23,14 @@ object WbiGenerator {
             return params
         }
 
-        val mixinKey = getMixinKey(imgKey + subKey)
+        val originKey = imgKey + subKey
+        synchronized(this) {
+            if (originKey != cachedOriginKey) {
+                cachedOriginKey = null
+                cachedMixinKey = null
+            }
+        }
+        val mixinKey = getMixinKey(originKey)
         val wts = System.currentTimeMillis() / 1000
 
         val withWts = params.toMutableMap()
@@ -39,6 +49,11 @@ object WbiGenerator {
     }
 
     private fun getMixinKey(originKey: String): String {
+        synchronized(this) {
+            if (originKey == cachedOriginKey && cachedMixinKey != null) {
+                return cachedMixinKey!!
+            }
+        }
         val sb = StringBuilder()
         for (i in mixinKeyEncTab.indices) {
             val index = mixinKeyEncTab[i]
@@ -46,7 +61,12 @@ object WbiGenerator {
                 sb.append(originKey[index])
             }
         }
-        return sb.toString().take(32)
+        val result = sb.toString().take(32)
+        synchronized(this) {
+            cachedOriginKey = originKey
+            cachedMixinKey = result
+        }
+        return result
     }
 
     private fun filterValue(v: String): String = v.filterNot { it in "!\'()*" }
