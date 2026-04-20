@@ -69,6 +69,20 @@ class SearchRepository(
     private val okHttpClient: OkHttpClient,
     private val sessionGateway: NetworkSessionGateway
 ) {
+
+    private val htmlCache = object : LinkedHashMap<String, String>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean {
+            return size > 64
+        }
+    }
+
+    @Synchronized
+    private fun parseHtml(html: String): String {
+        return htmlCache.getOrPut(html) {
+            HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+        }
+    }
+
     private val searchApiService: SearchApiService by lazy {
         Retrofit.Builder()
             .baseUrl("https://api.bilibili.com/")
@@ -96,8 +110,7 @@ class SearchRepository(
         runCatching {
             val response = searchApiService.searchSuggest(keyword)
             response.result.tag.mapNotNull { item ->
-                val name = HtmlCompat.fromHtml(item.name, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                    .toString()
+                val name = parseHtml(item.name)
                     .ifBlank { item.value }
                     .takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 HotWordModel.createSuggest(
@@ -193,7 +206,7 @@ class SearchRepository(
         return VideoModel(
             aid = aid.takeIf { it > 0 } ?: id,
             bvid = bvid,
-            title = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY).toString(),
+            title = parseHtml(title),
             pic = normalizeUrl(pic.ifBlank { cover }),
             owner = Owner(
                 mid = mid.toLongOrNull() ?: 0L,

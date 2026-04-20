@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.tutu.myblbl.MyBLBLApplication
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
+import com.tutu.myblbl.network.http.NetworkClientFactory
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -37,7 +38,7 @@ object FileCacheManager {
 
     private val totalSize = AtomicLong(0)
     private val totalCount = AtomicInteger(0)
-    private val gson = Gson()
+    private val gson: Gson by lazy { NetworkClientFactory.createGson() }
 
     @Volatile
     private var initialized = false

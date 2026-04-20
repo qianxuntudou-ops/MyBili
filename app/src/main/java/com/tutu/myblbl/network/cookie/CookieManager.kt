@@ -19,9 +19,13 @@ class CookieManager : CookieJar {
     
     private val appSettings: AppSettingsDataStore get() = KoinPlatform.getKoin().get()
     private val cookieCache = ConcurrentHashMap<String, MutableList<Cookie>>()
-    
+
+    @Volatile
+    private var lastCookieCleanupTime = 0L
+
     companion object {
         private const val KEY_COOKIES = "cookies"
+        private const val COOKIE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
     }
     
     fun init(context: Context) {
@@ -266,6 +270,9 @@ class CookieManager : CookieJar {
     }
 
     private fun removeExpiredCookies() {
+        val now = System.currentTimeMillis()
+        if (now - lastCookieCleanupTime < COOKIE_CLEANUP_INTERVAL_MS) return
+        lastCookieCleanupTime = now
         val emptyDomains = mutableListOf<String>()
         cookieCache.forEach { (domain, cookies) ->
             cookies.removeAll { !isCookieActive(it) }

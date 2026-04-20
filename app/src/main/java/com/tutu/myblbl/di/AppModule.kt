@@ -42,6 +42,9 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
+// Koin DI 延迟加载检查结论：
+// Koin 的 single {} 和 viewModel {} 默认都是延迟创建的（首次请求时才实例化），
+// 当前模块声明方式已经是最佳实践，无需额外优化。
 val networkModule = module {
     single<ApiService> { NetworkManager.apiService }
     single<OkHttpClient> { NetworkManager.getOkHttpClient() }
