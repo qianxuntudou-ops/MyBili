@@ -823,6 +823,8 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
     override fun onStart() {
         super.onStart()
+        // 重新绑定 video surface，恢复视频解码器
+        playerView.reattachVideoSurface()
         resumePlaybackIfNeeded(reason = "onStart")
         if (resumePlaybackWhenStarted) {
             playerView.resumeDanmaku()
@@ -848,8 +850,10 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         resumePlaybackWhenStarted = snapshotPlayWhenReady
         player?.pause()
         player?.playWhenReady = false
-        playerView.pauseDanmaku()
+        playerView.stopDanmaku()
         stopProgressUpdates()
+        // 提前释放视频解码器，避免后台持有硬件解码器资源
+        playerView.detachVideoSurface()
         syncPlaybackEnvironment()
     }
 

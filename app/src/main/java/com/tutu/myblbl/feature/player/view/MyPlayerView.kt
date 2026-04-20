@@ -1350,6 +1350,31 @@ class MyPlayerView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * 将 player 的 video surface 解绑，释放视频解码器。
+     * 用于 onStop 中提前释放解码器资源，避免后台持有硬件解码器。
+     */
+    fun detachVideoSurface() {
+        val currentPlayer = player ?: return
+        when (val surfaceView = videoSurfaceView) {
+            is SurfaceView -> currentPlayer.clearVideoSurfaceView(surfaceView)
+            is TextureView -> currentPlayer.clearVideoTextureView(surfaceView)
+            else -> currentPlayer.clearVideoSurface()
+        }
+    }
+
+    /**
+     * 将 player 的 video surface 重新绑定，恢复视频渲染。
+     * 用于 onStart 中恢复前台播放。
+     */
+    fun reattachVideoSurface() {
+        val currentPlayer = player ?: return
+        when (val surfaceView = videoSurfaceView) {
+            is SurfaceView -> currentPlayer.setVideoSurfaceView(surfaceView)
+            is TextureView -> currentPlayer.setVideoTextureView(surfaceView)
+        }
+    }
+
     fun destroy() {
         controller?.clearVideoSettingChangeListener()
         val currentPlayer = player

@@ -275,6 +275,13 @@ class MyPlayerDanmakuController(
         danmakuView.isFocusable = false
         syncSnapshotPosition()
         releasePlayer()
+
+        // 根据屏幕分辨率动态调整弹幕缓存池大小
+        val screenW = context.resources.displayMetrics.widthPixels
+        val screenH = context.resources.displayMetrics.heightPixels
+        DanmakuConfig.CACHE_POOL_MAX_MEMORY_SIZE =
+            DanmakuConfig.computeCachePoolMaxMemorySize(screenW, screenH)
+
         danmakuPlayer = DanmakuPlayer(SimpleRenderer()).also { player ->
             player.bindView(danmakuView)
             player.updateConfig(danmakuConfig)

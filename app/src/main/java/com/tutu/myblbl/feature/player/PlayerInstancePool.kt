@@ -9,10 +9,11 @@ import androidx.media3.exoplayer.ExoPlayer
 
 internal object PlayerInstancePool {
     private const val IDLE_RELEASE_DELAY_MS = 45_000L
-    private const val MIN_BUFFER_MS = 1_000
+    private const val MIN_BUFFER_MS = 2_000
     private const val MAX_BUFFER_MS = 12_000
-    private const val BUFFER_FOR_PLAYBACK_MS = 100
-    private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 500
+    private const val BUFFER_FOR_PLAYBACK_MS = 2_000
+    private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 3_000
+    private const val TARGET_BUFFER_BYTES = 10 * 1024 * 1024 // 10MB
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -110,7 +111,7 @@ internal object PlayerInstancePool {
                 BUFFER_FOR_PLAYBACK_MS,
                 BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
             )
-            .setTargetBufferBytes(DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES)
+            .setTargetBufferBytes(TARGET_BUFFER_BYTES)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         return ExoPlayer.Builder(context)

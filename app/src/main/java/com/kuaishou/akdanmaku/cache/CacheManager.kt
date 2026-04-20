@@ -26,7 +26,6 @@ package com.kuaishou.akdanmaku.cache
 import android.os.*
 import com.kuaishou.akdanmaku.ext.AkLog as Log
 import com.kuaishou.akdanmaku.DanmakuConfig
-import com.kuaishou.akdanmaku.DanmakuConfig.Companion.CACHE_POOL_MAX_MEMORY_SIZE
 import com.kuaishou.akdanmaku.data.DanmakuItem
 import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.data.ItemState
@@ -59,7 +58,7 @@ class CacheManager(private val callbackHandler: Handler, private val renderer: D
 
   private val measureSizeCache = Collections.synchronizedMap(mutableMapOf<Long, Size>())
 
-  val cachePool = DrawingCachePool(CACHE_POOL_MAX_MEMORY_SIZE)
+  val cachePool = DrawingCachePool(DanmakuConfig.CACHE_POOL_MAX_MEMORY_SIZE)
   var isReleased: Boolean = false
     private set
 

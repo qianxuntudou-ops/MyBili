@@ -214,9 +214,39 @@ data class DanmakuConfig(
       Log.d(DanmakuEngine.TAG, "Generation[$type] update to $generation")
     }
 
-    // 50M 缓存池
-    var CACHE_POOL_MAX_MEMORY_SIZE = 1024 * 1024 * 50
+    // 单次释放缓存的最大数量
+    const val MAX_RELEASE_PER_DRAIN = 48
 
     const val DEFAULT_DURATION = 3800L
+
+    /**
+     * 根据屏幕分辨率和设备可用内存动态计算弹幕缓存池大小。
+     *
+     * - 低分辨率 (<=720p): 32MB
+     * - 中分辨率 (720p < x <= 1080p): 50MB
+     * - 高分辨率 (>1080p): 72MB
+     *
+     * 在设备可用内存较低 (<512MB) 时，以上值减半。
+     */
+    fun computeCachePoolMaxMemorySize(screenWidth: Int, screenHeight: Int): Int {
+      val mb = 1024 * 1024
+      val maxPixels = screenWidth * screenHeight
+
+      val baseSize = when {
+        maxPixels <= 1280 * 720 -> 32 * mb   // <=720p
+        maxPixels <= 1920 * 1080 -> 50 * mb  // <=1080p
+        else -> 72 * mb                       // >1080p
+      }
+
+      // 低内存设备减半
+      val runtime = Runtime.getRuntime()
+      val availableMb = (runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory())) / mb
+      return if (availableMb < 512) baseSize / 2 else baseSize
+    }
+
+    /**
+     * 全局缓存池最大内存（字节），默认 50MB，可由 [computeCachePoolMaxMemorySize] 动态设置。
+     */
+    var CACHE_POOL_MAX_MEMORY_SIZE = 1024 * 1024 * 50
   }
 }

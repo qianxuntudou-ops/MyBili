@@ -368,6 +368,12 @@ class VideoPlayerViewModel(
     private var danmakuLoadGeneration: Long = 0L
     private var videoLoadGeneration: Long = 0L
 
+    // 弹幕片段缓存：按片段索引存储弹幕数据，用于淘汰远距离片段释放内存
+    private val danmakuSegmentItems = LinkedHashMap<Int, List<DmModel>>()
+    private val danmakuLoadedSegments = linkedSetOf<Int>()
+    private var currentDanmakuSegmentIndex: Int = -1
+    private var danmakuTotalSegments: Int = 0
+
     private var currentStreamFallbackPlan: VideoPlayerStreamResolver.StreamFallbackPlan? = null
     private var fallbackRouteIndex: Int = 0
     private var fallbackCdnIndex: Int = 0
@@ -710,6 +716,7 @@ class VideoPlayerViewModel(
             }
         }
         updateSubtitleText(sanitizedPositionMs)
+        onDanmakuSegmentChanged(sanitizedPositionMs)
     }
 
     fun setLoading(loading: Boolean) {
@@ -2064,6 +2071,13 @@ class VideoPlayerViewModel(
                 segmentCount = segmentCount,
                 danmakuView = danmakuView
             )
+
+            // 初始化片段缓存
+            danmakuSegmentItems.clear()
+            danmakuLoadedSegments.clear()
+            danmakuTotalSegments = segmentCount
+            currentDanmakuSegmentIndex = 1
+
             val initialPayload = coroutineScope {
                 val firstBatchDeferred = async(Dispatchers.IO) {
                     loadDanmakuSegmentPayload(
@@ -2087,6 +2101,9 @@ class VideoPlayerViewModel(
             if (!isActiveDanmakuRequest(loadGeneration)) {
                 return@launch
             }
+            // 缓存第1个片段
+            danmakuSegmentItems[1] = initialPayload.regularItems.toList()
+            danmakuLoadedSegments.add(1)
             publishDanmaku(initialPayload.regularItems, replace = true)
             _specialDanmaku.value = initialPayload.specialItems
             logDanmakuDiagnostics(
@@ -2095,6 +2112,7 @@ class VideoPlayerViewModel(
                 danmakuView = danmakuView
             )
             if (segmentCount <= 1) {
+                trimDistantDanmakuSegments()
                 return@launch
             }
 
@@ -2116,6 +2134,9 @@ class VideoPlayerViewModel(
                     val (segmentIndex, payload) = deferred.await()
                     val chunkDanmaku = payload.regularItems
                     val chunkSpecialDanmaku = payload.specialItems
+                    // 缓存每个片段
+                    danmakuSegmentItems[segmentIndex] = chunkDanmaku.toList()
+                    danmakuLoadedSegments.add(segmentIndex)
                     if (chunkDanmaku.isEmpty() && chunkSpecialDanmaku.isEmpty()) return@forEach
                     if (chunkDanmaku.isNotEmpty()) {
                         fullDanmaku.addAll(chunkDanmaku)
@@ -2132,6 +2153,7 @@ class VideoPlayerViewModel(
             }
             _danmaku.value = fullDanmaku.toList()
             _specialDanmaku.value = fullSpecialDanmaku.toList()
+            trimDistantDanmakuSegments()
             logDanmakuDiagnostics(
                 label = "full",
                 items = fullDanmaku,
@@ -2375,10 +2397,46 @@ class VideoPlayerViewModel(
         danmakuLoadJob?.cancel()
         _danmaku.value = emptyList()
         _specialDanmaku.value = emptyList()
+        danmakuSegmentItems.clear()
+        danmakuLoadedSegments.clear()
+        currentDanmakuSegmentIndex = -1
+        danmakuTotalSegments = 0
     }
 
     private fun isActiveDanmakuRequest(loadGeneration: Long): Boolean {
         return danmakuLoadGeneration == loadGeneration && currentCid == loadedDanmakuCid
+    }
+
+    /**
+     * 根据播放位置计算当前弹幕片段索引（片段从1开始，每个片段6分钟）
+     */
+    private fun resolveDanmakuSegmentIndex(positionMs: Long): Int {
+        if (danmakuTotalSegments <= 0) return -1
+        return ((positionMs.coerceAtLeast(0L) / 360000L) + 1L).toInt().coerceIn(1, danmakuTotalSegments)
+    }
+
+    /**
+     * 清理距离当前播放片段过远的弹幕数据，保留当前片段 +/- 1 个片段
+     */
+    private fun trimDistantDanmakuSegments() {
+        if (currentDanmakuSegmentIndex <= 0 || danmakuSegmentItems.isEmpty()) return
+        val keepRange = (currentDanmakuSegmentIndex - 1)..(currentDanmakuSegmentIndex + 1)
+        val keysToRemove = danmakuSegmentItems.keys.filter { it !in keepRange }
+        if (keysToRemove.isEmpty()) return
+        keysToRemove.forEach { key ->
+            danmakuSegmentItems.remove(key)
+            danmakuLoadedSegments.remove(key)
+        }
+    }
+
+    /**
+     * 当播放位置变化导致片段切换时，更新当前片段索引并清理远距离片段
+     */
+    private fun onDanmakuSegmentChanged(positionMs: Long) {
+        val newIndex = resolveDanmakuSegmentIndex(positionMs)
+        if (newIndex <= 0 || newIndex == currentDanmakuSegmentIndex) return
+        currentDanmakuSegmentIndex = newIndex
+        trimDistantDanmakuSegments()
     }
 
     private fun capturePlaybackSnapshot(positionMs: Long, playWhenReady: Boolean) {
