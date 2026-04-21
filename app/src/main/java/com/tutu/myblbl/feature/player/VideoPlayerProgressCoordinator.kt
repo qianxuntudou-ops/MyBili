@@ -17,7 +17,7 @@ class VideoPlayerProgressCoordinator(
         private const val PROGRESS_POLL_INTERVAL_MS = 500L
         private const val PLAYBACK_STALL_THRESHOLD_MS = 2500L
         private const val PLAYBACK_STALL_RECOVERY_COOLDOWN_MS = 5000L
-        private const val HEARTBEAT_INTERVAL_MS = 15_000L
+        private const val HEARTBEAT_INTERVAL_MS = 5_000L
     }
 
     private val handler = Handler(Looper.getMainLooper())

@@ -11,6 +11,7 @@ import android.view.ViewConfiguration
 import androidx.recyclerview.widget.DiffUtil
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
+import com.tutu.myblbl.model.video.Dimension
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.core.ui.base.BaseAdapter
 import com.tutu.myblbl.core.ui.image.ImageLoader
@@ -279,7 +280,7 @@ class VideoAdapter(
                         && currentVideo === video && isPortrait
                     ) {
                         binding.imageAvatar.visibility = View.GONE
-                        binding.textPortraitBadge.visibility = View.VISIBLE
+                        applyBadge(video.copy(dimension = Dimension(width = 1, height = 2)))
                     }
                 }
             }
@@ -306,11 +307,10 @@ class VideoAdapter(
             }
             if (video.isPortrait) {
                 binding.imageAvatar.visibility = View.GONE
-                binding.textPortraitBadge.visibility = View.VISIBLE
             } else {
                 binding.imageAvatar.visibility = if (ownerName.isNotBlank()) View.VISIBLE else View.GONE
-                binding.textPortraitBadge.visibility = View.GONE
             }
+            applyBadge(video)
 
             val duration = video.durationValue
             val progress = video.historyProgress.coerceAtLeast(0L)
@@ -339,7 +339,7 @@ class VideoAdapter(
             binding.iconDanmaku.visibility = View.GONE
             binding.textDanmakuCount.visibility = View.GONE
             binding.imageAvatar.visibility = View.GONE
-            binding.textPortraitBadge.visibility = View.GONE
+            binding.textBadge.visibility = View.GONE
 
             val duration = video.durationValue
             val progress = video.historyProgress.coerceAtLeast(0)
@@ -360,6 +360,18 @@ class VideoAdapter(
             }
             binding.textViewOwner.text = formatHistoryTime(video.historyViewAt)
             binding.textChargeBadge.visibility = if (video.isChargingExclusive) View.VISIBLE else View.GONE
+        }
+
+        private fun applyBadge(video: VideoModel) {
+            val parts = mutableListOf<String>()
+            if (video.isFollowed) parts.add("已关注")
+            if (video.isPortrait) parts.add("竖屏")
+            if (parts.isEmpty()) {
+                binding.textBadge.visibility = View.GONE
+            } else {
+                binding.textBadge.text = parts.joinToString("|")
+                binding.textBadge.visibility = View.VISIBLE
+            }
         }
 
         private fun resolveDisplayTitle(video: VideoModel): String {

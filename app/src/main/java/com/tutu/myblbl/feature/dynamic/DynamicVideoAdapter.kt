@@ -199,23 +199,25 @@ class DynamicVideoAdapter(
                 }
                 if (item.isPortrait) {
                     binding.imageAvatar.visibility = View.GONE
-                    binding.textPortraitBadge.visibility = View.VISIBLE
+                    binding.textBadge.text = "竖屏"
+                    binding.textBadge.visibility = View.VISIBLE
                 } else {
                     binding.imageAvatar.visibility = View.VISIBLE
-                    binding.textPortraitBadge.visibility = View.GONE
+                    binding.textBadge.visibility = View.GONE
                     ImageLoader.detectPortraitFromCover(binding.imageView, coverUrl) { isPortrait ->
                         if (bindingAdapterPosition != NO_POSITION
                             && currentItem === item && isPortrait
                         ) {
                             binding.imageAvatar.visibility = View.GONE
-                            binding.textPortraitBadge.visibility = View.VISIBLE
+                            binding.textBadge.text = "竖屏"
+                            binding.textBadge.visibility = View.VISIBLE
                         }
                     }
                 }
             } else {
                 binding.textViewOwner.text = publishText
                 binding.imageAvatar.visibility = View.GONE
-                binding.textPortraitBadge.visibility = View.GONE
+                binding.textBadge.visibility = View.GONE
             }
 
             binding.textPlayCount.text = NumberUtils.formatCount(item.viewCount)

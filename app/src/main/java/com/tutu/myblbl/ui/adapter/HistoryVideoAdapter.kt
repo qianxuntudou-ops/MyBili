@@ -56,25 +56,6 @@ class HistoryVideoAdapter(
         submitList(currentList + deduplicated)
     }
 
-    fun updateProgressFromPlayer(
-        aid: Long,
-        cid: Long,
-        @Suppress("UNUSED_PARAMETER") pageOrProgressMs: Long
-    ) {
-        if (aid <= 0L) return
-        val index = currentList.indexOfFirst { (it.history?.oid ?: 0L) == aid }
-        if (index < 0) return
-        val item = currentList[index]
-        val updatedItem = item.copy(
-            history = item.history?.copy(cid = cid),
-            progress = pageOrProgressMs.coerceAtLeast(0L) / 1000L,
-            viewAt = System.currentTimeMillis() / 1000L
-        )
-        val newList = currentList.toMutableList()
-        newList[index] = updatedItem
-        submitList(newList)
-    }
-
     fun getFocusedPosition(): Int = focusedPosition
 
     fun getItemsSnapshot(): List<HistoryVideoModel> = currentList.toList()
@@ -257,7 +238,7 @@ class HistoryVideoAdapter(
                 chainedListener = keyListener
             )
             binding.imageAvatar.visibility = View.GONE
-            binding.textPortraitBadge.visibility = View.GONE
+            binding.textBadge.visibility = View.GONE
             binding.iconPlayCount.visibility = View.GONE
             binding.textPlayCount.visibility = View.GONE
             binding.iconDanmaku.visibility = View.GONE
@@ -271,7 +252,12 @@ class HistoryVideoAdapter(
             binding.textView.isSelected = isFocused
             binding.textView.text = item.title.ifBlank { item.showTitle }
             binding.imageAvatar.visibility = View.GONE
-            binding.textPortraitBadge.visibility = if (item.isPortrait) View.VISIBLE else View.GONE
+            if (item.isPortrait) {
+                binding.textBadge.text = "竖屏"
+                binding.textBadge.visibility = View.VISIBLE
+            } else {
+                binding.textBadge.visibility = View.GONE
+            }
             binding.iconPlayCount.visibility = View.GONE
             binding.textPlayCount.visibility = View.GONE
             binding.iconDanmaku.visibility = View.GONE

@@ -218,15 +218,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
                         return@collectLatest
                     }
                     when (event) {
-                        is AppEventHub.Event.PlaybackProgressUpdated -> {
-                            if (type == TYPE_HISTORY) {
-                                historyAdapter?.updateProgressFromPlayer(
-                                    event.aid,
-                                    event.cid,
-                                    event.progressMs
-                                )
-                            }
-                        }
+
 
                         AppEventHub.Event.UserSessionChanged -> {
                             if (type == TYPE_HISTORY || type == TYPE_LATER) {

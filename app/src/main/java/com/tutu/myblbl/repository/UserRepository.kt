@@ -16,6 +16,7 @@ import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.BaseBaseResponse
 import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.supervisorScope
@@ -123,6 +124,28 @@ class UserRepository(
                 source = "checkUserRelation"
             )
         }
+
+    suspend fun batchCheckFollowed(mids: List<Long>): Set<Long> {
+        if (!isLoggedIn() || mids.isEmpty()) return emptySet()
+        return try {
+            coroutineScope {
+                mids.map { mid ->
+                    async {
+                        runCatching {
+                            val response = sessionGateway.syncAuthState(
+                                apiService.checkUserRelation(mid.toString()),
+                                source = "batchCheckFollowed"
+                            )
+                            if (response.isSuccess && response.data?.attribute?.and(2) != 0) mid else null
+                        }.getOrNull()
+                    }
+                }.awaitAll().filterNotNull().toSet()
+            }
+        } catch (e: Exception) {
+            AppLog.w("UserRepository", "batchCheckFollowed failed: ${e.message}")
+            emptySet()
+        }
+    }
 
     suspend fun modifyRelation(
         fid: Long,

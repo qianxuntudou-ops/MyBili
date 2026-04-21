@@ -379,6 +379,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        @Suppress("DEPRECATION")
         overridePendingTransition(R.anim.slide_in_to_right, R.anim.slide_out_to_left)
         handleIntent(intent)
     }
@@ -943,6 +944,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
     override fun finish() {
         super.finish()
+        @Suppress("DEPRECATION")
         overridePendingTransition(R.anim.slide_in_to_left, R.anim.slide_out_to_right)
     }
 

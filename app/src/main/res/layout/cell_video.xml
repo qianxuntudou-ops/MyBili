@@ -147,7 +147,7 @@
             app:srcCompat="@drawable/ic_video_up"
             app:tint="?android:attr/textColorSecondary"/>
         <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/text_portrait_badge"
+            android:id="@+id/text_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -155,11 +155,11 @@
             android:background="@drawable/bg_charge_badge"
             android:paddingStart="@dimen/px6"
             android:paddingEnd="@dimen/px6"
-            android:paddingTop="@dimen/px2"
-            android:paddingBottom="@dimen/px2"
-            android:text="竖屏"
+            android:paddingTop="@dimen/px4"
+            android:paddingBottom="@dimen/px4"
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/px18"
+            android:textSize="@dimen/px20"
+            android:textStyle="bold"
             android:visibility="gone"/>
     </FrameLayout>
     <androidx.appcompat.widget.AppCompatTextView
