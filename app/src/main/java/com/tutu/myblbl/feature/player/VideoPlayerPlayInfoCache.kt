@@ -48,6 +48,19 @@ internal object VideoPlayerPlayInfoCache {
     }
 
     @Synchronized
+    fun updateLastPlayPosition(bvid: String, cid: Long, lastPlayTime: Long, lastPlayCid: Long) {
+        if (bvid.isBlank() || cid <= 0L) return
+        val key = buildKey(bvid, cid)
+        val entry = cache[key] ?: return
+        cache[key] = entry.copy(
+            playInfo = entry.playInfo.copy(
+                lastPlayTime = lastPlayTime,
+                lastPlayCid = lastPlayCid
+            )
+        )
+    }
+
+    @Synchronized
     fun invalidate(bvid: String, cid: Long) {
         if (bvid.isBlank() || cid <= 0L) return
         cache.remove(buildKey(bvid, cid))

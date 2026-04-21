@@ -722,8 +722,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                 try {
                     currentPlayer.playWhenReady = false
                     currentPlayer.stop()
-                    currentPlayer.setMediaSource(playbackRequest.mediaSource)
-                    currentPlayer.seekTo(playbackRequest.seekPositionMs)
+                    currentPlayer.setMediaSource(playbackRequest.mediaSource, playbackRequest.seekPositionMs)
                     currentPlayer.prepare()
                     currentPlayer.playWhenReady = playbackRequest.playWhenReady
                 } finally {
@@ -876,7 +875,10 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         }
 
         lifecycleScope.launch {
-            viewModel.resumeHint.collect { hint -> resumeHintController.onHintChanged(hint) }
+            viewModel.resumeHint.collect { hint ->
+                // Toast 已在 ViewModel 中直接显示，仅消费 hint
+                if (hint != null) viewModel.clearResumeHint()
+            }
         }
 
         lifecycleScope.launch {

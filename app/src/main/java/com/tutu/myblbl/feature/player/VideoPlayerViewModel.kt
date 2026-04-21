@@ -5,6 +5,8 @@ package com.tutu.myblbl.feature.player
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
+import java.util.Locale
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,6 +20,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.MediaSource
 import com.google.gson.Gson
+import com.tutu.myblbl.R
 import com.tutu.myblbl.core.common.media.VideoCodecSupport
 import com.tutu.myblbl.feature.player.cache.PlayerMediaCache
 import com.tutu.myblbl.model.dm.AdvancedDanmakuParser
@@ -199,6 +202,26 @@ class VideoPlayerViewModel(
 
     fun clearResumeHint() {
         _resumeHint.value = null
+    }
+
+    private var resumeToast: Toast? = null
+
+    private fun showResumePositionToast(positionMs: Long) {
+        resumeToast?.cancel()
+        val totalSeconds = positionMs / 1000
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        val timeStr = if (hours > 0) {
+            String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        }
+        resumeToast = Toast.makeText(
+            appContext,
+            appContext.getString(R.string.tip_play_from_history, timeStr),
+            Toast.LENGTH_SHORT
+        ).also { it.show() }
     }
 
     private val gson = Gson()
@@ -442,6 +465,11 @@ class VideoPlayerViewModel(
         val bvid = currentBvid.orEmpty()
         val cid = currentCid
         if (cid <= 0L && aid <= 0L && bvid.isBlank()) return
+        val positionMs = _currentPosition.value.coerceAtLeast(0L)
+            .takeIf { it > 0L } ?: pendingSeekPositionMs.coerceAtLeast(0L)
+        if (bvid.isNotBlank() && cid > 0L && positionMs > 0L) {
+            VideoPlayerPlayInfoCache.updateLastPlayPosition(bvid, cid, positionMs, cid)
+        }
         savedStateHandle[SAVED_AID] = aid
         savedStateHandle[SAVED_BVID] = bvid
         savedStateHandle[SAVED_CID] = cid
@@ -1457,7 +1485,6 @@ class VideoPlayerViewModel(
         }
 
         val useServerResume = preferLastPlayTime &&
-            !usedCachedPlayInfo &&
             initialPlayInfo.lastPlayCid == identity.cid &&
             initialPlayInfo.lastPlayTime > 5000L
 
@@ -1472,8 +1499,12 @@ class VideoPlayerViewModel(
         val startPosition = rawResumePosition.takeIf { shouldResume } ?: 0L
 
         val resumeHintPositionMs = startPosition.takeIf { shouldResume && !replaceInPlace }
-        val seekToStart = if (resumeHintPositionMs != null) 0L else startPosition
-        AppLog.i(TAG, "PLAY_CHAIN [6] createMediaSource done +${System.currentTimeMillis() - requestStartMs}ms")
+        val seekToStart = startPosition
+        AppLog.i(TAG, "PLAY_CHAIN [6] createMediaSource done +${System.currentTimeMillis() - requestStartMs}ms " +
+            "useServerResume=$useServerResume usedCached=$usedCachedPlayInfo " +
+            "lastPlayCid=${initialPlayInfo.lastPlayCid} cid=${identity.cid} " +
+            "lastPlayTime=${initialPlayInfo.lastPlayTime} playbackPos=$playbackPositionMs " +
+            "rawResume=$rawResumePosition shouldResume=$shouldResume seekTo=$seekToStart")
         return PreparedPlayback(
             identity = identity,
             playInfo = initialPlayInfo,
@@ -1518,6 +1549,7 @@ class VideoPlayerViewModel(
         )
         preparedPlayback.resumeHintPositionMs?.let { targetPositionMs ->
             _resumeHint.value = ResumeProgressHint(targetPositionMs = targetPositionMs)
+            showResumePositionToast(targetPositionMs)
         }
         _error.value = null
         if (loadedPlayerExtrasCid != preparedPlayback.identity.cid) {

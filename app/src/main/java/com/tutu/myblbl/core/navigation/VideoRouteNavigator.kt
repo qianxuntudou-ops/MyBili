@@ -30,7 +30,8 @@ object VideoRouteNavigator {
         PlayerActivity.start(
             context = context,
             video = video,
-            seekPositionMs = seekPositionMs,
+            seekPositionMs = seekPositionMs.takeIf { it > 0L }
+                ?: video.historyProgress * 1000L,
             playQueue = playQueue,
             startEpisodeIndex = startEpisodeIndex
         )
