@@ -71,7 +71,7 @@ internal class AkTopRetainer(
       for (row in rows) {
         if (itemHeight > row.bottom - row.top) continue
         val hasCollision = row.items.any { existing ->
-          existing.willCollision(drawItem, displayer, currentTimeMills, duration)
+          existing.willCollision(drawItem, displayer, currentTimeMills, duration, config.overlapFraction)
         }
         if (!hasCollision && row.items.size < bestLoad) {
           bestLoad = row.items.size

@@ -112,6 +112,11 @@ data class DanmakuConfig(
   var allowOverlap: Boolean = false,
 
   /**
+   * 同行弹幕允许的重叠比例，0 = 不允许重叠，0.5 = 允许重叠一半宽度
+   */
+  var overlapFraction: Float = 0.3f,
+
+  /**
    * 可见性标记，当可见性发生变化时更新
    */
   var visibilityGeneration: Int = 0,

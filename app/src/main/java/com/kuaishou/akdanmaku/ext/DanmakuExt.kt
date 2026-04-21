@@ -51,7 +51,8 @@ internal fun DanmakuItem.willCollision(
   danmaku: DanmakuItem,
   displayer: DanmakuDisplayer,
   current: Long,
-  durationMs: Long
+  durationMs: Long,
+  overlapFraction: Float = 0f
 ): Boolean {
   if (isOutside(current)) return false
   val dt = danmaku.timePosition - timePosition
@@ -66,8 +67,8 @@ internal fun DanmakuItem.willCollision(
     return true
   }
 
-  return checkCollisionAtTime(this, danmaku, displayer, current, durationMs) ||
-    checkCollisionAtTime(this, danmaku, displayer, current + durationMs, durationMs)
+  return checkCollisionAtTime(this, danmaku, displayer, current, durationMs, overlapFraction) ||
+    checkCollisionAtTime(this, danmaku, displayer, current + durationMs, durationMs, overlapFraction)
 }
 
 private fun checkCollisionAtTime(
@@ -75,16 +76,18 @@ private fun checkCollisionAtTime(
   d2: DanmakuItem,
   displayer: DanmakuDisplayer,
   current: Long,
-  durationMs: Long
+  durationMs: Long,
+  overlapFraction: Float = 0f
 ): Boolean {
   val width = displayer.width
   val w1 = d1.drawState.width
   val w2 = d2.drawState.width
+  val tolerance = minOf(w1, w2) * overlapFraction
   val dt1 = current - d1.timePosition
   val dt2 = current - d2.timePosition
   val r1 = width - (width + w1) * (dt1.toFloat() / durationMs) + w1
   val l2 = width - (width + w2) * (dt2.toFloat() / durationMs)
-  return l2 < r1
+  return l2 < r1 - tolerance
 }
 
 const val RETAINER_BILIBILI = 0
