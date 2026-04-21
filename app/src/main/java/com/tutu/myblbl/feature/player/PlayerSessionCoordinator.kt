@@ -6,7 +6,6 @@ import androidx.media3.common.util.UnstableApi
 import com.tutu.myblbl.core.model.id.Cid
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
-import com.tutu.myblbl.core.common.ext.serializableCompat
 import java.util.ArrayDeque
 
 @OptIn(UnstableApi::class)
@@ -43,12 +42,7 @@ class PlayerSessionCoordinator {
     fun consumeLaunchContext(arguments: Bundle?): PlayerLaunchContext? {
         val resolved = resolveLaunchContext(arguments) ?: return null
         launchContext = resolved
-        launchVideo = resolved.initialVideo
-        currentVideo = resolved.initialVideo
         launchStartEpisodeIndex = resolved.startEpisodeIndex
-        launchQueue.clear()
-        launchQueue.addAll(resolved.playQueue.filter(::isPlayableVideo))
-        trimQueueAgainstCurrent(launchVideo)
         if (launchStartEpisodeIndex >= 0 && selectedEpisodeIndex == 0) {
             selectedEpisodeIndex = launchStartEpisodeIndex
         }
@@ -57,9 +51,6 @@ class PlayerSessionCoordinator {
 
     fun resolveLaunchContext(arguments: Bundle?): PlayerLaunchContext? {
         val args = arguments ?: return null
-        args.serializableCompat<PlayerLaunchContext>(VideoPlayerFragment.ARG_LAUNCH_CONTEXT)?.let {
-            return it
-        }
         return PlayerLaunchContext.create(
             aid = args.getLong(VideoPlayerFragment.ARG_AID, 0L),
             bvid = args.getString(VideoPlayerFragment.ARG_BVID).orEmpty(),
@@ -67,8 +58,6 @@ class PlayerSessionCoordinator {
             epId = args.getLong(VideoPlayerFragment.ARG_EP_ID, 0L),
             seasonId = args.getLong(VideoPlayerFragment.ARG_SEASON_ID, 0L),
             seekPositionMs = args.getLong(VideoPlayerFragment.ARG_SEEK_POSITION_MS, 0L),
-            initialVideo = args.serializableCompat(VideoPlayerFragment.ARG_INITIAL_VIDEO),
-            playQueue = args.serializableCompat<ArrayList<VideoModel>>(VideoPlayerFragment.ARG_PLAY_QUEUE).orEmpty(),
             startEpisodeIndex = args.getInt(VideoPlayerFragment.ARG_START_EPISODE, -1)
         )
     }

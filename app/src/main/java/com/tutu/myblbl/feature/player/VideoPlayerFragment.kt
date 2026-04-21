@@ -65,26 +65,13 @@ class VideoPlayerFragment : Fragment() {
 
     companion object {
         private const val TAG = "VideoPlayerFragment"
-        const val ARG_LAUNCH_CONTEXT = "launch_context"
         const val ARG_AID = "aid"
         const val ARG_BVID = "bvid"
         const val ARG_CID = "cid"
         const val ARG_EP_ID = "ep_id"
         const val ARG_SEASON_ID = "season_id"
         const val ARG_SEEK_POSITION_MS = "seek_position_ms"
-        const val ARG_INITIAL_VIDEO = "initial_video"
-        const val ARG_PLAY_QUEUE = "play_queue"
         const val ARG_START_EPISODE = "start_episode"
-
-        fun newInstance(
-            launchContext: PlayerLaunchContext
-        ): VideoPlayerFragment {
-            return VideoPlayerFragment().apply {
-                arguments = Bundle().apply {
-                    putSerializable(ARG_LAUNCH_CONTEXT, launchContext)
-                }
-            }
-        }
 
         fun newInstance(
             aid: Long = 0L,
@@ -93,23 +80,19 @@ class VideoPlayerFragment : Fragment() {
             epId: Long = 0L,
             seasonId: Long = 0L,
             seekPositionMs: Long = 0L,
-            initialVideo: com.tutu.myblbl.model.video.VideoModel? = null,
-            playQueue: List<com.tutu.myblbl.model.video.VideoModel> = emptyList(),
             startEpisodeIndex: Int = -1
         ): VideoPlayerFragment {
-            return newInstance(
-                PlayerLaunchContext.create(
-                    aid = aid,
-                    bvid = bvid,
-                    cid = cid,
-                    epId = epId,
-                    seasonId = seasonId,
-                    seekPositionMs = seekPositionMs,
-                    initialVideo = initialVideo,
-                    playQueue = playQueue,
-                    startEpisodeIndex = startEpisodeIndex
-                )
-            )
+            return VideoPlayerFragment().apply {
+                arguments = Bundle().apply {
+                    putLong(ARG_AID, aid)
+                    putString(ARG_BVID, bvid)
+                    putLong(ARG_CID, cid)
+                    putLong(ARG_EP_ID, epId)
+                    putLong(ARG_SEASON_ID, seasonId)
+                    putLong(ARG_SEEK_POSITION_MS, seekPositionMs)
+                    putInt(ARG_START_EPISODE, startEpisodeIndex)
+                }
+            }
         }
     }
 
@@ -268,11 +251,14 @@ class VideoPlayerFragment : Fragment() {
         initViews(view)
         playerSettings = PlayerSettingsStore.load(requireContext())
         consumeLaunchContext()
-        setupAdapters()
         setupOverlayController()
         setupPlayer()
-        setupBackHandler()
         setupObservers()
+        view.post {
+            if (_binding == null) return@post
+            setupAdapters()
+            setupBackHandler()
+        }
 
         resolveLaunchContext()?.let { launchContext ->
             if (

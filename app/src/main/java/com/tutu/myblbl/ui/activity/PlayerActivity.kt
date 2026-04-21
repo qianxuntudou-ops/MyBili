@@ -38,7 +38,6 @@ import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.feature.player.PlayerInstancePool
 import com.tutu.myblbl.feature.player.PlaybackUiCoordinator
 import com.tutu.myblbl.feature.player.UiEvent
-import com.tutu.myblbl.feature.player.PlayerLaunchContext
 import com.tutu.myblbl.feature.player.PlayerOverlayCoordinator
 import com.tutu.myblbl.feature.player.PlayerSessionCoordinator
 import com.tutu.myblbl.feature.player.SeekSession
@@ -63,7 +62,6 @@ import com.tutu.myblbl.ui.adapter.VideoAdapter
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
-import java.io.Serializable
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -75,7 +73,13 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
     companion object {
         private const val TAG = "PlayerActivity"
-        private const val EXTRA_LAUNCH_CONTEXT = "player_launch_context"
+        private const val EXTRA_AID = "player_aid"
+        private const val EXTRA_BVID = "player_bvid"
+        private const val EXTRA_CID = "player_cid"
+        private const val EXTRA_EP_ID = "player_ep_id"
+        private const val EXTRA_SEASON_ID = "player_season_id"
+        private const val EXTRA_SEEK_MS = "player_seek_ms"
+        private const val EXTRA_START_EPISODE = "player_start_episode"
 
         fun start(
             context: Context,
@@ -89,23 +93,25 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             playQueue: List<VideoModel> = emptyList(),
             startEpisodeIndex: Int = -1
         ) {
-            val launchContext = PlayerLaunchContext.create(
-                aid = aid,
-                bvid = bvid,
-                cid = cid,
-                epId = epId,
-                seasonId = seasonId,
-                seekPositionMs = seekPositionMs,
-                initialVideo = initialVideo,
-                playQueue = playQueue,
-                startEpisodeIndex = startEpisodeIndex
-            )
+            val resolvedAid = aid.takeIf { it > 0L } ?: initialVideo?.aid ?: 0L
+            val resolvedBvid = bvid.takeIf { it.isNotBlank() } ?: initialVideo?.bvid.orEmpty()
+            val resolvedCid = cid.takeIf { it > 0L } ?: initialVideo?.cid ?: 0L
+            val resolvedEpId = epId.takeIf { it > 0L } ?: initialVideo?.playbackEpId ?: 0L
+            val resolvedSeasonId = seasonId.takeIf { it > 0L }
+                ?: initialVideo?.playbackSeasonId
+                ?: 0L
             context.startActivity(Intent(context, PlayerActivity::class.java).apply {
                 if (context !is Activity) {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                putExtra(EXTRA_LAUNCH_CONTEXT, launchContext)
+                putExtra(EXTRA_AID, resolvedAid)
+                putExtra(EXTRA_BVID, resolvedBvid)
+                putExtra(EXTRA_CID, resolvedCid)
+                putExtra(EXTRA_EP_ID, resolvedEpId)
+                putExtra(EXTRA_SEASON_ID, resolvedSeasonId)
+                putExtra(EXTRA_SEEK_MS, seekPositionMs.coerceAtLeast(0L))
+                putExtra(EXTRA_START_EPISODE, startEpisodeIndex)
             })
         }
 
@@ -335,14 +341,12 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     }
 
     private fun handleIntent(intent: Intent) {
-        val launchContext = intent.serializableExtraCompat<PlayerLaunchContext>(EXTRA_LAUNCH_CONTEXT)
-            ?: PlayerLaunchContext.create()
-        if (
-            launchContext.aid <= 0L &&
-            launchContext.bvid.isBlank() &&
-            launchContext.epId <= 0L &&
-            launchContext.seasonId <= 0L
-        ) {
+        val aid = intent.getLongExtra(EXTRA_AID, 0L)
+        val bvid = intent.getStringExtra(EXTRA_BVID).orEmpty()
+        val cid = intent.getLongExtra(EXTRA_CID, 0L)
+        val epId = intent.getLongExtra(EXTRA_EP_ID, 0L)
+        val seasonId = intent.getLongExtra(EXTRA_SEASON_ID, 0L)
+        if (aid <= 0L && bvid.isBlank() && epId <= 0L && seasonId <= 0L) {
             finish()
             return
         }
@@ -354,23 +358,41 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             setupAdapters()
             setupOverlayController()
             setupPlayer()
-            setupBackHandler()
             setupObservers()
+            binding.root.post {
+                setupBackHandler()
+            }
         }
 
-        startPlayback(launchContext)
+        startPlayback(
+            aid = aid,
+            bvid = bvid,
+            cid = cid,
+            seasonId = seasonId,
+            epId = epId,
+            seekPositionMs = intent.getLongExtra(EXTRA_SEEK_MS, 0L),
+            startEpisodeIndex = intent.getIntExtra(EXTRA_START_EPISODE, -1)
+        )
     }
 
-    private fun startPlayback(launchContext: PlayerLaunchContext) {
+    private fun startPlayback(
+        aid: Long,
+        bvid: String,
+        cid: Long,
+        seasonId: Long,
+        epId: Long,
+        seekPositionMs: Long,
+        startEpisodeIndex: Int
+    ) {
         playerView.pauseDanmaku()
         viewModel.loadVideoInfo(
-            aid = launchContext.aid,
-            bvid = launchContext.bvid,
-            cid = launchContext.cid,
-            seasonId = launchContext.seasonId,
-            epId = launchContext.epId,
-            seekPositionMs = launchContext.seekPositionMs,
-            startEpisodeIndex = launchContext.startEpisodeIndex
+            aid = aid,
+            bvid = bvid,
+            cid = cid,
+            seasonId = seasonId,
+            epId = epId,
+            seekPositionMs = seekPositionMs,
+            startEpisodeIndex = startEpisodeIndex
         )
     }
 
@@ -1135,15 +1157,6 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         updateEpisodeNavigationVisibility()
         updateDanmakuSwitchVisibility()
         renderControllerChrome()
-    }
-
-    private inline fun <reified T : Serializable> Intent.serializableExtraCompat(key: String): T? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            getSerializableExtra(key, T::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            getSerializableExtra(key) as? T
-        }
     }
 
     private fun syncChromeStateToCoordinator(visibility: Int) {

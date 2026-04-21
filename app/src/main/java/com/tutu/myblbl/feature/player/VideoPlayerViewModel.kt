@@ -464,49 +464,49 @@ class VideoPlayerViewModel(
         currentCid = cid
         currentSeasonId = seasonId.takeIf { it > 0L }
         currentEpId = epId.takeIf { it > 0L }
-        currentPlayInfo = null
-        currentSubtitleData = null
-        currentGraphVersion = 0L
-        loadedDanmakuCid = 0L
-        loadedPlayerExtrasCid = 0L
-        pendingPlayerExtrasCid = 0L
-        requestedQualityId = preferredQualityId.takeIf { it > 0 } ?: currentSettings.defaultVideoQualityId
-        requestedAudioId = preferredAudioQualityId.takeIf { it > 0 } ?: currentSettings.defaultAudioQualityId
-        requestedCodec = currentSettings.defaultVideoCodec
-        selectedQualityId = null
-        selectedAudioId = null
-        selectedCodec = null
         pendingSeekPositionMs = seekPositionMs.coerceAtLeast(0L)
         pendingPlayWhenReady = true
         launchStartEpisodeIndex = startEpisodeIndex
-        didApplyLastPlayPosition = pendingSeekPositionMs > 0L
-        shouldAutoSelectSubtitle = currentSettings.showSubtitleByDefault
-        sessionStartTimestampMs = 0L
-        lastReportedHeartbeatPositionSec = -1L
-        resetFallbackState()
-        clearPreloadedPlayback(cancelJob = true)
-        hasReachedFirstFrame = false
-        currentDashSession = null
         val loadGeneration = ++videoLoadGeneration
-        _selectedSubtitleIndex.value = -1
-        _currentSubtitleText.value = null
-        currentSubtitleCueIndex = 0
-        clearDanmaku()
-        _interactionModel.value = null
-        _videoSnapshot.value = null
-        _error.value = null
-        _qualities.value = emptyList()
-        _selectedQuality.value = null
-        _audioQualities.value = emptyList()
-        _selectedAudioQuality.value = null
-        _videoCodecs.value = emptyList()
-        _selectedVideoCodec.value = null
         viewModelScope.launch {
             runCatching { playInfoGateway.warmupWbiKeys() }
         }
 
         viewModelScope.launch {
             _isLoading.value = true
+            currentPlayInfo = null
+            currentSubtitleData = null
+            currentGraphVersion = 0L
+            loadedDanmakuCid = 0L
+            loadedPlayerExtrasCid = 0L
+            pendingPlayerExtrasCid = 0L
+            requestedQualityId = preferredQualityId.takeIf { it > 0 } ?: currentSettings.defaultVideoQualityId
+            requestedAudioId = preferredAudioQualityId.takeIf { it > 0 } ?: currentSettings.defaultAudioQualityId
+            requestedCodec = currentSettings.defaultVideoCodec
+            selectedQualityId = null
+            selectedAudioId = null
+            selectedCodec = null
+            didApplyLastPlayPosition = pendingSeekPositionMs > 0L
+            shouldAutoSelectSubtitle = currentSettings.showSubtitleByDefault
+            sessionStartTimestampMs = 0L
+            lastReportedHeartbeatPositionSec = -1L
+            resetFallbackState()
+            clearPreloadedPlayback(cancelJob = true)
+            hasReachedFirstFrame = false
+            currentDashSession = null
+            _selectedSubtitleIndex.value = -1
+            _currentSubtitleText.value = null
+            currentSubtitleCueIndex = 0
+            clearDanmaku()
+            _interactionModel.value = null
+            _videoSnapshot.value = null
+            _error.value = null
+            _qualities.value = emptyList()
+            _selectedQuality.value = null
+            _audioQualities.value = emptyList()
+            _selectedAudioQuality.value = null
+            _videoCodecs.value = emptyList()
+            _selectedVideoCodec.value = null
             try {
                 if (isPgcPlayback()) {
                     loadPgcVideoInfo(loadGeneration)
@@ -952,10 +952,27 @@ class VideoPlayerViewModel(
         }
     }
 
-    private suspend fun loadPgcVideoInfo(loadGeneration: Long) {
+    private suspend fun loadPgcVideoInfo(loadGeneration: Long): Unit = coroutineScope {
         val seasonId = currentSeasonId
         val epId = currentEpId
+        val initialIdentity = currentPlayRequestIdentity()
+        val preparedPlaybackDeferred = initialIdentity
+            ?.takeIf { it.cid > 0L && it.epId != null }
+            ?.let { identity ->
+                async {
+                    requestPreparedPlayback(
+                        identity = identity,
+                        preferLastPlayTime = true,
+                        replaceInPlace = false
+                    )
+                }
+            }
         securityGateway.prewarmWebSession()
+        val sectionsDeferred = async {
+            seasonId?.takeIf { it > 0L }?.let {
+                runCatching { apiService.getVideoEpisodeSections(it) }.getOrNull()
+            }
+        }
         val detailResponse = apiService.getVideoEpisodes(seasonId, epId)
         val detail = detailResponse.result
         if (!detailResponse.isSuccess || detail == null) {
@@ -963,19 +980,19 @@ class VideoPlayerViewModel(
                 currentSeasonId = null
                 currentEpId = null
                 loadUgcVideoInfo(preferLastPlayTime = true, loadGeneration = loadGeneration)
-                return
+                return@coroutineScope
             }
             AppLog.e(
                 TAG,
                 "loadPgcVideoInfo failure: code=${detailResponse.code}, message=${detailResponse.errorMessage}, seasonId=${seasonId ?: 0L}, epId=${epId ?: 0L}"
             )
             _error.value = detailResponse.message.ifBlank { "番剧详情加载失败" }
-            return
+            return@coroutineScope
         }
 
         val resolvedSeasonId = detail.seasonId.takeIf { it > 0L } ?: seasonId
-        val sectionResult = resolvedSeasonId
-            ?.takeIf { it > 0L }
+        val sectionResult = sectionsDeferred.await()?.result ?: resolvedSeasonId
+            ?.takeIf { it > 0L && it != seasonId }
             ?.let { apiService.getVideoEpisodeSections(it).result }
         val mergedDetail = detail.copy(
             episodes = sectionResult?.mainSection?.episodes.orEmpty(),
@@ -1013,10 +1030,26 @@ class VideoPlayerViewModel(
 
         if (currentCid <= 0L) {
             _error.value = "未找到可播放剧集"
-            return
+            return@coroutineScope
         }
 
-        loadPlayUrl(preferLastPlayTime = true, loadGeneration = loadGeneration)
+        val resolvedIdentity = currentPlayRequestIdentity()
+        val preparedPlayback = if (
+            preparedPlaybackDeferred != null &&
+            canReusePreparedPlayback(initialIdentity, resolvedIdentity)
+        ) {
+            preparedPlaybackDeferred.await()
+        } else {
+            null
+        }
+        if (!isActiveVideoLoad(loadGeneration)) {
+            return@coroutineScope
+        }
+        if (preparedPlayback != null) {
+            applyPreparedPlayback(preparedPlayback)
+        } else {
+            loadPlayUrl(preferLastPlayTime = true, loadGeneration = loadGeneration)
+        }
     }
 
     private suspend fun loadUgcVideoInfo(preferLastPlayTime: Boolean, loadGeneration: Long) = coroutineScope {

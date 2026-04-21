@@ -3,6 +3,7 @@ package com.tutu.myblbl.feature.live
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.os.Bundle
 import androidx.core.os.bundleOf
 import com.tutu.myblbl.databinding.FragmentLiveBaseListBinding
 import com.tutu.myblbl.model.live.LiveAreaCategory
@@ -12,25 +13,36 @@ import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
-import com.tutu.myblbl.core.common.ext.serializableCompat
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 class LiveAreaFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveTabPage {
 
     companion object {
-        private const val ARG_CATEGORY = "category"
+        private const val ARG_CATEGORY_JSON = "category_json"
+
+        private val gson = Gson()
 
         fun newInstance(category: LiveAreaCategoryParent): LiveAreaFragment {
+            val json = gson.toJson(category)
             return LiveAreaFragment().apply {
-                arguments = bundleOf(ARG_CATEGORY to category)
+                arguments = bundleOf(ARG_CATEGORY_JSON to json)
             }
         }
     }
 
     private lateinit var adapter: LiveAreaAdapter
-    private var category: LiveAreaCategoryParent? = null
+    private var areaList: List<LiveAreaCategory> = emptyList()
 
     override fun initArguments() {
-        category = arguments?.serializableCompat(ARG_CATEGORY)
+        arguments?.let { args ->
+            val json = args.getString(ARG_CATEGORY_JSON).orEmpty()
+            if (json.isNotBlank()) {
+                val type = object : TypeToken<LiveAreaCategoryParent>() {}.type
+                val category = gson.fromJson<LiveAreaCategoryParent>(json, type)
+                areaList = category?.areaList.orEmpty()
+            }
+        }
     }
 
     override fun getViewBinding(
@@ -51,7 +63,6 @@ class LiveAreaFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveTabPag
     }
 
     override fun initData() {
-        val areaList = category?.areaList.orEmpty()
         adapter.setData(areaList)
     }
 

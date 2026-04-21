@@ -1,7 +1,6 @@
 package com.tutu.myblbl.model.live
 
 import com.google.gson.annotations.SerializedName
-import java.io.Serializable
 
 data class LiveAreaCategory(
     @SerializedName("id")
@@ -24,4 +23,4 @@ data class LiveAreaCategory(
     val areaV2Id: Long = 0,
     @SerializedName("area_v2_parent_id")
     val areaV2ParentId: Long = 0
-) : Serializable
+)

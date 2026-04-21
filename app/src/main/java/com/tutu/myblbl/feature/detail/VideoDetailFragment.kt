@@ -35,7 +35,6 @@ import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.ui.dialog.OwnerDetailDialog
 import com.tutu.myblbl.ui.dialog.PlayerActionDialog
 import com.tutu.myblbl.feature.search.SearchNewFragment
-import com.tutu.myblbl.core.common.ext.serializableCompat
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.time.TimeUtils
@@ -48,14 +47,13 @@ import java.util.Locale
 class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
 
     companion object {
-        private const val ARG_VIDEO = "video"
         private const val ARG_AID = "aid"
         private const val ARG_BVID = "bvid"
 
         fun newInstance(video: VideoModel): VideoDetailFragment {
-            return VideoDetailFragment().apply {
-                arguments = bundleOf(ARG_VIDEO to video)
-            }
+            val aid = video.aid.takeIf { it > 0L } ?: 0L
+            val bvid = video.bvid.takeIf { it.isNotBlank() }.orEmpty()
+            return if (aid > 0L) newInstance(aid) else newInstance(bvid)
         }
 
         fun newInstance(aid: Long): VideoDetailFragment {
@@ -109,7 +107,6 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
 
     override fun initArguments() {
         arguments?.let { args ->
-            videoModel = args.serializableCompat(ARG_VIDEO)
             aid = if (args.containsKey(ARG_AID)) args.getLong(ARG_AID) else null
             bvid = if (args.containsKey(ARG_BVID)) args.getString(ARG_BVID) else null
         }
@@ -281,8 +278,8 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
         binding.progressBar.isVisible = true
         binding.viewError.isVisible = false
 
-        val currentAid = videoModel?.aid ?: aid
-        val currentBvid = videoModel?.bvid ?: bvid
+        val currentAid = aid
+        val currentBvid = bvid
 
         lifecycleScope.launch {
             binding.progressBar.isVisible = false
@@ -327,6 +324,8 @@ class VideoDetailFragment : BaseFragment<FragmentVideoDetailBinding>() {
                 privilegeType = view.privilegeType
             )
         }
+        if (aid == null) aid = view.aid
+        if (bvid.isNullOrBlank()) bvid = view.bvid
 
         binding.textPageTitle.text = view.title
 

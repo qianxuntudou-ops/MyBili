@@ -7,7 +7,6 @@ import com.google.gson.annotations.SerializedName
 import com.tutu.myblbl.model.adapter.FlexibleBooleanAdapter
 import com.tutu.myblbl.model.series.UgcSeriesModel
 import com.tutu.myblbl.model.user.OfficialVerifySimple
-import java.io.Serializable
 
 data class VideoModel(
     @SerializedName(value = "aid", alternate = ["id"])
@@ -153,7 +152,7 @@ data class VideoModel(
 
     @SerializedName("elec_arc_badge")
     val elecArcBadge: String = ""
-) : Serializable {
+) {
     private val _cachedIsChargingExclusive: Boolean by lazy {
         isUpowerExclusive || privilegeType > 0 || isChargingArc
                 || elecArcType == 1 || elecArcBadge == "充电专属"
@@ -249,7 +248,7 @@ data class Owner(
 
     @SerializedName("official_verify")
     val officialVerify: OfficialVerifySimple? = null
-) : Serializable
+)
 
 data class Bangumi(
     @SerializedName("long_title")
@@ -257,7 +256,7 @@ data class Bangumi(
 
     @SerializedName("cover")
     val cover: String = ""
-) : Serializable
+)
 
 data class Stat(
     @SerializedName("aid")
@@ -292,7 +291,7 @@ data class Stat(
     
     @SerializedName("dislike")
     val dislike: Long = 0
-) : Serializable
+)
 
 data class VideoRights(
     @SerializedName("elec")
@@ -305,7 +304,7 @@ data class VideoRights(
     val ugcPay: Int = 0,
     @SerializedName("arc_pay")
     val arcPay: Int = 0
-) : Serializable
+)
 
 data class Dimension(
     @SerializedName("width")
@@ -316,7 +315,7 @@ data class Dimension(
     
     @SerializedName("rotate")
     val rotate: Int = 0
-) : Serializable {
+) {
     val isPortrait: Boolean
         get() {
             if (width == 0 || height == 0) return false

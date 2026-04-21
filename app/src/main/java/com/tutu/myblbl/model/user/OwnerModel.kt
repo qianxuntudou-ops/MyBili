@@ -1,7 +1,6 @@
 package com.tutu.myblbl.model.user
 
 import com.google.gson.annotations.SerializedName
-import java.io.Serializable
 
 data class OwnerModel(
     @SerializedName("mid")
@@ -20,7 +19,7 @@ data class OwnerModel(
     var officialVerify: OfficialVerifySimple? = null,
     @SerializedName("vip")
     var vip: VipSimple? = null
-) : Serializable
+)
 
 data class OfficialVerifySimple(
     @SerializedName("type")

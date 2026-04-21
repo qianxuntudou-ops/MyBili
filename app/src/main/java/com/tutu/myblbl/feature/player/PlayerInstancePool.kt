@@ -7,7 +7,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 
-internal object PlayerInstancePool {
+object PlayerInstancePool {
     private const val IDLE_RELEASE_DELAY_MS = 45_000L
     private const val MIN_BUFFER_MS = 3_000
     private const val MAX_BUFFER_MS = 12_000
@@ -20,6 +20,17 @@ internal object PlayerInstancePool {
     private var cachedPlayer: ExoPlayer? = null
     private var isAttached = false
     private var pendingReleaseRunnable: Runnable? = null
+
+    @Synchronized
+    fun prewarm(context: Context) {
+        if (cachedPlayer != null) return
+        mainHandler.post {
+            synchronized(this) {
+                if (cachedPlayer != null) return@synchronized
+                cachedPlayer = buildPlayer(context.applicationContext)
+            }
+        }
+    }
 
     @Synchronized
     fun acquire(context: Context): ExoPlayer {
