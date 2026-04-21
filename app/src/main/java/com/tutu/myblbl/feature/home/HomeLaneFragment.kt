@@ -407,8 +407,9 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
 
     private fun showMyFollowingDialog(followType: Int) {
         if (!isAdded || view == null) return
+        val ctx = context ?: return
         val dialog = MyFollowingDialog(
-            context = requireContext(),
+            context = ctx,
             type = followType,
             onSeriesClick = { series ->
                 if (series.seasonId > 0) {

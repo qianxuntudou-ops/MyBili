@@ -53,8 +53,9 @@ class HotListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
     }
 
     private fun onVideoClick(video: VideoModel) {
+        val ctx = context ?: return
         VideoRouteNavigator.openVideo(
-            context = requireContext(),
+            context = ctx,
             video = video,
             playQueue = com.tutu.myblbl.ui.activity.PlayerActivity.buildPlayQueue(
                 (adapter as? VideoAdapter)?.getItemsSnapshot().orEmpty(),

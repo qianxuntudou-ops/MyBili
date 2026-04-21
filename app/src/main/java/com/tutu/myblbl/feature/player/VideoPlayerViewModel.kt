@@ -379,6 +379,14 @@ class VideoPlayerViewModel(
     private var preloadedDanmakuViewCid: Long = 0L
     private var preloadedDanmakuView: DmWebViewReplyProto? = null
 
+    // 弹幕元数据缓存：同一视频复用，避免重复请求
+    private val danmakuViewCache = object : LinkedHashMap<Long, Pair<DmWebViewReplyProto?, Long>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Pair<DmWebViewReplyProto?, Long>>): Boolean {
+            return size > 8
+        }
+    }
+    private var danmakuViewCacheTtlMs: Long = 300_000L
+
     private var currentStreamFallbackPlan: VideoPlayerStreamResolver.StreamFallbackPlan? = null
     private var fallbackRouteIndex: Int = 0
     private var fallbackCdnIndex: Int = 0
@@ -473,11 +481,18 @@ class VideoPlayerViewModel(
         pendingPlayWhenReady = true
         launchStartEpisodeIndex = startEpisodeIndex
         val loadGeneration = ++videoLoadGeneration
+        val chainStartMs = System.currentTimeMillis()
         viewModelScope.launch {
             runCatching { playInfoGateway.warmupWbiKeys() }
         }
 
+        // 入口就已知 cid+aid 时，立即启动弹幕元数据预加载（不用等 getVideoDetail）
+        if (cid > 0L && (aid ?: 0L) > 0L) {
+            preloadDanmakuView(cid = cid, aid = aid ?: 0L, loadGeneration = loadGeneration)
+        }
+
         viewModelScope.launch {
+            AppLog.i(TAG, "PLAY_CHAIN [0] loadVideoInfo start aid=$aid bvid=$bvid cid=$cid")
             _isLoading.value = true
             currentPlayInfo = null
             currentSubtitleData = null
@@ -927,12 +942,14 @@ class VideoPlayerViewModel(
             _isLoading.value = true
             try {
                 val loadStartMs = System.currentTimeMillis()
+                AppLog.i(TAG, "PLAY_CHAIN [3] loadPlayUrl start cid=${identity.cid}")
                 val preparedPlayback = consumePreloadedPlayback(
                     identity = identity,
                     preferLastPlayTime = preferLastPlayTime,
                     replaceInPlace = replaceInPlace
                 )
                 if (preparedPlayback != null) {
+                    AppLog.i(TAG, "PLAY_CHAIN [3] loadPlayUrl preload hit +${System.currentTimeMillis() - loadStartMs}ms")
                 } else {
                 }
                 val resolvedPlayback = preparedPlayback ?: requestPreparedPlayback(
@@ -958,6 +975,8 @@ class VideoPlayerViewModel(
     }
 
     private suspend fun loadPgcVideoInfo(loadGeneration: Long): Unit = coroutineScope {
+        val chainMs = System.currentTimeMillis()
+        AppLog.i(TAG, "PLAY_CHAIN [1-pgc] start season=${currentSeasonId} ep=${currentEpId}")
         val seasonId = currentSeasonId
         val epId = currentEpId
         val initialIdentity = currentPlayRequestIdentity()
@@ -978,8 +997,10 @@ class VideoPlayerViewModel(
                 runCatching { apiService.getVideoEpisodeSections(it) }.getOrNull()
             }
         }
+        AppLog.i(TAG, "PLAY_CHAIN [2-pgc] getVideoEpisodes start +${System.currentTimeMillis() - chainMs}ms")
         val detailResponse = apiService.getVideoEpisodes(seasonId, epId)
         val detail = detailResponse.result
+        AppLog.i(TAG, "PLAY_CHAIN [2-pgc] getVideoEpisodes done +${System.currentTimeMillis() - chainMs}ms")
         if (!detailResponse.isSuccess || detail == null) {
             if (shouldFallbackToUgcPlayback(detailResponse)) {
                 currentSeasonId = null
@@ -1061,10 +1082,12 @@ class VideoPlayerViewModel(
     }
 
     private suspend fun loadUgcVideoInfo(preferLastPlayTime: Boolean, loadGeneration: Long) = coroutineScope {
+        val chainMs = System.currentTimeMillis()
         val initialIdentity = currentPlayRequestIdentity()
         val preparedPlaybackDeferred = initialIdentity
             ?.takeIf { it.cid > 0L && !it.bvid.isNullOrBlank() }
             ?.let { identity ->
+                AppLog.i(TAG, "PLAY_CHAIN [1-ugc] early PlayInfo start cid=${identity.cid}")
                 async {
                     requestPreparedPlayback(
                         identity = identity,
@@ -1075,6 +1098,7 @@ class VideoPlayerViewModel(
             }
         if (preparedPlaybackDeferred == null && initialIdentity != null) {
         }
+        AppLog.i(TAG, "PLAY_CHAIN [2-ugc] getVideoDetail start +${System.currentTimeMillis() - chainMs}ms")
         val detailResponse = apiService.getVideoDetail(currentAid, currentBvid)
         if (!detailResponse.isSuccess || detailResponse.data == null) {
             AppLog.e(
@@ -1086,6 +1110,7 @@ class VideoPlayerViewModel(
         }
 
         val detail = detailResponse.data
+        AppLog.i(TAG, "PLAY_CHAIN [2-ugc] getVideoDetail done +${System.currentTimeMillis() - chainMs}ms")
         _videoInfo.value = detail
         currentAid = detail.view?.aid ?: currentAid
         currentBvid = detail.view?.bvid?.takeIf { it.isNotBlank() } ?: currentBvid
@@ -1130,13 +1155,14 @@ class VideoPlayerViewModel(
             .orEmpty()
         maybeAutoSelectSubtitle()
         val resolvedIdentity = currentPlayRequestIdentity()
-        val preparedPlayback = if (
-            preparedPlaybackDeferred != null &&
+        val canReuse = preparedPlaybackDeferred != null &&
             canReusePreparedPlayback(initialIdentity, resolvedIdentity)
-        ) {
-            preparedPlaybackDeferred.await()
+        val preparedPlayback = if (canReuse) {
+            AppLog.i(TAG, "PLAY_CHAIN [3-ugc] await early PlayInfo +${System.currentTimeMillis() - chainMs}ms")
+            preparedPlaybackDeferred!!.await()
         } else {
             if (preparedPlaybackDeferred != null) {
+                AppLog.i(TAG, "PLAY_CHAIN [3-ugc] early PlayInfo identity mismatch, discarded")
             }
             null
         }
@@ -1144,8 +1170,10 @@ class VideoPlayerViewModel(
             return@coroutineScope
         }
         if (preparedPlayback != null) {
+            AppLog.i(TAG, "PLAY_CHAIN [4-ugc] applyPreparedPlayback (reused) +${System.currentTimeMillis() - chainMs}ms")
             applyPreparedPlayback(preparedPlayback)
         } else {
+            AppLog.i(TAG, "PLAY_CHAIN [4-ugc] loadPlayUrl start +${System.currentTimeMillis() - chainMs}ms")
             loadPlayUrl(preferLastPlayTime = preferLastPlayTime, loadGeneration = loadGeneration)
         }
 
@@ -1193,6 +1221,7 @@ class VideoPlayerViewModel(
         suppressUiSignals: Boolean = false
     ): PreparedPlayback? {
         val requestStartMs = System.currentTimeMillis()
+        AppLog.i(TAG, "PLAY_CHAIN [5] requestPreparedPlayback start cid=${identity.cid} qn=${qualityCandidates.firstOrNull()}")
         val preferredQualityId = qualityCandidates.firstOrNull()
             ?: requestedQualityId
             ?: selectedQualityId
@@ -1212,13 +1241,16 @@ class VideoPlayerViewModel(
         }
 
         val (initialPlayInfo, effectiveRequestedQualityId) = if (cachedPlayInfo != null) {
+            AppLog.i(TAG, "PLAY_CHAIN [5] PlayInfo cache hit")
             cachedPlayInfo to preferredQualityId
         } else {
+            AppLog.i(TAG, "PLAY_CHAIN [5] requestPlayInfo start +${System.currentTimeMillis() - requestStartMs}ms")
             val playInfoFetch = requestPlayInfoWithQualityFallback(
                 identity = identity,
                 qualityCandidates = qualityCandidates,
                 suppressUiSignals = suppressUiSignals
             )
+            AppLog.i(TAG, "PLAY_CHAIN [5] requestPlayInfo done +${System.currentTimeMillis() - requestStartMs}ms success=${playInfoFetch?.response?.isSuccess}")
             if (playInfoFetch == null) {
                 AppLog.e(TAG, "loadPlayUrl requestPlayInfoWithQualityFallback returned null")
                 return null
@@ -1275,7 +1307,7 @@ class VideoPlayerViewModel(
             selectionSnapshot = selectionSnapshot.copy(selectedQualityId = resolvedQualityId)
         }
 
-
+        AppLog.i(TAG, "PLAY_CHAIN [6] resolveDashRoute + createMediaSource start +${System.currentTimeMillis() - requestStartMs}ms")
         var dashMediaSource: MediaSource? = null
         if (useDashPlayback) {
             val dashRoutePlan = streamResolver.resolveDashRoutePlan(
@@ -1351,6 +1383,7 @@ class VideoPlayerViewModel(
 
         val resumeHintPositionMs = startPosition.takeIf { shouldResume && !replaceInPlace }
         val seekToStart = if (resumeHintPositionMs != null) 0L else startPosition
+        AppLog.i(TAG, "PLAY_CHAIN [6] createMediaSource done +${System.currentTimeMillis() - requestStartMs}ms")
         return PreparedPlayback(
             identity = identity,
             playInfo = initialPlayInfo,
@@ -1370,6 +1403,7 @@ class VideoPlayerViewModel(
         countCurrentAttemptAsFallback: Boolean = false
     ) {
         val applyStartMs = System.currentTimeMillis()
+        AppLog.i(TAG, "PLAY_CHAIN [7] applyPreparedPlayback start reqMs=${preparedPlayback.requestDurationMs}")
         clearPreloadedPlayback(cancelJob = false)
         currentPlayInfo = preparedPlayback.playInfo
         applySelectionSnapshot(preparedPlayback.selectionSnapshot)
@@ -1438,6 +1472,7 @@ class VideoPlayerViewModel(
 
     fun onPlaybackFirstFrame() {
         hasReachedFirstFrame = true
+        AppLog.i(TAG, "PLAY_CHAIN [FINAL] first frame rendered cid=${currentCid}")
         val cid = currentCid.takeIf { it > 0L } ?: return
         if (pendingPlayerExtrasCid == cid && loadedPlayerExtrasCid != cid) {
             pendingPlayerExtrasCid = 0L
@@ -2097,20 +2132,40 @@ class VideoPlayerViewModel(
             return
         }
         val loadGeneration = ++danmakuLoadGeneration
+        val dmStartMs = System.currentTimeMillis()
         danmakuLoadJob = viewModelScope.launch {
-            // 1. 获取弹幕 view 元数据（优先使用预加载的结果）
+            AppLog.i(TAG, "PLAY_CHAIN [8] loadDanmaku start cid=$cid preloadedCid=$preloadedDanmakuViewCid cacheKeys=${danmakuViewCache.keys}")
+            // 1. 获取弹幕 view 元数据（优先：预加载 > 缓存 > 网络）
             val danmakuView = if (preloadedDanmakuViewCid == cid) {
+                AppLog.i(TAG, "PLAY_CHAIN [8] danmakuView from preload")
                 preloadedDanmakuView.also {
                     preloadedDanmakuViewCid = 0L
                     preloadedDanmakuView = null
                 }
             } else {
-                playInfoGateway.requestDanmakuViewBytes(
-                    cid = cid,
-                    aid = aid
-                )?.let { bytes ->
-                    runCatching { DmProtoParser.parseView(bytes) }.getOrNull()
+                val cacheEntry = danmakuViewCache[cid]
+                val cacheAge = cacheEntry?.second?.let { System.currentTimeMillis() - it }
+                val cached = cacheEntry
+                    ?.takeIf { System.currentTimeMillis() - it.second < danmakuViewCacheTtlMs }
+                    ?.first
+                AppLog.i(TAG, "PLAY_CHAIN [8] danmakuView cache lookup: entry=$cacheEntry age=$cacheAge ttl=$danmakuViewCacheTtlMs result=$cached")
+                if (cached != null) {
+                    AppLog.i(TAG, "PLAY_CHAIN [8] danmakuView from cache")
+                    cached
+                } else {
+                    AppLog.i(TAG, "PLAY_CHAIN [8] danmakuView from network")
+                    playInfoGateway.requestDanmakuViewBytes(
+                        cid = cid,
+                        aid = aid
+                    )?.let { bytes ->
+                        runCatching { DmProtoParser.parseView(bytes) }.getOrNull()
+                    }
                 }
+            }
+            // 只缓存非 null 的元数据
+            if (danmakuView != null) {
+                danmakuViewCache[cid] = danmakuView to System.currentTimeMillis()
+                AppLog.i(TAG, "PLAY_CHAIN [8] danmakuView cached for cid=$cid")
             }
 
             val segmentCount = danmakuView?.totalSegments
@@ -2175,6 +2230,7 @@ class VideoPlayerViewModel(
             if (!isActiveDanmakuRequest(loadGeneration)) {
                 return@launch
             }
+            AppLog.i(TAG, "PLAY_CHAIN [9] danmaku seg-$initialSegment loaded +${System.currentTimeMillis() - dmStartMs}ms count=${initialPayload.regularItems.size}")
             // 缓存当前段
             danmakuSegmentItems[initialSegment] = initialPayload.regularItems.toList()
             danmakuLoadedSegments.add(initialSegment)
@@ -2421,6 +2477,7 @@ class VideoPlayerViewModel(
     }
 
     private fun clearDanmaku() {
+        AppLog.i(TAG, "CLEAR_DM preloadedCid=$preloadedDanmakuViewCid cacheKeys=${danmakuViewCache.keys} cacheSize=${danmakuViewCache.size}")
         danmakuLoadJob?.cancel()
         danmakuViewPreloadJob?.cancel()
         danmakuViewPreloadJob = null
@@ -2435,25 +2492,46 @@ class VideoPlayerViewModel(
     }
 
     /**
-     * 在拿到 cid+aid 后立即启动弹幕 view 预加载，与 PlayInfo 请求并行
+     * 在 loadVideoInfo 入口立即启动弹幕元数据预加载（最早时机）
+     */
+    private fun preloadDanmakuView(cid: Long, aid: Long, loadGeneration: Long) {
+        if (cid <= 0L || aid <= 0L || preloadedDanmakuViewCid == cid) {
+            AppLog.i(TAG, "PRELOAD_DM skip cid=$cid preloadedCid=$preloadedDanmakuViewCid")
+            return
+        }
+        val cacheEntry = danmakuViewCache[cid]
+        val cacheAge = cacheEntry?.second?.let { System.currentTimeMillis() - it }
+        val cached = cacheEntry
+            ?.takeIf { System.currentTimeMillis() - it.second < danmakuViewCacheTtlMs }
+            ?.first
+        AppLog.i(TAG, "PRELOAD_DM cid=$cid cacheEntry=$cacheEntry age=$cacheAge result=$cached")
+        if (cached != null) {
+            preloadedDanmakuViewCid = cid
+            preloadedDanmakuView = cached
+            AppLog.i(TAG, "PRELOAD_DM cid=$cid hit cache, set preloadedCid=$cid")
+            return
+        }
+        danmakuViewPreloadJob?.cancel()
+        danmakuViewPreloadJob = viewModelScope.launch(Dispatchers.IO) {
+            if (!isActiveVideoLoad(loadGeneration)) return@launch
+            val view = playInfoGateway.requestDanmakuViewBytes(cid = cid, aid = aid)
+                ?.let { runCatching { DmProtoParser.parseView(it) }.getOrNull() }
+            if (view != null && isActiveVideoLoad(loadGeneration)) {
+                preloadedDanmakuViewCid = cid
+                preloadedDanmakuView = view
+                danmakuViewCache[cid] = view to System.currentTimeMillis()
+            }
+        }
+    }
+
+    /**
+     * 在 getVideoDetail 拿到 cid+aid 后调用（兼容内部路径）
      */
     private fun preloadDanmakuViewIfNeeded(loadGeneration: Long) {
         val cid = currentCid
         val aid = currentAid ?: 0L
-        if (cid <= 0L || aid <= 0L || loadedDanmakuCid == cid) return
-        if (preloadedDanmakuViewCid == cid) return
-        danmakuViewPreloadJob?.cancel()
-        val prewarmCid = cid
-        val prewarmAid = aid
-        danmakuViewPreloadJob = viewModelScope.launch(Dispatchers.IO) {
-            if (!isActiveVideoLoad(loadGeneration)) return@launch
-            val view = playInfoGateway.requestDanmakuViewBytes(cid = prewarmCid, aid = prewarmAid)
-                ?.let { runCatching { DmProtoParser.parseView(it) }.getOrNull() }
-            if (view != null && isActiveVideoLoad(loadGeneration)) {
-                preloadedDanmakuViewCid = prewarmCid
-                preloadedDanmakuView = view
-            }
-        }
+        if (cid <= 0L || aid <= 0L) return
+        preloadDanmakuView(cid = cid, aid = aid, loadGeneration = loadGeneration)
     }
 
     private fun isActiveDanmakuRequest(loadGeneration: Long): Boolean {

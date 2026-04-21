@@ -100,11 +100,7 @@ class MyPlayerDanmakuController(
         }
         rawDanmakuCount = rawDanmakuData.size
         rawDanmakuSignature = rawDanmakuData.fastRawSignature()
-        if (mergeDuplicate) {
-            rebuildAndApplyData()
-            return
-        }
-        appendPreparedData(sortedData)
+        appendPreparedData(sortedData, enableMerge = mergeDuplicate)
     }
 
     /**
@@ -312,7 +308,7 @@ class MyPlayerDanmakuController(
         }
     }
 
-    private fun appendPreparedData(data: List<DmModel>) {
+    private fun appendPreparedData(data: List<DmModel>, enableMerge: Boolean = false) {
         prepareJob?.cancel()
         val generation = ++prepareGeneration
         prepareJob = controllerScope.launch {
@@ -320,7 +316,12 @@ class MyPlayerDanmakuController(
             val startIndex = danmakuData.size.toLong()
             val filteredData = data
                 .applySmartFilter(level = smartFilterLevel, stage = "append")
-            val preparedData = filteredData
+            val processedData = if (enableMerge) {
+                filteredData.mergeDuplicateDanmaku(enabled = true)
+            } else {
+                filteredData
+            }
+            val preparedData = processedData
                 .mapIndexedNotNull { index, item ->
                     item.toDanmakuItemData(startIndex + index, allowVipColorful)
                 }
