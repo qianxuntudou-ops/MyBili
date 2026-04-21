@@ -46,7 +46,11 @@ class RecommendViewModel(
                 if (response.isSuccess) {
                     val items = response.data?.items ?: emptyList()
                     val validItems = items.filter {
-                        it.title.isNotBlank() && (it.bvid.isNotBlank() || it.aid > 0 || it.cid > 0)
+                        it.title.isNotBlank()
+                                && it.coverUrl.isNotBlank()
+                                && (it.bvid.isNotBlank() || it.aid > 0 || it.cid > 0)
+                                && !it.isLive
+                                && it.goto.equals("av", ignoreCase = true)
                     }
                     if (page == 1) {
                         freshIndexTracker.markFirstPageLoaded()
