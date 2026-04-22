@@ -189,6 +189,32 @@ data class VideoModel(
     private val _cachedIsPgc: Boolean by lazy { playbackEpId > 0L || playbackSeasonId > 0L }
     val isPgc: Boolean get() = _cachedIsPgc
 
+    val hasPlaybackIdentity: Boolean
+        get() = aid > 0L || bvid.isNotBlank() || playbackEpId > 0L || playbackSeasonId > 0L
+
+    val isSupportedHomeVideoCard: Boolean
+        get() = unsupportedHomeVideoReasons().isEmpty()
+
+    fun unsupportedHomeVideoReasons(): List<String> {
+        val reasons = mutableListOf<String>()
+        if (title.isBlank()) {
+            reasons += "title_blank"
+        }
+        if (coverUrl.isBlank()) {
+            reasons += "cover_blank"
+        }
+        if (isLive) {
+            reasons += "is_live"
+        }
+        if (!hasPlaybackIdentity) {
+            reasons += "missing_playback_identity"
+        }
+        if (goto.isNotBlank() && !goto.equals("av", ignoreCase = true) && !isPgc) {
+            reasons += "goto=$goto"
+        }
+        return reasons
+    }
+
     private fun computePlaybackSeasonId(): Long = when {
         sid <= 0L -> parseBangumiSeasonIdFromRedirectUrl()
         epid > 0L -> sid

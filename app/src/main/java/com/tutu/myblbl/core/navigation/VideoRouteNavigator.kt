@@ -9,6 +9,7 @@ import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.ui.activity.PlayerActivity
 import com.tutu.myblbl.feature.detail.VideoDetailFragment
 import com.tutu.myblbl.core.common.ext.isOpenDetailFirstEnabled
+import com.tutu.myblbl.core.common.ext.toast
 import com.tutu.myblbl.core.common.log.AppLog
 
 object VideoRouteNavigator {
@@ -24,6 +25,11 @@ object VideoRouteNavigator {
         forcePlayer: Boolean = false
     ) {
         AppLog.d(TAG, "openVideo: bvid=${video.bvid}, aid=${video.aid}, title=${video.title}, forcePlayer=$forcePlayer")
+        if (!video.hasPlaybackIdentity) {
+            AppLog.w(TAG, "openVideo blocked: missing playback identity, title=${video.title}, cid=${video.cid}")
+            context.toast("当前卡片数据不完整，暂时无法播放")
+            return
+        }
         if (!forcePlayer && shouldOpenVideoDetailFirst(context, video)) {
             val hostActivity = findMainActivityHost(context)
             AppLog.d(TAG, "openVideo: detailFirst=true, host=$hostActivity")

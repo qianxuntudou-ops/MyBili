@@ -2,9 +2,10 @@ package com.tutu.myblbl.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.common.log.HomeVideoCardDebugLogger
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.repository.VideoRepository
-import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -45,13 +46,11 @@ class RecommendViewModel(
                 _loading.value = false
                 if (response.isSuccess) {
                     val items = response.data?.items ?: emptyList()
-                    val validItems = items.filter {
-                        it.title.isNotBlank()
-                                && it.coverUrl.isNotBlank()
-                                && (it.bvid.isNotBlank() || it.aid > 0 || it.cid > 0)
-                                && !it.isLive
-                                && it.goto.equals("av", ignoreCase = true)
-                    }
+                    HomeVideoCardDebugLogger.logRejectedCards(
+                        source = "recommend(page=$page,freshIdx=$freshIdx)",
+                        items = items
+                    )
+                    val validItems = items.filter { it.isSupportedHomeVideoCard }
                     if (page == 1) {
                         freshIndexTracker.markFirstPageLoaded()
                     }

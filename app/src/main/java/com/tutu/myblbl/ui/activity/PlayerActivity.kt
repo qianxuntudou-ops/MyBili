@@ -173,10 +173,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         }
 
         private fun isPlayableVideo(video: VideoModel): Boolean {
-            return video.aid > 0L ||
-                video.bvid.isNotBlank() ||
-                video.playbackEpId > 0L ||
-                video.playbackSeasonId > 0L
+            return video.hasPlaybackIdentity
         }
 
         private fun isSameVideo(left: VideoModel, right: VideoModel): Boolean {
