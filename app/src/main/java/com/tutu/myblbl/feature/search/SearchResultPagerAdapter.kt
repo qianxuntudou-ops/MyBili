@@ -16,6 +16,7 @@ import com.tutu.myblbl.model.search.SearchItemModel
 import com.tutu.myblbl.model.search.SearchType
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 
@@ -50,6 +51,7 @@ class SearchResultPagerAdapter(
     }
 
     override fun onViewRecycled(holder: ViewHolder) {
+        holder.release()
         holders.entries.removeAll { it.value == holder }
         super.onViewRecycled(holder)
     }
@@ -144,6 +146,7 @@ class SearchResultPagerAdapter(
         private var currentType: SearchType? = null
         private var currentAdapter: SearchItemAdapter? = null
         private var currentPage: SearchResultPage? = null
+        private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
         fun bind(page: SearchResultPage) {
             currentPage = page
@@ -193,6 +196,7 @@ class SearchResultPagerAdapter(
                         }
                     }
                 })
+                installLoadMoreFocusController()
             }
             submit(page)
         }
@@ -204,6 +208,8 @@ class SearchResultPagerAdapter(
                 binding.recyclerViewResult.isVisible = filteredItems.isNotEmpty()
                 binding.textEmpty.isVisible = !page.loading && filteredItems.isEmpty()
                 binding.textEmpty.setText(R.string.search_empty)
+                loadMoreFocusController?.consumePendingFocusAfterLoadMore()
+                Unit
             }
             if (binding.recyclerViewResult.isComputingLayout) {
                 binding.recyclerViewResult.post(applyUiState)
@@ -225,6 +231,11 @@ class SearchResultPagerAdapter(
             }
         }
 
+        fun release() {
+            loadMoreFocusController?.release()
+            loadMoreFocusController = null
+        }
+
         fun scrollToTop() {
             binding.recyclerViewResult.smoothScrollToPosition(0)
         }
@@ -243,6 +254,31 @@ class SearchResultPagerAdapter(
                     itemCount = currentAdapter?.itemCount.orZero()
                 ).resolved
             }
+        }
+
+        private fun installLoadMoreFocusController() {
+            loadMoreFocusController?.release()
+            loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+                recyclerView = binding.recyclerViewResult,
+                callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                    override fun canLoadMore(): Boolean {
+                        val page = currentPage
+                        return page != null && page.hasMore && !page.loading
+                    }
+
+                    override fun loadMore() {
+                        val type = currentType ?: return
+                        val page = currentPage ?: return
+                        if (!page.hasMore || page.loading) {
+                            return
+                        }
+                        page.loading = true
+                        binding.recyclerViewResult.post {
+                            onLoadMore(type)
+                        }
+                    }
+                }
+            ).also { it.install() }
         }
     }
 

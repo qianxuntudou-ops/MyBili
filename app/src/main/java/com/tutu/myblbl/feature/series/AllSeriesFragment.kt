@@ -27,6 +27,7 @@ import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.ui.decoration.LinearSpacingItemDecoration
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -83,6 +84,7 @@ class AllSeriesFragment : BaseFragment<FragmentAllSeriesBinding>(), OnBackPresse
     private var filters: List<AllSeriesFilterModel> = emptyList()
     private var lastFocusedArea = FocusArea.CONTENT
     private var originalSpacing = 0
+    private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
     override fun initArguments() {
         seasonType = arguments?.getInt(ARG_SEASON_TYPE, SeriesType.ANIME) ?: SeriesType.ANIME
@@ -209,6 +211,7 @@ class AllSeriesFragment : BaseFragment<FragmentAllSeriesBinding>(), OnBackPresse
                 }
             }
         })
+        installLoadMoreFocusController()
     }
 
     override fun initData() {
@@ -251,6 +254,7 @@ class AllSeriesFragment : BaseFragment<FragmentAllSeriesBinding>(), OnBackPresse
                         adapter.addData(page.list)
                         cachedList = cachedList + page.list
                     }
+                    loadMoreFocusController?.consumePendingFocusAfterLoadMore()
                     if (currentPage == 1 && page.list.isEmpty()) {
                         showInfo(R.drawable.empty, getString(R.string.empty_data))
                     } else {
@@ -270,6 +274,7 @@ class AllSeriesFragment : BaseFragment<FragmentAllSeriesBinding>(), OnBackPresse
                     isLoading = false
                     if (currentPage > 1) {
                         currentPage--
+                        loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                         if (cachedList.isNotEmpty()) {
                             binding.recyclerView.visibility = View.VISIBLE
                             binding.viewInfo.visibility = View.GONE
@@ -465,8 +470,28 @@ class AllSeriesFragment : BaseFragment<FragmentAllSeriesBinding>(), OnBackPresse
     }
 
     override fun onDestroyView() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
         listLayoutState = binding.recyclerView.layoutManager?.onSaveInstanceState()
         super.onDestroyView()
+    }
+
+    private fun installLoadMoreFocusController() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = binding.recyclerView,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = !isLoading && hasMore
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    currentPage++
+                    loadData()
+                }
+            }
+        ).also { it.install() }
     }
 
     private fun restoreListState() {

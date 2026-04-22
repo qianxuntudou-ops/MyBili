@@ -21,6 +21,7 @@ import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,7 @@ class OwnerDetailDialog(
     private var currentPage = 1
     private var hasMore = true
     private var isLoading = false
+    private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
     init {
         supportRequestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -93,6 +95,7 @@ class OwnerDetailDialog(
                 }
             }
         })
+        installLoadMoreFocusController()
     }
 
     private fun bindOwnerHeader() {
@@ -180,16 +183,19 @@ class OwnerDetailDialog(
                     } else {
                         videoAdapter.addData(videos)
                     }
+                    loadMoreFocusController?.consumePendingFocusAfterLoadMore()
                     if (!hasMore) {
                         videoAdapter.setShowLoadMore(false)
                     }
                 } else {
+                    loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                     toast(response.message)
                 }
             }.onFailure {
                 binding.progressBar.isVisible = false
                 isLoading = false
                 currentPage--
+                loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                 toast(it.message ?: "加载失败")
             }
         }
@@ -278,7 +284,27 @@ class OwnerDetailDialog(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
+    private fun installLoadMoreFocusController() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = binding.recyclerView,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = !isLoading && hasMore
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    currentPage++
+                    loadOwnerVideos()
+                }
+            }
+        ).also { it.install() }
+    }
+
     override fun dismiss() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
         scope.cancel()
         super.dismiss()
     }

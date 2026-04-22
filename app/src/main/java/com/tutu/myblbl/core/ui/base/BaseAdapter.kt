@@ -70,7 +70,7 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
 
     abstract fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): VH
 
-    fun setData(data: List<MODEL>) {
+    fun setData(data: List<MODEL>, onComplete: (() -> Unit)? = null) {
         focusedView = null
         rememberedPosition = rememberedPosition
             .takeIf { it != RecyclerView.NO_POSITION && it < data.size }
@@ -90,6 +90,7 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
             items.clear()
             items.addAll(data)
             diffResult.dispatchUpdatesTo(this@BaseAdapter)
+            onComplete?.invoke()
         }
     }
 

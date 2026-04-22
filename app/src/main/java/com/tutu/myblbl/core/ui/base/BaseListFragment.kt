@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.tutu.myblbl.databinding.FragmentBaseListBinding
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
 
@@ -35,9 +36,12 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
     protected val loadMoreThreshold = 12
     protected open val autoLoad: Boolean = true
     protected open val enableSwipeRefresh: Boolean = true
+    protected open val enableLoadMoreFocusController: Boolean = false
     private var pendingReturnRestoreAttempts = 0
     private var pendingLayoutState: Parcelable? = null
     private var restorePosted = false
+    private var pendingRecyclerIdleAction: (() -> Unit)? = null
+    protected var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
     private val restoreObserver = object : RecyclerView.AdapterDataObserver() {
         override fun onChanged() = schedulePendingReturnRestore()
         override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = schedulePendingReturnRestore()
@@ -80,7 +84,24 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
                 super.onScrolled(recyclerView, dx, dy)
                 checkLoadMore()
             }
+
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                super.onScrollStateChanged(recyclerView, newState)
+                if (newState != RecyclerView.SCROLL_STATE_IDLE) {
+                    return
+                }
+                val action = pendingRecyclerIdleAction ?: return
+                pendingRecyclerIdleAction = null
+                recyclerView.post {
+                    if (this@BaseListFragment.recyclerView === recyclerView && isAdded && view != null) {
+                        action.invoke()
+                    }
+                }
+            }
         })
+        if (enableLoadMoreFocusController) {
+            installLoadMoreFocusController()
+        }
         if (enableSwipeRefresh) {
             setupSwipeRefresh()
         }
@@ -150,6 +171,55 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
 
     open fun scrollToTop() {
         recyclerView?.scrollToPosition(0)
+    }
+
+    protected fun isRecyclerIdle(): Boolean {
+        val rv = recyclerView ?: return true
+        return rv.scrollState == RecyclerView.SCROLL_STATE_IDLE && !rv.isComputingLayout
+    }
+
+    protected fun runWhenRecyclerIdle(action: () -> Unit) {
+        val rv = recyclerView
+        if (rv == null || (rv.scrollState == RecyclerView.SCROLL_STATE_IDLE && !rv.isComputingLayout)) {
+            action()
+            return
+        }
+        pendingRecyclerIdleAction = action
+    }
+
+    protected fun setAdapterData(
+        data: List<MODEL>,
+        preserveScrollOffset: Boolean = false,
+        onComplete: (() -> Unit)? = null
+    ) {
+        val adp = adapter ?: return
+        if (!preserveScrollOffset) {
+            adp.setData(data, onComplete)
+            return
+        }
+
+        val rv = recyclerView
+        val lm = layoutManager
+        if (rv == null || lm == null || adp.contentCount() == 0) {
+            adp.setData(data, onComplete)
+            return
+        }
+
+        val anchorPosition = lm.findFirstVisibleItemPosition()
+        val anchorView = lm.findViewByPosition(anchorPosition)
+        val anchorOffset = if (anchorView != null) {
+            anchorView.top - rv.paddingTop
+        } else {
+            0
+        }
+
+        adp.setData(data) {
+            if (layoutManager === lm && anchorPosition != RecyclerView.NO_POSITION && data.isNotEmpty()) {
+                val boundedAnchor = anchorPosition.coerceIn(0, data.lastIndex)
+                lm.scrollToPositionWithOffset(boundedAnchor, anchorOffset)
+            }
+            onComplete?.invoke()
+        }
     }
 
     open fun focusPrimaryContent(): Boolean {
@@ -250,6 +320,8 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
     }
 
     override fun onDestroyView() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
         adapter?.unregisterAdapterDataObserver(restoreObserver)
         adapter?.clear()
         adapter = null
@@ -259,7 +331,27 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
         pendingReturnRestoreAttempts = 0
         pendingLayoutState = null
         restorePosted = false
+        pendingRecyclerIdleAction = null
         super.onDestroyView()
+    }
+
+    private fun installLoadMoreFocusController() {
+        val rv = recyclerView ?: return
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = rv,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = hasMore && !isLoading
+
+                override fun loadMore() {
+                    if (isLoading || !hasMore) {
+                        return
+                    }
+                    currentPage++
+                    loadData(currentPage)
+                }
+            }
+        ).also { it.install() }
     }
 
     private fun View.isDescendantOf(ancestor: View): Boolean {

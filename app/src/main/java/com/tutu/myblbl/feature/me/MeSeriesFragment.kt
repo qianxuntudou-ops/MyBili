@@ -23,6 +23,7 @@ import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.feature.series.SeriesDetailFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.common.cache.FileCacheManager
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
 import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
@@ -62,6 +63,7 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
 
     private lateinit var adapter: SeriesAdapter
     private var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout? = null
+    private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
     override fun initArguments() {
         type = arguments?.getInt(ARG_TYPE, TYPE_ANIMATION) ?: TYPE_ANIMATION
@@ -109,6 +111,7 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
                 }
             }
         })
+        installLoadMoreFocusController()
         swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(
             recyclerView = binding.recyclerView,
             onRefresh = { refresh() }
@@ -172,6 +175,7 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
                     } else if (list.isNotEmpty()) {
                         adapter.addData(list)
                     }
+                    loadMoreFocusController?.consumePendingFocusAfterLoadMore()
                     hasMore = list.size >= pageSize
                     if (currentPage == 1 && list.isEmpty()) {
                         showState(getEmptyMessage(), retryVisible = false)
@@ -184,6 +188,7 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
                     swipeRefreshLayout?.isRefreshing = false
                     if (currentPage > 1) {
                         currentPage--
+                        loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                         if (adapter.itemCount > 0) {
                             showContent()
                             return@onFailure
@@ -343,5 +348,29 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
             TYPE_SERIES -> FOLLOWING_SERIES_CACHE_KEY
             else -> FOLLOWING_ANIMATION_CACHE_KEY
         }
+    }
+
+    private fun installLoadMoreFocusController() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = binding.recyclerView,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = !isLoading && hasMore
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    currentPage++
+                    loadData()
+                }
+            }
+        ).also { it.install() }
+    }
+
+    override fun onDestroyView() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
+        super.onDestroyView()
     }
 }

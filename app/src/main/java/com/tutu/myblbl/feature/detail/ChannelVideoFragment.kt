@@ -13,6 +13,7 @@ import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -40,6 +41,7 @@ class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
     private var isLoading = false
     private var recyclerView: RecyclerView? = null
     private val videoAdapter = VideoAdapter()
+    private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
     private val videoRepository: VideoRepository by inject()
 
     override fun initArguments() {
@@ -74,6 +76,7 @@ class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
                 }
             }
         })
+        installLoadMoreFocusController()
 
         videoAdapter.setOnItemClickListener { _, item ->
             VideoRouteNavigator.openVideo(
@@ -120,10 +123,12 @@ class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
                     } else {
                         videoAdapter.addData(videos)
                     }
+                    loadMoreFocusController?.consumePendingFocusAfterLoadMore()
                 }
             }.onFailure {
                 showLoading(false)
                 isLoading = false
+                loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                 showError(it.message)
             }
         }
@@ -134,7 +139,27 @@ class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
         loadData()
     }
 
+    private fun installLoadMoreFocusController() {
+        val rv = recyclerView ?: return
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = rv,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = !isLoading && hasMore
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    loadMore()
+                }
+            }
+        ).also { it.install() }
+    }
+
     override fun onDestroyView() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
         videoAdapter.clear()
         recyclerView = null
         super.onDestroyView()

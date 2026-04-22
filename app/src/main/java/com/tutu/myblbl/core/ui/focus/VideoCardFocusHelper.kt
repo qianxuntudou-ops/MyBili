@@ -7,9 +7,11 @@ import android.view.View
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.ui.activity.MainActivity
 
 object VideoCardFocusHelper {
+    private const val TAG = "FocusCard"
 
     fun bindSidebarExit(
         view: View,
@@ -63,6 +65,10 @@ object VideoCardFocusHelper {
             }
 
             KeyEvent.KEYCODE_DPAD_UP -> {
+                RecyclerViewLoadMoreFocusController.fromView(target)?.let { controller ->
+                    AppLog.d(TAG, "up target=${target.javaClass.simpleName}@${Integer.toHexString(System.identityHashCode(target))}")
+                    controller.notifyItemVerticalNavigation(target, View.FOCUS_UP)
+                }
                 val atTopEdge = isAtTopEdge(target)
                 if (onTopEdgeUp == null || !atTopEdge) {
                     return false
@@ -72,10 +78,19 @@ object VideoCardFocusHelper {
 
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 val atBottomEdge = isAtBottomEdge(target)
-                if (onBottomEdgeDown == null || !atBottomEdge) {
-                    return false
+                if (atBottomEdge && onBottomEdgeDown != null) {
+                    AppLog.d(TAG, "down bottomEdgeCallback target=${target.javaClass.simpleName}@${Integer.toHexString(System.identityHashCode(target))}")
+                    return onBottomEdgeDown()
                 }
-                return onBottomEdgeDown()
+                val loadMoreController = RecyclerViewLoadMoreFocusController.fromView(target)
+                if (loadMoreController != null) {
+                    AppLog.d(
+                        TAG,
+                        "down delegate target=${target.javaClass.simpleName}@${Integer.toHexString(System.identityHashCode(target))} atBottom=$atBottomEdge"
+                    )
+                    return loadMoreController.handleItemDpadDown(target)
+                }
+                return false
             }
         }
         return false

@@ -44,6 +44,7 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
     private var pendingScrollToTopAfterRefresh = false
 
     override val autoLoad: Boolean = false
+    override val enableLoadMoreFocusController: Boolean = true
 
     override fun createAdapter(): VideoAdapter {
         return VideoAdapter(
@@ -115,6 +116,35 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
         }
     }
 
+    private fun applyLoadedVideos(page: Int, videos: List<VideoModel>) {
+        isLoading = false
+        setRefreshing(false)
+        if (page == 1 || (adapter as? VideoAdapter)?.items.isNullOrEmpty()) {
+            val shouldPreserveScroll = page == 1 &&
+                (adapter?.contentCount() ?: 0) > 0 &&
+                !pendingScrollToTopAfterRefresh
+            setAdapterData(videos, preserveScrollOffset = shouldPreserveScroll)
+        } else {
+            (adapter as? VideoAdapter)?.addData(videos)
+        }
+        loadMoreFocusController?.consumePendingFocusAfterLoadMore()
+        if (videos.isNotEmpty()) {
+            showContent()
+            showLoading(false)
+            mainNavigationViewModel.dispatch(MainNavigationViewModel.Event.HomeContentReady)
+            if (page == 1) {
+                cacheVideos(videos)
+                if (pendingScrollToTopAfterRefresh && !isPendingReturnRestore()) {
+                    scrollToTop()
+                }
+                pendingScrollToTopAfterRefresh = false
+            }
+        } else if (page == 1) {
+            pendingScrollToTopAfterRefresh = false
+            showEmpty()
+        }
+    }
+
     override fun initObserver() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -126,28 +156,21 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
                         return@collectLatest
                     }
                     waitingForFirstLoad = false
-                    isLoading = false
-                    setRefreshing(false)
-                    if (loadingPage == 1 || (adapter as? VideoAdapter)?.items.isNullOrEmpty()) {
-                        adapter?.setData(videos)
-                    } else {
-                        (adapter as? VideoAdapter)?.addData(videos)
-                    }
-                    if (videos.isNotEmpty()) {
-                        showContent()
-                        showLoading(false)
-                        mainNavigationViewModel.dispatch(MainNavigationViewModel.Event.HomeContentReady)
-                        if (loadingPage == 1) {
-                            cacheVideos(videos)
-                            if (pendingScrollToTopAfterRefresh && !isPendingReturnRestore()) {
-                                scrollToTop()
+                    val resultPage = loadingPage
+                    val shouldDeferApply = resultPage == 1 &&
+                        (adapter?.contentCount() ?: 0) > 0 &&
+                        !pendingScrollToTopAfterRefresh &&
+                        !isRecyclerIdle()
+                    if (shouldDeferApply) {
+                        runWhenRecyclerIdle {
+                            if (!isAdded || view == null) {
+                                return@runWhenRecyclerIdle
                             }
-                            pendingScrollToTopAfterRefresh = false
+                            applyLoadedVideos(resultPage, videos)
                         }
-                    } else if (loadingPage == 1) {
-                        pendingScrollToTopAfterRefresh = false
-                        showEmpty()
+                        return@collectLatest
                     }
+                    applyLoadedVideos(resultPage, videos)
                 }
             }
         }
@@ -184,6 +207,8 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
                                     showError(it.ifBlank { getString(R.string.net_error) })
                                 }
                             )
+                        } else {
+                            loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                         }
                     }
                 }

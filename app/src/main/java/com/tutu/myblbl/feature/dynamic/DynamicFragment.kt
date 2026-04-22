@@ -26,6 +26,7 @@ import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
 import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
@@ -67,6 +68,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
     private var pendingScrollToTop = false
     private var pendingVideoFocusRestoreOnResume = false
     private var preferredContentFocusTarget = ContentFocusTarget.LEFT_UP_LIST
+    private var videoLoadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
     override fun getViewBinding(
         inflater: LayoutInflater,
@@ -129,6 +131,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
                 if (dy > 0) checkLoadMore()
             }
         })
+        installVideoLoadMoreFocusController()
         swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(
             recyclerView = binding.recyclerViewRight,
             onRefresh = ::refreshCurrentVideoList
@@ -257,6 +260,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
                     } else if (videos.isNotEmpty()) {
                         videoAdapter.addData(videos)
                     }
+                    videoLoadMoreFocusController?.consumePendingFocusAfterLoadMore()
                     if (videos.isNotEmpty()) {
                         showContent()
                         if (pendingScrollToTop) {
@@ -291,6 +295,9 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.status.collectLatest { status ->
                     latestStatus = status
+                    if (status == DynamicViewModel.DynamicStatus.Error) {
+                        videoLoadMoreFocusController?.clearPendingFocusAfterLoadMore()
+                    }
                     renderUiState()
                 }
             }
@@ -627,6 +634,30 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
                 }
             }
         }
+    }
+
+    private fun installVideoLoadMoreFocusController() {
+        videoLoadMoreFocusController?.release()
+        videoLoadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = binding.recyclerViewRight,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = !viewModel.loading.value && viewModel.hasMoreVideos.value
+
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    viewModel.loadNextPage(pageSize)
+                }
+            }
+        ).also { it.install() }
+    }
+
+    override fun onDestroyView() {
+        videoLoadMoreFocusController?.release()
+        videoLoadMoreFocusController = null
+        super.onDestroyView()
     }
 
 

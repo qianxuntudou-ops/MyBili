@@ -27,6 +27,7 @@ import com.tutu.myblbl.feature.user.FollowUserListFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -70,6 +71,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
     private var lastFocusedArea = FocusArea.BACK
     private var lastFocusedVideoPosition = RecyclerView.NO_POSITION
     private var hasRequestedInitialFocus = false
+    private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
     override fun onResume() {
         super.onResume()
@@ -148,6 +150,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
                 }
             }
         })
+        installLoadMoreFocusController()
 
         videoAdapter.setOnItemClickListener { _, item ->
             if (item.aid != 0L || item.bvid.isNotBlank()) {
@@ -252,6 +255,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
                         } else {
                             videoAdapter.addData(items)
                         }
+                        loadMoreFocusController?.consumePendingFocusAfterLoadMore()
                         headerAdapter.updateVideoCount(page.totalCount)
                         if (!hasRequestedInitialFocus && currentPage == 1) {
                             hasRequestedInitialFocus = true
@@ -264,12 +268,14 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
                     }
                 } else {
                     rollbackPage()
+                    loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                     Toast.makeText(requireContext(), response.message, Toast.LENGTH_SHORT).show()
                 }
             }.onFailure { e ->
                 binding.progressBar.visibility = View.GONE
                 isLoading = false
                 rollbackPage()
+                loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                 Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
@@ -488,5 +494,29 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
             binding.recyclerViewVideos.post { requestVideoFocus(targetPosition, retries - 1) }
         }
         return false
+    }
+
+    private fun installLoadMoreFocusController() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = binding.recyclerViewVideos,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = !isLoading && hasMore
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    currentPage++
+                    loadUserVideos()
+                }
+            }
+        ).also { it.install() }
+    }
+
+    override fun onDestroyView() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
+        super.onDestroyView()
     }
 }

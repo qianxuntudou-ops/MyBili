@@ -26,6 +26,7 @@ import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
 import com.tutu.myblbl.core.common.cache.FileCacheManager
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
 import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
@@ -71,6 +72,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
     private var pendingHistoryReturnRestore = false
     private var pendingHistoryScrollToTop = false
     private var lastKnownLoggedIn = false
+    private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,6 +126,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
             }
         }
         setupLoadMore()
+        installLoadMoreFocusControllerIfNeeded()
         swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(
             recyclerView = binding.recyclerView,
             onRefresh = { refresh() }
@@ -203,6 +206,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.error.collectLatest { error ->
                     error?.let {
+                        loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                         if (!hasContentItems()) {
                             showState(it, showRetry = shouldShowRetry(it))
                         }
@@ -306,6 +310,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
         val shouldRestoreFocus = pendingHistoryReturnRestore && filtered.isNotEmpty()
         val shouldScrollToTop = pendingHistoryScrollToTop && filtered.isNotEmpty()
         adapter.setData(filtered) {
+            loadMoreFocusController?.consumePendingFocusAfterLoadMore()
             when {
                 shouldRestoreFocus -> {
                     restoreContentFocus()
@@ -327,6 +332,29 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
         adapter.setData(filtered)
         cacheLaterVideos(videos)
         updateContentState(filtered.isEmpty())
+    }
+
+    private fun installLoadMoreFocusControllerIfNeeded() {
+        if (type != TYPE_HISTORY) {
+            return
+        }
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = binding.recyclerView,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean {
+                    return type == TYPE_HISTORY && !viewModel.loading.value && viewModel.hasMore.value
+                }
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    currentPage++
+                    loadData()
+                }
+            }
+        ).also { it.install() }
     }
 
     private fun updateContentState(isEmpty: Boolean) {
@@ -661,6 +689,12 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
         runCatching {
             FileCacheManager.put(LATER_CACHE_KEY, videos)
         }
+    }
+
+    override fun onDestroyView() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
+        super.onDestroyView()
     }
 
 }

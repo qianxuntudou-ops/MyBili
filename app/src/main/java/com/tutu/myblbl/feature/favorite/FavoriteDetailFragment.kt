@@ -22,6 +22,7 @@ import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.ui.focus.RecyclerViewLoadMoreFocusController
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -58,6 +59,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
     private var pendingRestoreFocus = false
     private var hasRequestedInitialFocus = false
     private var pendingListLayoutState: Parcelable? = null
+    private var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
 
     override fun getViewBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentFavoriteDetailBinding {
         return FragmentFavoriteDetailBinding.inflate(inflater, container, false)
@@ -117,6 +119,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
                 }
             }
         })
+        installLoadMoreFocusController()
 
         binding.buttonBack.setOnClickListener {
             parentFragmentManager.popBackStack()
@@ -212,6 +215,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
                         } else if (filtered.isNotEmpty()) {
                             favoriteAdapter.addData(filtered)
                         }
+                        loadMoreFocusController?.consumePendingFocusAfterLoadMore()
                         if (!hasRequestedInitialFocus && currentPage == 1) {
                             hasRequestedInitialFocus = true
                             requestBackFocus()
@@ -221,10 +225,12 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
                     }
                 } else {
                     rollbackPage()
+                    loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                     handleLoadError(response.errorMessage)
                 }
             }.onFailure { e ->
                 rollbackPage()
+                loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                 handleLoadError("加载失败: ${e.message}")
             }
         }
@@ -291,5 +297,29 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
         if (retries > 0) {
             binding.recyclerViewVideos.post { requestItemFocus(position, retries - 1) }
         }
+    }
+
+    private fun installLoadMoreFocusController() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = RecyclerViewLoadMoreFocusController(
+            recyclerView = binding.recyclerViewVideos,
+            callbacks = object : RecyclerViewLoadMoreFocusController.Callbacks {
+                override fun canLoadMore(): Boolean = !isLoading && hasMore
+
+                override fun loadMore() {
+                    if (!canLoadMore()) {
+                        return
+                    }
+                    currentPage++
+                    loadFavoriteVideos()
+                }
+            }
+        ).also { it.install() }
+    }
+
+    override fun onDestroyView() {
+        loadMoreFocusController?.release()
+        loadMoreFocusController = null
+        super.onDestroyView()
     }
 }
