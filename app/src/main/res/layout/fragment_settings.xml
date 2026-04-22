@@ -196,8 +196,6 @@
             android:layout_height="0dp"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:paddingTop="@dimen/px25"
-            android:paddingBottom="@dimen/px40"
             android:scrollbars="vertical"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"

@@ -205,7 +205,6 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     private lateinit var bottomProgressBar: ProgressBar
     private lateinit var textClock: TextClock
     private lateinit var textSubtitle: TextView
-    private lateinit var viewDebug: View
     private lateinit var textDebug: TextView
     private lateinit var viewNext: View
     private lateinit var viewRelated: View
@@ -261,6 +260,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         onPlaybackPositionChanged = { positionMs ->
             playerView.syncDanmakuPosition(positionMs)
             interactionView.onPositionUpdate(positionMs)
+            renderDebugState()
         },
         onPlaybackStalled = { positionMs, stalledMs ->
             recoverFromPlaybackStall(positionMs, stalledMs)
@@ -458,7 +458,6 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         }
         textClock = binding.textClock
         textSubtitle = binding.textSubtitle
-        viewDebug = binding.viewDebug
         textDebug = binding.textDebug
         viewNext = binding.viewNext
         viewRelated = binding.viewRelated
@@ -470,7 +469,6 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         countdownView = binding.root.findViewById(R.id.countdown_view)
         interactionView = binding.interactionView
 
-        viewDebug.visibility = View.GONE
         viewRelated.visibility = View.GONE
         viewNext.visibility = View.GONE
         textSubtitle.visibility = View.GONE
@@ -1052,24 +1050,110 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
     private fun renderDebugState() {
         if (!::playerSettings.isInitialized || !playerSettings.showDebugInfo) {
-            viewDebug.isVisible = false
+            textDebug.isVisible = false
             textDebug.text = ""
             return
         }
-        when {
-            !latestErrorMessage.isNullOrBlank() -> {
-                viewDebug.isVisible = true
-                textDebug.text = latestErrorMessage
-            }
-            latestLoadingState -> {
-                viewDebug.isVisible = true
-                textDebug.text = getString(R.string.loading)
-            }
-            else -> {
-                viewDebug.isVisible = false
-                textDebug.text = ""
-            }
+        if (!latestErrorMessage.isNullOrBlank()) {
+            textDebug.isVisible = true
+            textDebug.text = latestErrorMessage
+            return
         }
+        val p = player
+        if (p == null || p.playbackState == Player.STATE_IDLE) {
+            textDebug.isVisible = true
+            textDebug.text = getString(R.string.loading)
+            return
+        }
+        textDebug.isVisible = true
+        textDebug.text = buildDebugInfo(p)
+    }
+
+    private fun buildDebugInfo(p: ExoPlayer): String {
+        val sb = StringBuilder()
+        val videoFormat = p.videoFormat
+        if (videoFormat != null) {
+            val w = videoFormat.width
+            val h = videoFormat.height
+            sb.appendLine("分辨率: ${w}x${h}${formatAspectRatio(w, h)}")
+            val codec = formatCodecName(videoFormat.sampleMimeType)
+            val bitrate = if (videoFormat.bitrate > 0) " ${videoFormat.bitrate / 1000}kbps" else ""
+            sb.appendLine("视频: $codec$bitrate")
+        }
+        val audioFormat = p.audioFormat
+        if (audioFormat != null) {
+            val codec = formatCodecName(audioFormat.sampleMimeType)
+            val sr = if (audioFormat.sampleRate > 0) " ${audioFormat.sampleRate}Hz" else ""
+            sb.appendLine("音频: $codec$sr")
+        }
+        if (p.duration > 0) {
+            val pos = formatMs(p.currentPosition)
+            val dur = formatMs(p.duration)
+            val speed = p.playbackParameters.speed
+            sb.appendLine("进度: $pos / $dur (${speed}x)")
+        }
+        val bufferedAhead = p.bufferedPosition - p.currentPosition
+        if (bufferedAhead > 0) {
+            sb.appendLine("缓冲: ${"%.1f".format(bufferedAhead / 1000.0)}s")
+        }
+        val stateLabel = when (p.playbackState) {
+            Player.STATE_BUFFERING -> "缓冲中"
+            Player.STATE_READY -> if (p.playWhenReady) "播放中" else "暂停"
+            Player.STATE_ENDED -> "已结束"
+            else -> ""
+        }
+        if (stateLabel.isNotEmpty()) {
+            sb.append("状态: $stateLabel")
+        }
+        return sb.toString().trimEnd()
+    }
+
+    private fun formatCodecName(mimeType: String?): String {
+        if (mimeType == null) return "未知"
+        return when {
+            mimeType.contains("avc") || mimeType.contains("h264") -> "AVC (H.264)"
+            mimeType.contains("hevc") || mimeType.contains("h265") -> "HEVC (H.265)"
+            mimeType.contains("av01") -> "AV1"
+            mimeType.contains("vp9") -> "VP9"
+            mimeType.contains("vp8") -> "VP8"
+            mimeType.contains("aac") -> "AAC"
+            mimeType.contains("opus") -> "Opus"
+            mimeType.contains("mp4a") -> "AAC"
+            mimeType.contains("ec-3") || mimeType.contains("eac3") -> "E-AC-3"
+            mimeType.contains("ac-3") -> "AC-3"
+            mimeType.contains("flac") -> "FLAC"
+            mimeType.contains("vorbis") -> "Vorbis"
+            else -> mimeType.substringAfterLast("/")
+        }
+    }
+
+    private fun formatAspectRatio(w: Int, h: Int): String {
+        if (w <= 0 || h <= 0) return ""
+        val gcd = gcd(w, h)
+        val rw = w / gcd
+        val rh = h / gcd
+        if (rw > 30 || rh > 30) return ""
+        return " ($rw:$rh)"
+    }
+
+    private fun gcd(a: Int, b: Int): Int {
+        var x = a
+        var y = b
+        while (y != 0) {
+            val t = y
+            y = x % y
+            x = t
+        }
+        return x
+    }
+
+    private fun formatMs(ms: Long): String {
+        val totalSec = ms / 1000
+        val h = totalSec / 3600
+        val m = (totalSec % 3600) / 60
+        val s = totalSec % 60
+        return if (h > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
+        else String.format(Locale.getDefault(), "%02d:%02d", m, s)
     }
 
     private fun formatCount(count: Long): String {

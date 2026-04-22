@@ -2,7 +2,6 @@ package com.tutu.myblbl.ui.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -45,7 +44,7 @@ class SettingAdapter(
     }
 
     override fun onBindViewHolder(holder: SettingViewHolder, position: Int) {
-        holder.bind(getItem(position), isLast = position == currentList.lastIndex)
+        holder.bind(getItem(position))
     }
 
     override fun onBindViewHolder(
@@ -58,7 +57,6 @@ class SettingAdapter(
         } else {
             holder.bindContent(getItem(position))
             holder.bindFocusState(position == focusedPosition)
-            holder.bindDivider(position == currentList.lastIndex)
         }
     }
 
@@ -94,9 +92,8 @@ class SettingAdapter(
             }
         }
 
-        fun bind(item: SettingModel, isLast: Boolean) {
+        fun bind(item: SettingModel) {
             bindContent(item)
-            bindDivider(isLast)
             bindFocusState(bindingAdapterPosition == focusedPosition)
         }
 
@@ -105,22 +102,19 @@ class SettingAdapter(
             binding.tvInfo.text = item.info
         }
 
-        fun bindDivider(isLast: Boolean) {
-            binding.dividerLine.visibility = if (isLast) View.GONE else View.VISIBLE
-        }
-
         fun bindFocusState(isFocused: Boolean) {
             binding.clickView.isSelected = isFocused
-            binding.iconArrow.alpha = if (isFocused) 1f else 0.72f
-            binding.tvInfo.alpha = if (isFocused) 1f else 0.86f
-            val targetTranslation = if (isFocused) binding.clickView.resources.displayMetrics.density * 4f else 0f
+            binding.iconArrow.alpha = if (isFocused) 1f else 0.6f
+            binding.tvInfo.alpha = if (isFocused) 1f else 0.8f
+            val density = binding.clickView.resources.displayMetrics.density
+            val targetTranslation = if (isFocused) density * 6f else 0f
             binding.clickView.animate()
-                .scaleX(if (isFocused) 1.01f else 1f)
-                .scaleY(if (isFocused) 1.01f else 1f)
+                .scaleX(if (isFocused) 1.02f else 1f)
+                .scaleY(if (isFocused) 1.02f else 1f)
                 .translationX(targetTranslation)
-                .setDuration(120L)
+                .setDuration(150L)
                 .start()
-            ViewCompat.setElevation(binding.clickView, if (isFocused) binding.clickView.resources.displayMetrics.density * 2f else 0f)
+            ViewCompat.setElevation(binding.clickView, if (isFocused) density * 4f else 0f)
         }
     }
 }

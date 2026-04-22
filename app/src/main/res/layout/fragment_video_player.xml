@@ -10,41 +10,23 @@
         android:descendantFocusability="afterDescendants"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:gravity="start"
-        android:orientation="vertical"
-        android:id="@+id/view_debug"
+    <androidx.appcompat.widget.AppCompatTextView
+        android:textSize="@dimen/px24"
+        android:textColor="@color/white"
+        android:id="@+id/text_debug"
         android:background="@drawable/transparent_black_bg"
-        android:paddingTop="@dimen/px20"
-        android:paddingBottom="@dimen/px20"
+        android:paddingTop="@dimen/px10"
+        android:paddingBottom="@dimen/px10"
+        android:paddingStart="@dimen/px15"
+        android:paddingEnd="@dimen/px15"
         android:visibility="gone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/px20"
-        android:paddingStart="@dimen/px20"
-        android:paddingEnd="@dimen/px20">
-        <androidx.appcompat.widget.AppCompatTextView
-            android:textSize="@dimen/px35"
-            android:textStyle="bold"
-            android:textColor="@color/white"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/px10"
-            android:text="@string/debug_info"
-            android:shadowColor="@color/systemBackgroundColor"
-            android:shadowRadius="4"/>
-        <androidx.appcompat.widget.AppCompatTextView
-            android:textSize="@dimen/px30"
-            android:textStyle="bold"
-            android:textColor="@color/white"
-            android:id="@+id/text_debug"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/px15"
-            android:text="Debug"
-            android:shadowColor="@color/systemBackgroundColor"
-            android:shadowRadius="4"/>
-    </androidx.appcompat.widget.LinearLayoutCompat>
+        android:fontFamily="monospace"
+        android:lineSpacingExtra="@dimen/px4"
+        android:shadowColor="@color/systemBackgroundColor"
+        android:shadowRadius="4"/>
     <androidx.appcompat.widget.LinearLayoutCompat
         android:gravity="start"
         android:layout_gravity="bottom|right"

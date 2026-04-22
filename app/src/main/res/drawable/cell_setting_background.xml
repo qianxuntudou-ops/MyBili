@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android" android:exitFadeDuration="@android:integer/config_shortAnimTime">
+    <item android:state_pressed="true">
+        <shape>
+            <solid android:color="?attr/colorPrimary"/>
+            <corners android:radius="@dimen/px15"/>
+        </shape>
+    </item>
+    <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape>
+                    <solid android:color="#3D3D3D"/>
+                    <corners android:radius="@dimen/px15"/>
+                </shape>
+            </item>
+            <item android:left="@dimen/px8" android:top="@dimen/px14" android:bottom="@dimen/px14">
+                <shape>
+                    <solid android:color="?attr/colorPrimary"/>
+                    <corners android:radius="@dimen/px6"/>
+                    <size android:width="@dimen/px6"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <shape>
+            <solid android:color="#2A2A2A"/>
+            <corners android:radius="@dimen/px15"/>
+        </shape>
+    </item>
+</selector>
