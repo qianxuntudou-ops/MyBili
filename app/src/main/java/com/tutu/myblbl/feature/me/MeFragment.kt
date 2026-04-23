@@ -59,7 +59,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
     override fun initView() {
         tabLayout = binding.tabLayout
         viewPager = binding.viewPager
-        binding.rightStateContainer.setOnClickListener {
+        binding.rightStateImage.setOnClickListener {
             if (!viewModel.isLoggedIn.value) {
                 openInHostContainer(SignInFragment.newInstance())
             }
@@ -255,8 +255,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
 
     override fun focusEntryFromMainTab(anchorView: View?, preferSpatialEntry: Boolean): Boolean {
         if (!viewModel.isLoggedIn.value) {
-            val handled = binding.rightStateContainer.requestFocus()
-            return handled
+            return false
         }
         val handled = focusCurrentPagePrimaryContent(anchorView, preferSpatialEntry) ||
             focusCurrentTab(anchorView)
@@ -302,7 +301,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
         binding.imageAvatar.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
         binding.tabLayout.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
         binding.viewPager.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
-        binding.rightStateText.text = getString(R.string.feature_wait_tip)
+        binding.rightStateText.text = getString(R.string.need_sign_in)
 
         if (isLoggedIn && pendingRefreshAfterLogin) {
             pendingRefreshAfterLogin = false

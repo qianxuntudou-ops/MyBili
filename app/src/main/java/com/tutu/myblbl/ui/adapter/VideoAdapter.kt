@@ -274,20 +274,19 @@ class VideoAdapter(
             }
 
             val coverUrl = resolveCoverUrl(video)
+            val needPortraitDetect = displayStyle == DisplayStyle.DEFAULT && !video.isPortrait
             ImageLoader.loadVideoCover(
                 imageView = binding.imageView,
-                url = coverUrl
-            )
-            if (displayStyle == DisplayStyle.DEFAULT && !video.isPortrait) {
-                ImageLoader.detectPortraitFromCover(binding.imageView, coverUrl) { isPortrait ->
+                url = coverUrl,
+                onPortraitDetected = if (needPortraitDetect) { isPortrait ->
                     if (bindingAdapterPosition != androidx.recyclerview.widget.RecyclerView.NO_POSITION
                         && currentVideo === video && isPortrait
                     ) {
                         binding.imageAvatar.visibility = View.GONE
                         applyBadge(video.copy(dimension = Dimension(width = 1, height = 2)))
                     }
-                }
-            }
+                } else null
+            )
         }
 
         private fun bindDefault(video: VideoModel) {

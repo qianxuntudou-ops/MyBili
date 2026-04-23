@@ -148,7 +148,8 @@ object ImageLoader {
         imageView: ImageView,
         url: String?,
         placeholder: Int = R.drawable.default_video,
-        error: Int = R.drawable.default_video
+        error: Int = R.drawable.default_video,
+        onPortraitDetected: ((Boolean) -> Unit)? = null
     ) {
         if (!isContextAlive(imageView)) {
             AppLog.w(TAG, "loadVideoCover: context not alive, url=$url")
@@ -170,6 +171,11 @@ object ImageLoader {
                     isFirstResource: Boolean
                 ): Boolean {
                     AppLog.d(TAG, "loadVideoCover OK: url=$optimizedUrl")
+                    if (onPortraitDetected != null) {
+                        val w = resource.intrinsicWidth
+                        val h = resource.intrinsicHeight
+                        onPortraitDetected(w > 0 && h > 0 && h > w)
+                    }
                     return false
                 }
 

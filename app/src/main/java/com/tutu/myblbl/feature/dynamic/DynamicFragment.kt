@@ -378,7 +378,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
                 DynamicViewModel.ScreenState.NotLoggedIn -> {
                     showStateOverlay(
                         imageResId = R.drawable.empty,
-                        message = getString(R.string.feature_wait_tip),
+                        message = getString(R.string.need_sign_in),
                         retryVisible = false
                     )
                 }
@@ -415,8 +415,6 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
         buttonRetry?.visibility = if (retryVisible) View.VISIBLE else View.GONE
         if (retryVisible) {
             buttonRetry?.requestFocus()
-        } else {
-            viewError?.requestFocus()
         }
         contentContainer?.visibility = View.GONE
     }
@@ -490,7 +488,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
     }
 
     private fun focusRightContent(): Boolean {
-        if (TabContentFocusHelper.requestVisibleFocus(buttonRetry, viewError)) {
+        if (TabContentFocusHelper.requestVisibleFocus(buttonRetry)) {
             return true
         }
         if (videoAdapter.itemCount == 0) {
@@ -517,7 +515,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
             return if (buttonRetry?.isShown == true) {
                 buttonRetry?.requestFocus() == true
             } else {
-                viewError?.requestFocus() == true
+                false
             }
         }
         return requestPreferredContentFocus(fallbackToAlternate = true)

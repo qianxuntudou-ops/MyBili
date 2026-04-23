@@ -255,6 +255,25 @@ object ContentFilter {
         "布丁奶酱团子"
     )
 
+    private val ALL_BLOCKED_KEYWORDS_LOWER = (VIDEO_BLOCKED_TYPE_NAMES + VIDEO_BLOCKED_TITLE_KEYWORDS)
+        .map { it.trim().lowercase() }
+        .filter { it.isNotEmpty() }
+
+    private val BLOCKED_TYPE_NAMES_LOWER = VIDEO_BLOCKED_TYPE_NAMES
+        .map { it.trim().lowercase() }
+        .filter { it.isNotEmpty() }
+        .toSet()
+
+    private val LIVE_BLOCKED_AREAS_LOWER = LIVE_BLOCKED_AREAS
+        .map { it.trim().lowercase() }
+        .filter { it.isNotEmpty() }
+        .toSet()
+
+    private val LIVE_BLOCKED_PARENT_AREAS_LOWER = LIVE_BLOCKED_PARENT_AREAS
+        .map { it.trim().lowercase() }
+        .filter { it.isNotEmpty() }
+        .toSet()
+
     fun isMinorProtectionEnabled(context: Context): Boolean {
         return appSettings.getCachedString(KEY_MINOR_PROTECTION) != "关"
     }
@@ -343,25 +362,16 @@ object ContentFilter {
             return true
         }
         if (!isMinorProtectionEnabled(context)) return false
-        val trimmedTypeName = typeName.orEmpty().trim()
-        if (trimmedTypeName.isNotEmpty() && VIDEO_BLOCKED_TYPE_NAMES.any { it.equals(trimmedTypeName, ignoreCase = true) }) {
+        val trimmedTypeName = typeName.orEmpty().trim().lowercase()
+        if (trimmedTypeName.isNotEmpty() && trimmedTypeName in BLOCKED_TYPE_NAMES_LOWER) {
             return true
         }
-        val safeTitle = title.orEmpty()
-        val safeDesc = desc.orEmpty()
-        val allKeywords = VIDEO_BLOCKED_TYPE_NAMES + VIDEO_BLOCKED_TITLE_KEYWORDS
-        if (safeTitle.isNotEmpty() && allKeywords.any { keyword ->
-                val kw = keyword.trim()
-                if (kw.isEmpty()) return@any false
-                safeTitle.contains(kw, ignoreCase = true)
-            }) {
+        val safeTitleLower = title.orEmpty().lowercase()
+        val safeDescLower = desc.orEmpty().lowercase()
+        if (safeTitleLower.isNotEmpty() && ALL_BLOCKED_KEYWORDS_LOWER.any { safeTitleLower.contains(it) }) {
             return true
         }
-        if (safeDesc.isNotEmpty() && allKeywords.any { keyword ->
-                val kw = keyword.trim()
-                if (kw.isEmpty()) return@any false
-                safeDesc.contains(kw, ignoreCase = true)
-            }) {
+        if (safeDescLower.isNotEmpty() && ALL_BLOCKED_KEYWORDS_LOWER.any { safeDescLower.contains(it) }) {
             return true
         }
         return false
@@ -372,19 +382,17 @@ object ContentFilter {
             return true
         }
         if (!isMinorProtectionEnabled(context)) return false
-        if (areaName.trim().isNotEmpty() && LIVE_BLOCKED_AREAS.any { it.equals(areaName.trim(), ignoreCase = true) }) {
+        val areaLower = areaName.trim().lowercase()
+        if (areaLower.isNotEmpty() && areaLower in LIVE_BLOCKED_AREAS_LOWER) {
             return true
         }
-        if (parentAreaName.trim().isNotEmpty() && LIVE_BLOCKED_PARENT_AREAS.any { it.equals(parentAreaName.trim(), ignoreCase = true) }) {
+        val parentAreaLower = parentAreaName.trim().lowercase()
+        if (parentAreaLower.isNotEmpty() && parentAreaLower in LIVE_BLOCKED_PARENT_AREAS_LOWER) {
             return true
         }
         if (title.isNotEmpty()) {
-            val allKeywords = VIDEO_BLOCKED_TYPE_NAMES + VIDEO_BLOCKED_TITLE_KEYWORDS
-            if (allKeywords.any { keyword ->
-                val kw = keyword.trim()
-                if (kw.isEmpty()) return@any false
-                title.contains(kw, ignoreCase = true)
-            }) {
+            val titleLower = title.lowercase()
+            if (ALL_BLOCKED_KEYWORDS_LOWER.any { titleLower.contains(it) }) {
                 return true
             }
         }

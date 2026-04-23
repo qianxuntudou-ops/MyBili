@@ -185,7 +185,16 @@ class DynamicVideoAdapter(
             }
             ImageLoader.loadVideoCover(
                 imageView = binding.imageView,
-                url = coverUrl
+                url = coverUrl,
+                onPortraitDetected = if (!item.isPortrait && ownerName.isNotBlank()) { isPortrait ->
+                    if (bindingAdapterPosition != NO_POSITION
+                        && currentItem === item && isPortrait
+                    ) {
+                        binding.imageAvatar.visibility = View.GONE
+                        binding.textBadge.text = "竖屏"
+                        binding.textBadge.visibility = View.VISIBLE
+                    }
+                } else null
             )
 
             if (ownerName.isNotBlank()) {
@@ -201,15 +210,6 @@ class DynamicVideoAdapter(
                 } else {
                     binding.imageAvatar.visibility = View.VISIBLE
                     binding.textBadge.visibility = View.GONE
-                    ImageLoader.detectPortraitFromCover(binding.imageView, coverUrl) { isPortrait ->
-                        if (bindingAdapterPosition != NO_POSITION
-                            && currentItem === item && isPortrait
-                        ) {
-                            binding.imageAvatar.visibility = View.GONE
-                            binding.textBadge.text = "竖屏"
-                            binding.textBadge.visibility = View.VISIBLE
-                        }
-                    }
                 }
             } else {
                 binding.textViewOwner.text = publishText

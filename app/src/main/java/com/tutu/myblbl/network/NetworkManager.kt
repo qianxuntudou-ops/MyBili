@@ -117,6 +117,13 @@ object NetworkManager {
         )
     }
 
+    fun warmUp() {
+        internalOkHttpClient
+        gson
+        retrofit
+        apiService
+    }
+
     fun setWbiInfo(imgKey: String, subKey: String) {
         sessionStore.setWbiInfo(imgKey, subKey)
     }

@@ -166,6 +166,7 @@ class SearchItemAdapter(
             }
 
             val coverUrl = item.pic.ifBlank { item.cover }
+            val needPortraitDetect = item.dimension?.isPortrait != true
             if (item.dimension?.isPortrait == true) {
                 binding.imageAvatar.visibility = View.GONE
                 binding.textBadge.text = "竖屏"
@@ -173,15 +174,6 @@ class SearchItemAdapter(
             } else {
                 binding.imageAvatar.visibility = if (ownerName.isNotBlank()) View.VISIBLE else View.GONE
                 binding.textBadge.visibility = View.GONE
-                ImageLoader.detectPortraitFromCover(binding.imageView, coverUrl) { isPortrait ->
-                    if (bindingAdapterPosition != RecyclerView.NO_POSITION
-                        && currentItem === item && isPortrait
-                    ) {
-                        binding.imageAvatar.visibility = View.GONE
-                        binding.textBadge.text = "竖屏"
-                        binding.textBadge.visibility = View.VISIBLE
-                    }
-                }
             }
             binding.textDuration.text = item.duration
             binding.progressBar.visibility = View.GONE
@@ -189,7 +181,16 @@ class SearchItemAdapter(
 
             ImageLoader.loadVideoCover(
                 imageView = binding.imageView,
-                url = coverUrl
+                url = coverUrl,
+                onPortraitDetected = if (needPortraitDetect) { isPortrait ->
+                    if (bindingAdapterPosition != RecyclerView.NO_POSITION
+                        && currentItem === item && isPortrait
+                    ) {
+                        binding.imageAvatar.visibility = View.GONE
+                        binding.textBadge.text = "竖屏"
+                        binding.textBadge.visibility = View.VISIBLE
+                    }
+                } else null
             )
         }
     }

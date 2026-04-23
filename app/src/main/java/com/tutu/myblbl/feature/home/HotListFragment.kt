@@ -90,7 +90,6 @@ class HotListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
 
     private fun restoreCacheThenLoad() {
         cacheRestoreJob?.cancel()
-        loadData(1)
         cacheRestoreJob = viewLifecycleOwner.lifecycleScope.launch {
             val cachedVideos = runCatching {
                 HomeCacheStore.readVideos(CACHE_KEY)
@@ -101,6 +100,7 @@ class HotListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
                 showContent()
                 showLoading(false)
             }
+            loadData(1)
         }
     }
 
