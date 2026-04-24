@@ -122,10 +122,8 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val root = FrameLayout(inflater.context)
-        inflater.inflate(R.layout.fragment_series_detail, root, true)
-        _binding = FragmentSeriesDetailBinding.bind(root)
-        return root
+        _binding = FragmentSeriesDetailBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

@@ -9,7 +9,7 @@
         android:id="@+id/image_cover"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginStart="@dimen/px130"
+        android:layout_marginStart="@dimen/px30"
         android:layout_marginTop="@dimen/px60"
         android:contentDescription="Series Cover"
         android:elevation="10dp"
