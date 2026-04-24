@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scroll_description"
     android:layout_width="@dimen/px1200"
     android:layout_height="wrap_content"
     android:background="@drawable/dialog_background"
+    android:defaultFocusHighlightEnabled="false"
+    android:descendantFocusability="afterDescendants"
+    android:focusable="true"
     android:maxHeight="@dimen/px800"
     android:paddingStart="@dimen/px40"
     android:paddingTop="@dimen/px35"
     android:paddingEnd="@dimen/px40"
-    android:paddingBottom="@dimen/px35">
+    android:paddingBottom="@dimen/px35"
+    android:scrollbars="vertical">
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/text_description"

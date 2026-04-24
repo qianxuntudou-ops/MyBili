@@ -37,6 +37,7 @@ import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.ui.activity.MainActivity
+import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.ui.adapter.VideoDetailContentAdapter
 import com.tutu.myblbl.ui.dialog.OwnerDetailDialog
 import com.tutu.myblbl.ui.dialog.PlayerActionDialog
@@ -99,6 +100,11 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
     private var ugcEpisodes: List<UgcEpisode> = emptyList()
     private var ugcReverseOrder = true
 
+    private var pendingFocusAid: Long = 0
+
+    private enum class PlaybackSource { NONE, PLAY_BUTTON, UGC_CARD }
+    private var lastPlaybackSource = PlaybackSource.NONE
+
     private var actionDialog: PlayerActionDialog? = null
     private var ownerDetailDialog: OwnerDetailDialog? = null
 
@@ -133,20 +139,61 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         loadVideoDetail()
     }
 
+    override fun onResume() {
+        super.onResume()
+        val source = lastPlaybackSource
+        if (source == PlaybackSource.NONE) return
+        lastPlaybackSource = PlaybackSource.NONE
+
+        binding.recyclerView.post {
+            when (source) {
+                PlaybackSource.PLAY_BUTTON -> {
+                    val header = binding.recyclerView.findViewHolderForAdapterPosition(0)?.itemView
+                    header?.findViewById<View>(R.id.button_play)?.requestFocus()
+                }
+                PlaybackSource.UGC_CARD -> {
+                    val ugcRow = contentAdapter.currentList.indexOfFirst {
+                        it is VideoDetailContentAdapter.Row.UgcSeason
+                    }
+                    if (ugcRow >= 0) {
+                        val laneHolder = binding.recyclerView.findViewHolderForAdapterPosition(ugcRow)
+                            as? VideoDetailContentAdapter.UgcSeasonLaneViewHolder ?: return@post
+                        val innerRv = laneHolder.innerRecyclerView
+                        val adapter = innerRv.adapter as? VideoAdapter ?: return@post
+                        val currentAid = videoView?.aid ?: videoModel?.aid ?: return@post
+                        for (i in 0 until innerRv.childCount) {
+                            val child = innerRv.getChildAt(i)
+                            val vh = innerRv.getChildViewHolder(child)
+                            val item = adapter.getItem(vh.bindingAdapterPosition)
+                            if (item?.aid == currentAid) {
+                                child.requestFocus()
+                                return@post
+                            }
+                        }
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
+
     private fun setupViews() {
         binding.buttonBack1.setOnClickListener {
             navigateBackFromUi()
         }
 
         contentAdapter = VideoDetailContentAdapter(
-            onPlayClick = { playVideo() },
+            onPlayClick = {
+                lastPlaybackSource = PlaybackSource.PLAY_BUTTON
+                playVideo()
+            },
             onUploaderClick = { showOwnerDetailDialog() },
             onLikeClick = { toggleLike() },
             onCoinClick = { giveCoin() },
             onFavoriteClick = { toggleFavorite() },
             onTagClick = { tag -> onTagClicked(tag) },
             onPageClick = { model -> onPageVideoClicked(model) },
-            onUgcEpisodeClick = { model -> onUgcEpisodeClicked(model) },
+            onUgcEpisodeClick = { v, model -> onUgcEpisodeClicked(v, model) },
             onUgcOrderToggle = { toggleUgcOrder() },
             onRelatedVideoClick = { model -> onRelatedVideoClicked(model) },
             onDescriptionClick = { desc -> showDescriptionDialog(desc) },
@@ -239,7 +286,35 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         ugcEpisodes = view.ugcSeason?.sections?.flatMap { it.episodes ?: emptyList() } ?: emptyList()
 
         val rows = buildRows(detail)
-        contentAdapter.submitList(rows)
+        contentAdapter.submitList(rows) {
+            binding.recyclerView.post {
+                if (pendingFocusAid > 0) {
+                    val focusAid = pendingFocusAid
+                    pendingFocusAid = 0
+                    val ugcRow = contentAdapter.currentList.indexOfFirst {
+                        it is VideoDetailContentAdapter.Row.UgcSeason
+                    }
+                    if (ugcRow >= 0) {
+                        val laneHolder = binding.recyclerView.findViewHolderForAdapterPosition(ugcRow)
+                            as? VideoDetailContentAdapter.UgcSeasonLaneViewHolder ?: return@post
+                        val innerRv = laneHolder.innerRecyclerView
+                        val adapter = innerRv.adapter as? VideoAdapter ?: return@post
+                        for (i in 0 until innerRv.childCount) {
+                            val child = innerRv.getChildAt(i)
+                            val vh = innerRv.getChildViewHolder(child)
+                            val item = adapter.getItem(vh.bindingAdapterPosition)
+                            if (item?.aid == focusAid) {
+                                child.requestFocus()
+                                return@post
+                            }
+                        }
+                    }
+                } else {
+                    val header = binding.recyclerView.findViewHolderForAdapterPosition(0)?.itemView
+                    header?.findViewById<View>(R.id.button_play)?.requestFocus()
+                }
+            }
+        }
 
         refreshActionState()
         loadRelationState()
@@ -430,8 +505,16 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         )
     }
 
-    private fun onUgcEpisodeClicked(model: VideoModel) {
-        if (model.aid == (videoView?.aid ?: videoModel?.aid)) return
+    private fun onUgcEpisodeClicked(view: View, model: VideoModel) {
+        val currentAid = videoView?.aid ?: videoModel?.aid ?: return
+        if (model.aid == currentAid) {
+            lastPlaybackSource = PlaybackSource.UGC_CARD
+            pendingFocusAid = 0
+            playVideo()
+            return
+        }
+        pendingFocusAid = model.aid
+        lastPlaybackSource = PlaybackSource.NONE
         aid = model.aid.takeIf { it > 0 }
         bvid = model.bvid.takeIf { it.isNotBlank() }
         videoModel = null
@@ -542,12 +625,11 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         val dialogBinding = com.tutu.myblbl.databinding.DialogDescriptionBinding
             .inflate(LayoutInflater.from(requireContext()))
         dialogBinding.textDescription.text = description
-        androidx.appcompat.app.AppCompatDialog(requireContext(), R.style.DialogTheme).apply {
-            setContentView(dialogBinding.root)
-            setCanceledOnTouchOutside(true)
-            setOnCancelListener { /* back key or touch outside */ }
-            show()
-        }
+        val dialog = androidx.appcompat.app.AppCompatDialog(requireContext(), R.style.DialogTheme)
+        dialog.setContentView(dialogBinding.root)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnCancelListener { /* back key or touch outside */ }
+        dialog.show()
     }
 
     private fun showActionDialog() {

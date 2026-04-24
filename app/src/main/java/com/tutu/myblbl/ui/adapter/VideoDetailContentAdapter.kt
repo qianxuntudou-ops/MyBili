@@ -35,7 +35,7 @@ class VideoDetailContentAdapter(
     private val onFavoriteClick: () -> Unit,
     private val onTagClick: (Tag) -> Unit,
     private val onPageClick: (VideoModel) -> Unit,
-    private val onUgcEpisodeClick: (VideoModel) -> Unit,
+    private val onUgcEpisodeClick: (View, VideoModel) -> Unit,
     private val onUgcOrderToggle: () -> Unit,
     private val onRelatedVideoClick: (VideoModel) -> Unit,
     private val onDescriptionClick: (CharSequence) -> Unit,
@@ -213,13 +213,12 @@ class VideoDetailContentAdapter(
                 }
                 val scale = if (hasFocus) 1.3f else 1.0f
                 val iconColor = if (hasFocus) accentColor else white
-                val ringColor = if (hasFocus) accentColor else white
                 binding.iconPlayButton.animate().scaleX(scale).scaleY(scale).setDuration(200).start()
                 binding.viewPlayRing.animate().scaleX(scale).scaleY(scale).setDuration(200).start()
                 binding.iconPlayButton.setColorFilter(iconColor)
                 val ringDrawable = binding.viewPlayRing.background?.mutate()
                 if (ringDrawable is android.graphics.drawable.GradientDrawable) {
-                    ringDrawable.setStroke(context.resources.getDimensionPixelSize(R.dimen.px3), ringColor)
+                    ringDrawable.setStroke(context.resources.getDimensionPixelSize(R.dimen.px6), iconColor)
                 }
             }
             binding.buttonUploader.onFocusChangeListener = scrollListener
@@ -290,11 +289,20 @@ class VideoDetailContentAdapter(
 
             updateTagLayout(tags)
             updateActionButtons(isLiked, isCoined, isFavorited)
+            updateUploaderNextFocusDown()
+        }
 
-            if (!itemView.hasFocus()) {
-                binding.buttonPlay.post {
-                    binding.buttonPlay.requestFocus()
-                }
+        private fun updateUploaderNextFocusDown() {
+            val targetId = if (binding.buttonDetail.visibility == View.VISIBLE) {
+                R.id.button_detail
+            } else if (binding.viewFlexLayout.visibility == View.VISIBLE && binding.viewFlexLayout.childCount > 0) {
+                R.id.view_flex_layout
+            } else {
+                0
+            }
+            if (targetId != 0) {
+                binding.buttonUploader.nextFocusDownId = targetId
+                binding.buttonFollow.nextFocusDownId = targetId
             }
         }
 
@@ -302,16 +310,19 @@ class VideoDetailContentAdapter(
             if (description.isBlank()) {
                 binding.textDescription.visibility = View.GONE
                 binding.buttonDetail.visibility = View.GONE
+                updateUploaderNextFocusDown()
                 return
             }
             binding.textDescription.visibility = View.VISIBLE
-            binding.textDescription.text = description
+            val displayText = "简介：$description"
+            binding.textDescription.text = displayText
             binding.textDescription.post {
                 val availableWidth = binding.textDescription.width -
                         binding.textDescription.paddingLeft - binding.textDescription.paddingRight
                 if (availableWidth > 0) {
-                    val textWidth = binding.textDescription.paint.measureText(description.toString())
+                    val textWidth = binding.textDescription.paint.measureText(displayText.toString())
                     binding.buttonDetail.visibility = if (textWidth > availableWidth) View.VISIBLE else View.GONE
+                    updateUploaderNextFocusDown()
                 }
             }
         }
@@ -453,11 +464,12 @@ class VideoDetailContentAdapter(
 
     class UgcSeasonLaneViewHolder(
         private val binding: CellSeriesLaneBinding,
-        onEpisodeClick: (VideoModel) -> Unit,
+        onEpisodeClick: (View, VideoModel) -> Unit,
         private val onOrderToggle: () -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private val videoAdapter = VideoAdapter(itemWidthPx = ScreenUtils.getScreenWidth(binding.root.context) / 5)
+        val innerRecyclerView: RecyclerView get() = binding.recyclerView
 
         init {
             videoAdapter.setShowLoadMore(false)
@@ -469,8 +481,8 @@ class VideoDetailContentAdapter(
             binding.buttonOrder.setOnClickListener {
                 onOrderToggle()
             }
-            videoAdapter.setOnItemClickListener { _, item ->
-                onEpisodeClick(item)
+            videoAdapter.setOnItemClickListener { v, item ->
+                onEpisodeClick(v, item)
             }
             bindBackButtonOnScroll(binding.recyclerView)
         }

@@ -6,17 +6,13 @@
     android:paddingBottom="@dimen/px30">
 
     <com.google.android.material.card.MaterialCardView
-        android:id="@+id/button_play"
+        android:id="@+id/card_cover"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginTop="@dimen/px60"
-        android:clickable="true"
-        android:focusable="true"
-        android:foreground="@drawable/cell_background"
-        android:nextFocusLeft="@id/button_back_1"
-        android:nextFocusRight="@+id/button_uploader"
         app:cardBackgroundColor="@android:color/transparent"
         app:cardCornerRadius="@dimen/px15"
+        app:cardForegroundColor="@android:color/transparent"
         app:cardElevation="0dp"
         app:layout_constraintDimensionRatio="h,16:9"
         app:layout_constraintStart_toStartOf="parent"
@@ -52,6 +48,85 @@
             app:srcCompat="@drawable/ic_play" />
     </com.google.android.material.card.MaterialCardView>
 
+    <View
+        android:id="@+id/button_play"
+        android:layout_width="@dimen/px130"
+        android:layout_height="@dimen/px130"
+        android:clickable="true"
+        android:defaultFocusHighlightEnabled="false"
+        android:focusable="true"
+        android:nextFocusDown="@+id/button_like"
+        android:nextFocusLeft="@id/button_back_1"
+        android:nextFocusRight="@+id/button_uploader"
+        app:layout_constraintBottom_toBottomOf="@+id/card_cover"
+        app:layout_constraintEnd_toEndOf="@+id/card_cover"
+        app:layout_constraintStart_toStartOf="@+id/card_cover"
+        app:layout_constraintTop_toTopOf="@+id/card_cover" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/button_like"
+        android:layout_width="@dimen/px80"
+        android:layout_height="@dimen/px80"
+        android:layout_marginBottom="@dimen/px15"
+        android:background="@drawable/button_common"
+        android:clickable="true"
+        android:focusable="true"
+        android:nextFocusLeft="@id/button_back_1"
+        android:nextFocusUp="@+id/button_play"
+        android:padding="@dimen/px20"
+        app:layout_constraintBottom_toBottomOf="@+id/card_cover"
+        app:layout_constraintEnd_toStartOf="@+id/button_coin"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        app:layout_constraintStart_toStartOf="@+id/card_cover"
+        app:srcCompat="@drawable/ic_like"
+        app:tint="?android:attr/textColorPrimary" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/button_coin"
+        android:layout_width="@dimen/px80"
+        android:layout_height="@dimen/px80"
+        android:layout_marginStart="@dimen/px20"
+        android:layout_marginBottom="@dimen/px15"
+        android:background="@drawable/button_common"
+        android:clickable="true"
+        android:focusable="true"
+        android:nextFocusLeft="@id/button_back_1"
+        android:nextFocusUp="@+id/button_play"
+        android:padding="@dimen/px20"
+        app:layout_constraintBottom_toBottomOf="@+id/card_cover"
+        app:layout_constraintEnd_toStartOf="@+id/button_favorite"
+        app:layout_constraintStart_toEndOf="@+id/button_like"
+        app:srcCompat="@drawable/ic_coin"
+        app:tint="?android:attr/textColorPrimary" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/button_favorite"
+        android:layout_width="@dimen/px80"
+        android:layout_height="@dimen/px80"
+        android:layout_marginStart="@dimen/px20"
+        android:layout_marginBottom="@dimen/px15"
+        android:background="@drawable/button_common"
+        android:clickable="true"
+        android:focusable="true"
+        android:nextFocusLeft="@id/button_back_1"
+        android:nextFocusUp="@+id/button_play"
+        android:padding="@dimen/px20"
+        app:layout_constraintBottom_toBottomOf="@+id/card_cover"
+        app:layout_constraintEnd_toEndOf="@+id/card_cover"
+        app:layout_constraintStart_toEndOf="@+id/button_coin"
+        app:srcCompat="@drawable/ic_favorite"
+        app:tint="?android:attr/textColorPrimary" />
+
+    <com.tutu.myblbl.ui.widget.TripleActionProgressView
+        android:id="@+id/view_triple_progress"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@+id/button_favorite"
+        app:layout_constraintEnd_toEndOf="@+id/button_favorite"
+        app:layout_constraintStart_toStartOf="@+id/button_like"
+        app:layout_constraintTop_toTopOf="@+id/button_like" />
+
     <androidx.appcompat.widget.LinearLayoutCompat
         android:id="@+id/button_uploader"
         android:layout_width="wrap_content"
@@ -61,11 +136,12 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
+        android:nextFocusDown="@+id/button_detail"
         android:nextFocusLeft="@+id/button_play"
         android:nextFocusRight="@+id/button_follow"
         android:paddingEnd="@dimen/px20"
-        app:layout_constraintStart_toEndOf="@+id/button_play"
-        app:layout_constraintTop_toTopOf="@+id/button_play">
+        app:layout_constraintStart_toEndOf="@+id/card_cover"
+        app:layout_constraintTop_toTopOf="@+id/card_cover">
 
         <com.tutu.myblbl.core.ui.image.AvatarBadgeView
             android:id="@+id/image_avatar"
@@ -110,6 +186,7 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
+        android:nextFocusDown="@+id/button_detail"
         android:nextFocusLeft="@+id/button_uploader"
         android:nextFocusRight="@+id/button_like"
         android:paddingStart="@dimen/px20"
@@ -150,7 +227,7 @@
         android:textSize="@dimen/px40"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/button_play"
+        app:layout_constraintStart_toEndOf="@+id/card_cover"
         app:layout_constraintTop_toBottomOf="@+id/button_uploader" />
 
     <androidx.appcompat.widget.AppCompatTextView
@@ -167,38 +244,45 @@
         app:layout_constraintTop_toBottomOf="@+id/text_title"
         app:layout_constraintVertical_bias="0.1" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/button_detail"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/px15"
-        android:background="@drawable/button_accent_outline"
-        android:clickable="true"
-        android:focusable="true"
-        android:paddingStart="@dimen/px20"
-        android:paddingTop="@dimen/px10"
-        android:paddingEnd="@dimen/px20"
-        android:paddingBottom="@dimen/px10"
-        android:text="@string/detail"
-        android:textColor="@color/colorAccent"
-        android:textSize="@dimen/px26"
-        android:visibility="gone"
-        app:layout_constraintStart_toStartOf="@+id/text_title"
-        app:layout_constraintTop_toBottomOf="@+id/text_subtitle" />
-
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/text_description"
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/layout_desc_row"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="标题标题标题标题标题标题标题标题标题"
-        android:textColor="?android:attr/textColorSecondary"
-        android:textSize="@dimen/px28"
-        app:layout_constraintBottom_toBottomOf="@+id/button_detail"
+        android:layout_marginTop="@dimen/px15"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="@+id/text_title"
-        app:layout_constraintStart_toEndOf="@+id/button_detail"
-        app:layout_constraintTop_toTopOf="@+id/button_detail" />
+        app:layout_constraintStart_toStartOf="@+id/text_title"
+        app:layout_constraintTop_toBottomOf="@+id/text_subtitle">
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/button_detail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/button_accent_outline"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="@dimen/px20"
+            android:paddingTop="@dimen/px10"
+            android:paddingEnd="@dimen/px20"
+            android:paddingBottom="@dimen/px10"
+            android:text="@string/detail"
+            android:textColor="@color/colorAccent"
+            android:textSize="@dimen/px26"
+            android:layout_marginEnd="@dimen/px15"
+            android:visibility="gone" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/text_description"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="标题标题标题标题标题标题标题标题标题"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="@dimen/px28" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
 
     <com.google.android.flexbox.FlexboxLayout
         android:id="@+id/view_flex_layout"
@@ -215,70 +299,6 @@
         app:alignItems="flex_start"
         app:flexWrap="wrap"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/button_play"
-        app:layout_constraintTop_toBottomOf="@+id/text_description" />
-
-    <androidx.appcompat.widget.AppCompatImageView
-        android:id="@+id/button_like"
-        android:layout_width="@dimen/px80"
-        android:layout_height="@dimen/px80"
-        android:layout_marginTop="@dimen/px20"
-        android:background="@drawable/button_common"
-        android:clickable="true"
-        android:focusable="true"
-        android:nextFocusLeft="@id/button_back_1"
-        android:nextFocusUp="@+id/button_play"
-        android:padding="@dimen/px20"
-        app:layout_constraintEnd_toStartOf="@+id/button_coin"
-        app:layout_constraintHorizontal_chainStyle="packed"
-        app:layout_constraintStart_toStartOf="@+id/button_play"
-        app:layout_constraintTop_toBottomOf="@+id/button_play"
-        app:srcCompat="@drawable/ic_like"
-        app:tint="?android:attr/textColorPrimary" />
-
-    <androidx.appcompat.widget.AppCompatImageView
-        android:id="@+id/button_coin"
-        android:layout_width="@dimen/px80"
-        android:layout_height="@dimen/px80"
-        android:layout_marginStart="@dimen/px20"
-        android:layout_marginTop="@dimen/px20"
-        android:background="@drawable/button_common"
-        android:clickable="true"
-        android:focusable="true"
-        android:nextFocusLeft="@id/button_back_1"
-        android:nextFocusUp="@+id/button_play"
-        android:padding="@dimen/px20"
-        app:layout_constraintEnd_toStartOf="@+id/button_favorite"
-        app:layout_constraintStart_toEndOf="@+id/button_like"
-        app:layout_constraintTop_toBottomOf="@+id/button_play"
-        app:srcCompat="@drawable/ic_coin"
-        app:tint="?android:attr/textColorPrimary" />
-
-    <androidx.appcompat.widget.AppCompatImageView
-        android:id="@+id/button_favorite"
-        android:layout_width="@dimen/px80"
-        android:layout_height="@dimen/px80"
-        android:layout_marginStart="@dimen/px20"
-        android:layout_marginTop="@dimen/px20"
-        android:background="@drawable/button_common"
-        android:clickable="true"
-        android:focusable="true"
-        android:nextFocusLeft="@id/button_back_1"
-        android:nextFocusUp="@+id/button_play"
-        android:padding="@dimen/px20"
-        app:layout_constraintEnd_toEndOf="@+id/button_play"
-        app:layout_constraintStart_toEndOf="@+id/button_coin"
-        app:layout_constraintTop_toBottomOf="@+id/button_play"
-        app:srcCompat="@drawable/ic_favorite"
-        app:tint="?android:attr/textColorPrimary" />
-
-    <com.tutu.myblbl.ui.widget.TripleActionProgressView
-        android:id="@+id/view_triple_progress"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="@+id/button_favorite"
-        app:layout_constraintEnd_toEndOf="@+id/button_favorite"
-        app:layout_constraintStart_toStartOf="@+id/button_like"
-        app:layout_constraintTop_toTopOf="@+id/button_like" />
+        app:layout_constraintStart_toEndOf="@+id/card_cover"
+        app:layout_constraintTop_toBottomOf="@+id/layout_desc_row" />
 </androidx.constraintlayout.widget.ConstraintLayout>
