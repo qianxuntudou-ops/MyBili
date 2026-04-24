@@ -9,7 +9,6 @@
         android:id="@+id/button_play"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginStart="@dimen/px30"
         android:layout_marginTop="@dimen/px60"
         android:clickable="true"
         android:focusable="true"
@@ -76,24 +75,38 @@
             android:layout_marginEnd="@dimen/px15"
             app:srcCompat="@drawable/default_avatar" />
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/text_name"
+        <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/px15"
-            android:ellipsize="end"
-            android:singleLine="true"
-            android:text="Title"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="@dimen/px30"
-            android:textStyle="bold" />
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/text_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Title"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="@dimen/px30"
+                android:textStyle="bold" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/text_fans"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/px5"
+                android:text="0粉丝"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="@dimen/px24" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
     </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.LinearLayoutCompat
         android:id="@+id/button_follow"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="@drawable/cell_background"
+        android:background="@drawable/button_accent_outline"
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
@@ -159,7 +172,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/px15"
-        android:background="@drawable/cell_background"
+        android:background="@drawable/button_accent_outline"
         android:clickable="true"
         android:focusable="true"
         android:paddingStart="@dimen/px20"
@@ -169,6 +182,7 @@
         android:text="@string/detail"
         android:textColor="@color/colorAccent"
         android:textSize="@dimen/px26"
+        android:visibility="gone"
         app:layout_constraintStart_toStartOf="@+id/text_title"
         app:layout_constraintTop_toBottomOf="@+id/text_subtitle" />
 
@@ -176,12 +190,11 @@
         android:id="@+id/text_description"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/px15"
         android:ellipsize="end"
         android:maxLines="1"
         android:text="标题标题标题标题标题标题标题标题标题"
         android:textColor="?android:attr/textColorSecondary"
-        android:textSize="@dimen/px32"
+        android:textSize="@dimen/px28"
         app:layout_constraintBottom_toBottomOf="@+id/button_detail"
         app:layout_constraintEnd_toEndOf="@+id/text_title"
         app:layout_constraintStart_toEndOf="@+id/button_detail"

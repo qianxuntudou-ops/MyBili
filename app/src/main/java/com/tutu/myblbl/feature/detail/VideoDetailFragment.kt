@@ -351,7 +351,8 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
 
     private fun loadRelationState() {
         val ownerMid = videoView?.owner?.mid ?: return
-        if (!sessionGateway.isLoggedIn() || sessionGateway.getUserInfo()?.mid == ownerMid) return
+        val isSelf = sessionGateway.getUserInfo()?.mid == ownerMid
+        if (!sessionGateway.isLoggedIn() || isSelf) return
         lifecycleScope.launch {
             userRepository.checkUserRelation(ownerMid)
                 .onSuccess { response ->
@@ -361,6 +362,14 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
                             ?.updateFollowState(response.data.attribute)
                     }
                 }
+            try {
+                val statResponse = userRepository.getRelationStat(ownerMid)
+                if (statResponse.isSuccess && statResponse.data != null) {
+                    val holder = binding.recyclerView.findViewHolderForAdapterPosition(0)
+                    (holder as? VideoDetailContentAdapter.VideoDetailHeadViewHolder)
+                        ?.updateFansCount(statResponse.data.follower.toLong())
+                }
+            } catch (_: Exception) { }
         }
     }
 

@@ -286,7 +286,7 @@ class VideoDetailContentAdapter(
             }
 
             currentDescription = view.desc.orEmpty()
-            binding.textDescription.text = currentDescription
+            updateDescription(currentDescription)
 
             updateTagLayout(tags)
             updateActionButtons(isLiked, isCoined, isFavorited)
@@ -294,6 +294,24 @@ class VideoDetailContentAdapter(
             if (!itemView.hasFocus()) {
                 binding.buttonPlay.post {
                     binding.buttonPlay.requestFocus()
+                }
+            }
+        }
+
+        private fun updateDescription(description: CharSequence) {
+            if (description.isBlank()) {
+                binding.textDescription.visibility = View.GONE
+                binding.buttonDetail.visibility = View.GONE
+                return
+            }
+            binding.textDescription.visibility = View.VISIBLE
+            binding.textDescription.text = description
+            binding.textDescription.post {
+                val availableWidth = binding.textDescription.width -
+                        binding.textDescription.paddingLeft - binding.textDescription.paddingRight
+                if (availableWidth > 0) {
+                    val textWidth = binding.textDescription.paint.measureText(description.toString())
+                    binding.buttonDetail.visibility = if (textWidth > availableWidth) View.VISIBLE else View.GONE
                 }
             }
         }
@@ -356,22 +374,27 @@ class VideoDetailContentAdapter(
             relationAttribute = attribute
             val isMutual = attribute == 6
             val isFollowing = attribute == 2 || attribute == 6
+            val accent = ContextCompat.getColorStateList(context, R.color.colorAccent)
             if (isMutual) {
                 binding.textFollow.text = context.getString(R.string.follow_as_friend)
-                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.grey))
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
                 binding.iconFollow.setImageResource(R.drawable.ic_check)
-                binding.iconFollow.imageTintList = ContextCompat.getColorStateList(context, R.color.grey)
+                binding.iconFollow.imageTintList = accent
             } else if (isFollowing) {
                 binding.textFollow.text = context.getString(R.string.followed)
-                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.grey))
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
                 binding.iconFollow.setImageResource(R.drawable.ic_check)
-                binding.iconFollow.imageTintList = ContextCompat.getColorStateList(context, R.color.grey)
+                binding.iconFollow.imageTintList = accent
             } else {
                 binding.textFollow.text = context.getString(R.string.follow)
                 binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
                 binding.iconFollow.setImageResource(R.drawable.ic_plus)
-                binding.iconFollow.imageTintList = ContextCompat.getColorStateList(context, R.color.colorAccent)
+                binding.iconFollow.imageTintList = accent
             }
+        }
+
+        fun updateFansCount(count: Long) {
+            binding.textFans.text = formatFans(count)
         }
 
         private fun showTripleHintIfNeeded() {
@@ -390,6 +413,14 @@ class VideoDetailContentAdapter(
                 count >= 1000 -> String.format(Locale.getDefault(), "%.1f千", count / 1000.0)
                 else -> count.toString()
             }
+        }
+
+        private fun formatFans(count: Long): String {
+            val number = when {
+                count >= 10000 -> String.format(Locale.getDefault(), "%.1f万", count / 10000.0)
+                else -> String.format(Locale.getDefault(), "%,d", count)
+            }
+            return "${number}粉丝"
         }
     }
 
