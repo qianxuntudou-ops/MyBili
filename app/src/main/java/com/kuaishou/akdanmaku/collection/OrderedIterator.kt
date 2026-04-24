@@ -20,27 +20,23 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.kuaishou.akdanmaku.collection;
-
-import java.util.Iterator;
+package com.kuaishou.akdanmaku.collection
 
 /**
- * Defines an iterator that operates over an ordered container. Subset of {@link java.util.ListIterator}.
- * <p>
+ * Defines an iterator that operates over an ordered container.
  * This iterator allows both forward and reverse iteration through the container.
- * </p>
  *
- * @param <E> the type of elements returned by this iterator.
+ * @param E the type of elements returned by this iterator.
  * @since 3.0
  */
-public interface OrderedIterator<E> extends Iterator<E> {
+interface OrderedIterator<E> : Iterator<E> {
 
     /**
      * Checks to see if there is a previous element that can be iterated to.
      *
-     * @return {@code true} if the iterator has a previous element
+     * @return `true` if the iterator has a previous element
      */
-    boolean hasPrevious();
+    fun hasPrevious(): Boolean
 
     /**
      * Gets the previous element from the container.
@@ -48,6 +44,5 @@ public interface OrderedIterator<E> extends Iterator<E> {
      * @return the previous element in the iteration
      * @throws java.util.NoSuchElementException if the iteration is finished
      */
-    E previous();
-
+    fun previous(): E
 }
