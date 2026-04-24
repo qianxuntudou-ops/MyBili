@@ -470,6 +470,8 @@ class VideoDetailContentAdapter(
 
         private val videoAdapter = VideoAdapter(itemWidthPx = ScreenUtils.getScreenWidth(binding.root.context) / 5)
         val innerRecyclerView: RecyclerView get() = binding.recyclerView
+        private var lastIsReverse: Boolean? = null
+        private var lastCurrentAid: Long = 0
 
         init {
             videoAdapter.setShowLoadMore(false)
@@ -490,9 +492,22 @@ class VideoDetailContentAdapter(
         fun bind(title: String, items: List<VideoModel>, isReverse: Boolean, currentAid: Long) {
             binding.topTitle.text = title
             binding.textOrder.text = if (isReverse) "正序" else "倒序"
-            videoAdapter.currentPlayingAid = currentAid
-            videoAdapter.setData(items) {
-                scrollToCurrentVideo(items, currentAid)
+            if (lastIsReverse != isReverse) {
+                lastIsReverse = isReverse
+                lastCurrentAid = currentAid
+                videoAdapter.currentPlayingAid = currentAid
+                videoAdapter.setData(items) {
+                    scrollToCurrentVideo(items, currentAid)
+                }
+            } else if (lastCurrentAid != currentAid) {
+                val oldAid = lastCurrentAid
+                lastCurrentAid = currentAid
+                videoAdapter.currentPlayingAid = currentAid
+                val snapshot = videoAdapter.getItemsSnapshot()
+                val oldPos = snapshot.indexOfFirst { it.aid == oldAid }
+                val newPos = snapshot.indexOfFirst { it.aid == currentAid }
+                if (oldPos >= 0) videoAdapter.notifyItemChanged(oldPos)
+                if (newPos >= 0 && newPos != oldPos) videoAdapter.notifyItemChanged(newPos)
             }
         }
 
@@ -572,7 +587,7 @@ class VideoDetailContentAdapter(
                 return when (row) {
                     is Row.Header -> "header"
                     is Row.Pages -> "pages"
-                    is Row.UgcSeason -> "ugc_season:${row.title}"
+                    is Row.UgcSeason -> "ugc_season"
                     is Row.Related -> "related"
                 }
             }

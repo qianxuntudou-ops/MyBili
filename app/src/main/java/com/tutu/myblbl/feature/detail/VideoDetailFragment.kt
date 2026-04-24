@@ -290,21 +290,53 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
 
         ugcEpisodes = view.ugcSeason?.sections?.flatMap { it.episodes ?: emptyList() } ?: emptyList()
 
-        val rows = buildRows(detail)
-        contentAdapter.submitList(rows) {
-            binding.recyclerView.postDelayed({
-                if (pendingFocusAid > 0) {
-                    val focusAid = pendingFocusAid
-                    pendingFocusAid = 0
-                    focusUgcCardByAid(focusAid)
-                } else {
+        if (pendingFocusAid > 0) {
+            updateUIForEpisodeSwitch(detail)
+        } else {
+            val rows = buildRows(detail)
+            contentAdapter.submitList(rows) {
+                binding.recyclerView.postDelayed({
                     focusPlayButton()
-                }
-            }, 150)
+                }, 150)
+            }
         }
 
         refreshActionState()
         loadRelationState()
+    }
+
+    private fun updateUIForEpisodeSwitch(detail: VideoDetailModel) {
+        val view = detail.view ?: return
+        val focusAid = pendingFocusAid
+        pendingFocusAid = 0
+
+        val headerHolder = binding.recyclerView.findViewHolderForAdapterPosition(0)
+            as? VideoDetailContentAdapter.VideoDetailHeadViewHolder
+        if (headerHolder != null) {
+            headerHolder.bind(view, detail.tags ?: emptyList(), isLiked, isCoined, isFavorited)
+        }
+
+        val ugcRowIndex = contentAdapter.currentList.indexOfFirst {
+            it is VideoDetailContentAdapter.Row.UgcSeason
+        }
+        if (ugcRowIndex >= 0) {
+            val oldRow = contentAdapter.currentList[ugcRowIndex] as VideoDetailContentAdapter.Row.UgcSeason
+            val rawTitle = view.ugcSeason?.title.orEmpty()
+            val items = oldRow.items
+            val currentIdx = items.indexOfFirst { it.aid == view.aid }.let { if (it >= 0) it + 1 else 0 }
+            val seasonTitle = buildString {
+                append("合集")
+                if (rawTitle.isNotBlank()) append("·").append(rawTitle)
+                append("（").append(currentIdx).append("/").append(items.size).append("）")
+            }
+            val ugcHolder = binding.recyclerView.findViewHolderForAdapterPosition(ugcRowIndex)
+                as? VideoDetailContentAdapter.UgcSeasonLaneViewHolder
+            ugcHolder?.bind(seasonTitle, items, oldRow.isReverse, view.aid)
+        }
+
+        binding.recyclerView.postDelayed({
+            focusUgcCardByAid(focusAid)
+        }, 150)
     }
 
     private fun buildRows(detail: VideoDetailModel): List<VideoDetailContentAdapter.Row> {
