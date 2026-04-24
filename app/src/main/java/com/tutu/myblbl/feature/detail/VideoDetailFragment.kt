@@ -145,34 +145,39 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         if (source == PlaybackSource.NONE) return
         lastPlaybackSource = PlaybackSource.NONE
 
-        binding.recyclerView.post {
+        binding.recyclerView.postDelayed({
             when (source) {
-                PlaybackSource.PLAY_BUTTON -> {
-                    val header = binding.recyclerView.findViewHolderForAdapterPosition(0)?.itemView
-                    header?.findViewById<View>(R.id.button_play)?.requestFocus()
-                }
+                PlaybackSource.PLAY_BUTTON -> focusPlayButton()
                 PlaybackSource.UGC_CARD -> {
-                    val ugcRow = contentAdapter.currentList.indexOfFirst {
-                        it is VideoDetailContentAdapter.Row.UgcSeason
-                    }
-                    if (ugcRow >= 0) {
-                        val laneHolder = binding.recyclerView.findViewHolderForAdapterPosition(ugcRow)
-                            as? VideoDetailContentAdapter.UgcSeasonLaneViewHolder ?: return@post
-                        val innerRv = laneHolder.innerRecyclerView
-                        val adapter = innerRv.adapter as? VideoAdapter ?: return@post
-                        val currentAid = videoView?.aid ?: videoModel?.aid ?: return@post
-                        for (i in 0 until innerRv.childCount) {
-                            val child = innerRv.getChildAt(i)
-                            val vh = innerRv.getChildViewHolder(child)
-                            val item = adapter.getItem(vh.bindingAdapterPosition)
-                            if (item?.aid == currentAid) {
-                                child.requestFocus()
-                                return@post
-                            }
-                        }
-                    }
+                    val currentAid = videoView?.aid ?: videoModel?.aid ?: return@postDelayed
+                    focusUgcCardByAid(currentAid)
                 }
                 else -> {}
+            }
+        }, 150)
+    }
+
+    private fun focusPlayButton() {
+        val header = binding.recyclerView.findViewHolderForAdapterPosition(0)?.itemView ?: return
+        header.findViewById<View>(R.id.button_play)?.requestFocus()
+    }
+
+    private fun focusUgcCardByAid(aid: Long) {
+        val ugcRow = contentAdapter.currentList.indexOfFirst {
+            it is VideoDetailContentAdapter.Row.UgcSeason
+        }
+        if (ugcRow < 0) return
+        val laneHolder = binding.recyclerView.findViewHolderForAdapterPosition(ugcRow)
+            as? VideoDetailContentAdapter.UgcSeasonLaneViewHolder ?: return
+        val innerRv = laneHolder.innerRecyclerView
+        val adapter = innerRv.adapter as? VideoAdapter ?: return
+        for (i in 0 until innerRv.childCount) {
+            val child = innerRv.getChildAt(i)
+            val vh = innerRv.getChildViewHolder(child)
+            val item = adapter.getItem(vh.bindingAdapterPosition)
+            if (item?.aid == aid) {
+                child.requestFocus()
+                return
             }
         }
     }
@@ -287,33 +292,15 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
 
         val rows = buildRows(detail)
         contentAdapter.submitList(rows) {
-            binding.recyclerView.post {
+            binding.recyclerView.postDelayed({
                 if (pendingFocusAid > 0) {
                     val focusAid = pendingFocusAid
                     pendingFocusAid = 0
-                    val ugcRow = contentAdapter.currentList.indexOfFirst {
-                        it is VideoDetailContentAdapter.Row.UgcSeason
-                    }
-                    if (ugcRow >= 0) {
-                        val laneHolder = binding.recyclerView.findViewHolderForAdapterPosition(ugcRow)
-                            as? VideoDetailContentAdapter.UgcSeasonLaneViewHolder ?: return@post
-                        val innerRv = laneHolder.innerRecyclerView
-                        val adapter = innerRv.adapter as? VideoAdapter ?: return@post
-                        for (i in 0 until innerRv.childCount) {
-                            val child = innerRv.getChildAt(i)
-                            val vh = innerRv.getChildViewHolder(child)
-                            val item = adapter.getItem(vh.bindingAdapterPosition)
-                            if (item?.aid == focusAid) {
-                                child.requestFocus()
-                                return@post
-                            }
-                        }
-                    }
+                    focusUgcCardByAid(focusAid)
                 } else {
-                    val header = binding.recyclerView.findViewHolderForAdapterPosition(0)?.itemView
-                    header?.findViewById<View>(R.id.button_play)?.requestFocus()
+                    focusPlayButton()
                 }
-            }
+            }, 150)
         }
 
         refreshActionState()
