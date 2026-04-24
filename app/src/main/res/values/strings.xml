@@ -350,7 +350,7 @@
     <string name="qwe_keyboard">全键盘</string>
     <string name="recent_update">最近更新</string>
     <string name="recommend">推荐</string>
-    <string name="related_video">相关视频</string>
+    <string name="related_video">相关视频：</string>
     <string name="retry">重试</string>
     <string name="rewind">快退</string>
     <string name="saturday">周六</string>
@@ -401,6 +401,7 @@
     <string name="video_play_exit">再按一次返回退出播放</string>
     <string name="video_quality">画质</string>
     <string name="watch">观看</string>
+    <string name="detail">详情</string>
     <string name="wednesday">周三</string>
     <string name="zone">分区</string>
 </resources>

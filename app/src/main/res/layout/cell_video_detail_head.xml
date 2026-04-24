@@ -20,11 +20,84 @@
         app:layout_constraintWidth_percent="0.35"
         app:srcCompat="@drawable/default_video" />
 
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/button_uploader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/px50"
+        android:background="@drawable/cell_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:nextFocusLeft="@id/button_back_1"
+        android:nextFocusRight="@+id/button_follow"
+        android:paddingEnd="@dimen/px20"
+        app:layout_constraintStart_toEndOf="@+id/image_cover"
+        app:layout_constraintTop_toTopOf="@+id/image_cover">
+
+        <com.tutu.myblbl.core.ui.image.AvatarBadgeView
+            android:id="@+id/image_avatar"
+            android:layout_width="@dimen/px70"
+            android:layout_height="@dimen/px70"
+            android:layout_marginStart="@dimen/px5"
+            android:layout_marginTop="@dimen/px15"
+            android:layout_marginBottom="@dimen/px15"
+            app:srcCompat="@drawable/default_avatar" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/text_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/px15"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="Title"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="@dimen/px30"
+            android:textStyle="bold" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/button_follow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/cell_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:nextFocusLeft="@+id/button_uploader"
+        android:nextFocusRight="@+id/button_play"
+        android:paddingStart="@dimen/px20"
+        android:paddingTop="@dimen/px10"
+        android:paddingEnd="@dimen/px20"
+        android:paddingBottom="@dimen/px10"
+        app:layout_constraintBottom_toBottomOf="@+id/button_uploader"
+        app:layout_constraintEnd_toEndOf="@+id/text_title"
+        app:layout_constraintTop_toTopOf="@+id/button_uploader">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/icon_follow"
+            android:layout_width="@dimen/px30"
+            android:layout_height="@dimen/px30"
+            app:srcCompat="@drawable/ic_plus"
+            app:tint="@color/colorAccent" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/text_follow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/px8"
+            android:text="@string/follow"
+            android:textColor="@color/colorAccent"
+            android:textSize="@dimen/px26" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/text_title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="@dimen/px50"
+        android:layout_marginTop="@dimen/px15"
         android:layout_marginEnd="@dimen/px100"
         android:lineSpacingMultiplier="1.1"
         android:text="标题标题标题标题标题标题标题标题标题"
@@ -33,7 +106,7 @@
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/image_cover"
-        app:layout_constraintTop_toTopOf="@+id/image_cover" />
+        app:layout_constraintTop_toBottomOf="@+id/button_uploader" />
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/text_subtitle"
@@ -49,54 +122,38 @@
         app:layout_constraintTop_toBottomOf="@+id/text_title"
         app:layout_constraintVertical_bias="0.1" />
 
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:id="@+id/button_uploader"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/px7"
-        android:background="@drawable/cell_background"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusRight="@+id/button_play"
-        app:layout_constraintStart_toStartOf="@+id/image_cover"
-        app:layout_constraintTop_toBottomOf="@+id/image_cover"
-        app:layout_constraintVertical_bias="0.1">
-
-        <com.tutu.myblbl.core.ui.image.AvatarBadgeView
-            android:id="@+id/image_avatar"
-            android:layout_width="@dimen/px70"
-            android:layout_height="@dimen/px70"
-            android:layout_marginStart="@dimen/px5"
-            android:layout_marginTop="@dimen/px15"
-            android:layout_marginBottom="@dimen/px15"
-            app:srcCompat="@drawable/default_avatar" />
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/text_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/px15"
-            android:layout_weight="1"
-            android:ellipsize="marquee"
-            android:singleLine="true"
-            android:text="Title"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="@dimen/px30"
-            android:textStyle="bold" />
-    </androidx.appcompat.widget.LinearLayoutCompat>
-
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/text_description"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/px15"
+        android:ellipsize="end"
+        android:maxLines="3"
         android:text="标题标题标题标题标题标题标题标题标题"
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="@dimen/px32"
-        app:layout_constraintEnd_toEndOf="@+id/text_title"
+        app:layout_constraintEnd_toStartOf="@+id/button_detail"
         app:layout_constraintStart_toStartOf="@+id/text_title"
         app:layout_constraintTop_toBottomOf="@+id/text_subtitle" />
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/button_detail"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/px10"
+        android:background="@drawable/cell_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingStart="@dimen/px20"
+        android:paddingTop="@dimen/px10"
+        android:paddingEnd="@dimen/px20"
+        android:paddingBottom="@dimen/px10"
+        android:text="@string/detail"
+        android:textColor="@color/colorAccent"
+        android:textSize="@dimen/px26"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@+id/text_description"
+        app:layout_constraintEnd_toEndOf="@+id/text_title" />
 
     <com.google.android.flexbox.FlexboxLayout
         android:id="@+id/view_flex_layout"
@@ -115,20 +172,37 @@
         app:layout_constraintStart_toEndOf="@+id/image_cover"
         app:layout_constraintTop_toBottomOf="@+id/text_description" />
 
-    <androidx.appcompat.widget.AppCompatButton
+    <androidx.appcompat.widget.LinearLayoutCompat
         android:id="@+id/button_play"
-        android:layout_width="@dimen/px180"
+        android:layout_width="wrap_content"
         android:layout_height="@dimen/px80"
         android:layout_marginStart="@dimen/px49"
         android:background="@drawable/button_common"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
         android:nextFocusLeft="@+id/button_uploader"
-        android:text="@string/watch"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textSize="@dimen/px30"
+        android:paddingStart="@dimen/px30"
+        android:paddingEnd="@dimen/px40"
         app:layout_constraintStart_toEndOf="@+id/image_cover"
         app:layout_constraintTop_toBottomOf="@+id/view_flex_layout">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_width="@dimen/px32"
+            android:layout_height="@dimen/px32"
+            android:src="@drawable/ic_play_triangle"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/px12"
+            android:text="@string/watch"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="@dimen/px30"
+            android:textStyle="bold" />
         <requestFocus />
-    </androidx.appcompat.widget.AppCompatButton>
+    </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.AppCompatImageView
         android:id="@+id/button_like"

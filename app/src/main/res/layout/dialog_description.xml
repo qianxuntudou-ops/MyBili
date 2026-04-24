@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/px1200"
+    android:layout_height="wrap_content"
+    android:background="@drawable/dialog_background"
+    android:maxHeight="@dimen/px800"
+    android:paddingStart="@dimen/px40"
+    android:paddingTop="@dimen/px35"
+    android:paddingEnd="@dimen/px40"
+    android:paddingBottom="@dimen/px35">
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/text_description"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lineSpacingMultiplier="1.3"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="@dimen/px32" />
+</ScrollView>

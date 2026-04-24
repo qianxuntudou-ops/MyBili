@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
@@ -29,6 +30,8 @@ class VideoAdapter(
     private val onBottomEdgeDown: (() -> Boolean)? = null,
     private val onItemFocused: ((Int) -> Unit)? = null
 ) : BaseAdapter<VideoModel, VideoAdapter.VideoViewHolder>() {
+
+    var currentPlayingAid: Long = 0
 
     companion object {
         private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<VideoModel>() {
@@ -113,7 +116,8 @@ class VideoAdapter(
     }
 
     override fun onBindContentViewHolder(holder: VideoViewHolder, position: Int) {
-        holder.bind(items[position])
+        val video = items[position]
+        holder.bind(video, video.aid == currentPlayingAid)
     }
 
     override fun getItemId(position: Int): Long {
@@ -264,10 +268,26 @@ class VideoAdapter(
             }
         }
 
-        fun bind(video: VideoModel) {
+        fun bind(video: VideoModel, isCurrentlyPlaying: Boolean = false) {
             currentVideo = video
 
             binding.textView.text = resolveDisplayTitle(video)
+            if (isCurrentlyPlaying) {
+                binding.iconPlaying.visibility = View.VISIBLE
+                com.bumptech.glide.Glide.with(binding.root.context)
+                    .asGif()
+                    .load(R.drawable.playing)
+                    .into(binding.iconPlaying)
+                val accentColor = ContextCompat.getColor(binding.root.context, R.color.colorAccent)
+                binding.textView.setTextColor(accentColor)
+            } else {
+                binding.iconPlaying.visibility = View.GONE
+                com.bumptech.glide.Glide.with(binding.root.context).clear(binding.iconPlaying)
+                val ta = binding.root.context.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
+                val defaultColor = ta.getColor(0, 0)
+                ta.recycle()
+                binding.textView.setTextColor(defaultColor)
+            }
             when (displayStyle) {
                 DisplayStyle.DEFAULT -> bindDefault(video)
                 DisplayStyle.HISTORY -> bindHistory(video)

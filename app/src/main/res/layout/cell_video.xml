@@ -125,6 +125,14 @@
         android:minLines="2"
         android:lineSpacingMultiplier="1.1"
         app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintStart_toEndOf="@+id/icon_playing"
+        app:layout_constraintTop_toBottomOf="@+id/imageView"/>
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/icon_playing"
+        android:layout_width="@dimen/px35"
+        android:layout_height="@dimen/px35"
+        android:layout_marginTop="@dimen/px15"
+        android:visibility="gone"
         app:layout_constraintStart_toStartOf="@+id/imageView"
         app:layout_constraintTop_toBottomOf="@+id/imageView"/>
     <FrameLayout

@@ -31,8 +31,10 @@ import com.tutu.myblbl.model.video.detail.UgcEpisode
 import com.tutu.myblbl.model.video.detail.UgcSeason
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.model.video.detail.VideoView
+import com.tutu.myblbl.model.user.CheckRelationModel
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.FavoriteRepository
+import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.ui.adapter.VideoDetailContentAdapter
@@ -87,6 +89,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
     private val sessionGateway: NetworkSessionGateway by inject()
     private val videoRepository: VideoRepository by inject()
     private val favoriteRepository: FavoriteRepository by inject()
+    private val userRepository: UserRepository by inject()
     private val appSettings: AppSettingsDataStore by inject()
 
     private var isLiked = false
@@ -94,7 +97,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
     private var isFavorited = false
 
     private var ugcEpisodes: List<UgcEpisode> = emptyList()
-    private var ugcReverseOrder = false
+    private var ugcReverseOrder = true
 
     private var actionDialog: PlayerActionDialog? = null
     private var ownerDetailDialog: OwnerDetailDialog? = null
@@ -147,7 +150,9 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             onPageClick = { model -> onPageVideoClicked(model) },
             onUgcEpisodeClick = { model -> onUgcEpisodeClicked(model) },
             onUgcOrderToggle = { toggleUgcOrder() },
-            onRelatedVideoClick = { model -> onRelatedVideoClicked(model) }
+            onRelatedVideoClick = { model -> onRelatedVideoClicked(model) },
+            onDescriptionClick = { desc -> showDescriptionDialog(desc) },
+            onFollowClick = { toggleFollow() }
         )
 
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -238,6 +243,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         contentAdapter.submitList(rows)
 
         refreshActionState()
+        loadRelationState()
     }
 
     private fun buildRows(detail: VideoDetailModel): List<VideoDetailContentAdapter.Row> {
@@ -254,37 +260,27 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             )
         )
 
-        view.pages?.takeIf { it.isNotEmpty() }?.let { pages ->
-            rows.add(
-                VideoDetailContentAdapter.Row.Pages(
-                    items = pages.mapIndexed { index, pv ->
-                        VideoModel(
-                            aid = view.aid,
-                            bvid = view.bvid,
-                            pic = view.pic,
-                            title = pv.part.ifBlank { "P${index + 1}" },
-                            cid = pv.cid,
-                            duration = pv.duration
-                        )
-                    }
-                )
-            )
-        }
-
         if (ugcEpisodes.isNotEmpty()) {
             val videos = ugcEpisodes.mapNotNull { episode ->
                 episode.arc?.let { arc ->
-                    arc.copy(pic = episode.displayCover.ifBlank { arc.coverUrl })
+                    arc.copy(
+                        pic = episode.displayCover.ifBlank { arc.coverUrl },
+                        aid = episode.displayAid,
+                        bvid = episode.displayBvid,
+                        cid = episode.cid.takeIf { it > 0 } ?: arc.cid
+                    )
                 }
             }
             val ordered = if (ugcReverseOrder) videos.reversed() else videos
             if (ordered.isNotEmpty()) {
-                val seasonTitle = view.ugcSeason?.title.orEmpty()
+                val rawTitle = view.ugcSeason?.title.orEmpty()
+                val seasonTitle = if (rawTitle.isNotBlank()) "合集（$rawTitle）：" else "合集"
                 rows.add(
                     VideoDetailContentAdapter.Row.UgcSeason(
                         title = seasonTitle,
                         items = ordered,
-                        isReverse = ugcReverseOrder
+                        isReverse = ugcReverseOrder,
+                        currentAid = view.aid
                     )
                 )
             }
@@ -343,6 +339,47 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         }
     }
 
+    private fun loadRelationState() {
+        val ownerMid = videoView?.owner?.mid ?: return
+        if (!sessionGateway.isLoggedIn() || sessionGateway.getUserInfo()?.mid == ownerMid) return
+        lifecycleScope.launch {
+            userRepository.checkUserRelation(ownerMid)
+                .onSuccess { response ->
+                    if (response.isSuccess && response.data != null) {
+                        val holder = binding.recyclerView.findViewHolderForAdapterPosition(0)
+                        (holder as? VideoDetailContentAdapter.VideoDetailHeadViewHolder)
+                            ?.updateFollowState(response.data.attribute)
+                    }
+                }
+        }
+    }
+
+    private fun toggleFollow() {
+        if (!sessionGateway.isLoggedIn()) {
+            toast(getString(R.string.need_sign_in))
+            return
+        }
+        val ownerMid = videoView?.owner?.mid ?: return
+        val holder = binding.recyclerView.findViewHolderForAdapterPosition(0)
+            as? VideoDetailContentAdapter.VideoDetailHeadViewHolder ?: return
+        val currentAttr = holder.currentRelationAttribute()
+        val isFollowing = currentAttr == 2 || currentAttr == 6
+        val action = if (isFollowing) 2 else 1
+        lifecycleScope.launch {
+            userRepository.modifyRelation(ownerMid, action)
+                .onSuccess { response ->
+                    if (response.isSuccess) {
+                        val newAttr = if (action == 1) 2 else 0
+                        holder.updateFollowState(newAttr)
+                        toast(if (action == 1) "关注成功" else "已取消关注")
+                    } else {
+                        toast(response.errorMessage)
+                    }
+                }
+                .onFailure { toast(it.message ?: "操作失败") }
+        }
+    }
+
     private fun playVideo() {
         val targetVideo = videoView?.toPlaybackVideoModel() ?: videoModel ?: return
         VideoRouteNavigator.openVideo(
@@ -375,18 +412,15 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
     }
 
     private fun onUgcEpisodeClicked(model: VideoModel) {
-        VideoRouteNavigator.openVideo(
-            context = requireContext(),
-            video = model,
-            playQueue = com.tutu.myblbl.ui.activity.PlayerActivity.buildPlayQueue(
-                ugcEpisodes.mapNotNull { episode ->
-                    episode.arc?.let { arc ->
-                        arc.copy(pic = episode.displayCover.ifBlank { arc.coverUrl })
-                    }
-                }.let { if (ugcReverseOrder) it.reversed() else it },
-                model
-            )
-        )
+        if (model.aid == (videoView?.aid ?: videoModel?.aid)) return
+        aid = model.aid.takeIf { it > 0 }
+        bvid = model.bvid.takeIf { it.isNotBlank() }
+        videoModel = null
+        videoView = null
+        isLiked = false
+        isCoined = false
+        isFavorited = false
+        loadVideoDetail()
     }
 
     private fun onRelatedVideoClicked(model: VideoModel) {
@@ -413,16 +447,23 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         if (ugcSeasonIndex >= 0) {
             val videos = ugcEpisodes.mapNotNull { episode ->
                 episode.arc?.let { arc ->
-                    arc.copy(pic = episode.displayCover.ifBlank { arc.coverUrl })
+                    arc.copy(
+                        pic = episode.displayCover.ifBlank { arc.coverUrl },
+                        aid = episode.displayAid,
+                        bvid = episode.displayBvid,
+                        cid = episode.cid.takeIf { it > 0 } ?: arc.cid
+                    )
                 }
             }
             val ordered = if (ugcReverseOrder) videos.reversed() else videos
-            val seasonTitle = view.ugcSeason?.title.orEmpty()
+            val rawTitle = view.ugcSeason?.title.orEmpty()
+            val seasonTitle = if (rawTitle.isNotBlank()) "合集（$rawTitle）：" else "合集"
             val newList = contentAdapter.currentList.toMutableList()
             newList[ugcSeasonIndex] = VideoDetailContentAdapter.Row.UgcSeason(
                 title = seasonTitle,
                 items = ordered,
-                isReverse = ugcReverseOrder
+                isReverse = ugcReverseOrder,
+                currentAid = view.aid
             )
             contentAdapter.submitList(newList)
         }
@@ -467,6 +508,18 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         }
     }
 
+    private fun showDescriptionDialog(description: CharSequence) {
+        val dialogBinding = com.tutu.myblbl.databinding.DialogDescriptionBinding
+            .inflate(LayoutInflater.from(requireContext()))
+        dialogBinding.textDescription.text = description
+        androidx.appcompat.app.AppCompatDialog(requireContext(), R.style.DialogTheme).apply {
+            setContentView(dialogBinding.root)
+            setCanceledOnTouchOutside(true)
+            setOnCancelListener { /* back key or touch outside */ }
+            show()
+        }
+    }
+
     private fun showActionDialog() {
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return
         val currentBvid = videoView?.bvid ?: videoModel?.bvid ?: return
@@ -499,7 +552,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             }.onSuccess { response ->
                 if (response.isSuccess) {
                     isLiked = !isLiked
-                    updateActionStateAndRefresh()
+                    updateActionButtonsDirectly()
                     toast(if (isLiked) getString(R.string.liked_) else getString(R.string.like))
                 } else {
                     toast(response.message)
@@ -528,7 +581,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             }.onSuccess { response ->
                 if (response.isSuccess) {
                     isCoined = true
-                    updateActionStateAndRefresh()
+                    updateActionButtonsDirectly()
                     toast("投币成功")
                 } else {
                     toast(response.message)
@@ -568,13 +621,19 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             result.onSuccess { response ->
                 if (response.isSuccess) {
                     isFavorited = !isFavorited
-                    updateActionStateAndRefresh()
+                    updateActionButtonsDirectly()
                     toast(if (isFavorited) getString(R.string.collection_) else "取消收藏")
                 } else {
                     toast(response.errorMessage)
                 }
             }.onFailure { toast(it.message ?: "操作失败") }
         }
+    }
+
+    private fun updateActionButtonsDirectly() {
+        val holder = binding.recyclerView.findViewHolderForAdapterPosition(0)
+            as? VideoDetailContentAdapter.VideoDetailHeadViewHolder ?: return
+        holder.updateActionButtons(isLiked, isCoined, isFavorited)
     }
 
     private fun toast(message: String) {

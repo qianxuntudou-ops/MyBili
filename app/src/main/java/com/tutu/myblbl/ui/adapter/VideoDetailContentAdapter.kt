@@ -34,7 +34,9 @@ class VideoDetailContentAdapter(
     private val onPageClick: (VideoModel) -> Unit,
     private val onUgcEpisodeClick: (VideoModel) -> Unit,
     private val onUgcOrderToggle: () -> Unit,
-    private val onRelatedVideoClick: (VideoModel) -> Unit
+    private val onRelatedVideoClick: (VideoModel) -> Unit,
+    private val onDescriptionClick: (CharSequence) -> Unit,
+    private val onFollowClick: () -> Unit
 ) : ListAdapter<VideoDetailContentAdapter.Row, RecyclerView.ViewHolder>(RowItemCallback) {
 
     sealed interface Row {
@@ -51,7 +53,8 @@ class VideoDetailContentAdapter(
         data class UgcSeason(
             val title: String,
             val items: List<VideoModel>,
-            val isReverse: Boolean
+            val isReverse: Boolean,
+            val currentAid: Long = 0
         ) : Row
 
         data class Related(val items: List<VideoModel>) : Row
@@ -77,6 +80,8 @@ class VideoDetailContentAdapter(
                 onCoinClick,
                 onFavoriteClick,
                 onTagClick,
+                onDescriptionClick,
+                onFollowClick,
                 parent.context
             )
 
@@ -102,7 +107,7 @@ class VideoDetailContentAdapter(
         when (val row = getItem(position)) {
             is Row.Header -> (holder as VideoDetailHeadViewHolder).bind(row.view, row.tags, row.isLiked, row.isCoined, row.isFavorited)
             is Row.Pages -> (holder as PagesLaneViewHolder).bind(row.items)
-            is Row.UgcSeason -> (holder as UgcSeasonLaneViewHolder).bind(row.title, row.items, row.isReverse)
+            is Row.UgcSeason -> (holder as UgcSeasonLaneViewHolder).bind(row.title, row.items, row.isReverse, row.currentAid)
             is Row.Related -> (holder as RelatedLaneViewHolder).bind(row.items)
         }
     }
@@ -115,17 +120,41 @@ class VideoDetailContentAdapter(
         private val onCoinClick: () -> Unit,
         private val onFavoriteClick: () -> Unit,
         private val onTagClick: (Tag) -> Unit,
+        private val onDescriptionClick: (CharSequence) -> Unit,
+        private val onFollowClick: () -> Unit,
         private val context: Context
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private var currentTags: List<Tag> = emptyList()
+        private var currentDescription: CharSequence = ""
+        private var relationAttribute = 0
 
         init {
             binding.buttonPlay.setOnClickListener { onPlayClick() }
+            binding.buttonPlay.setOnKeyListener { _, keyCode, event ->
+                if (event.action == android.view.KeyEvent.ACTION_DOWN && (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER || keyCode == android.view.KeyEvent.KEYCODE_ENTER)) {
+                    onPlayClick()
+                    true
+                } else false
+            }
             binding.buttonUploader.setOnClickListener { onUploaderClick() }
             binding.buttonLike.setOnClickListener { onLikeClick() }
             binding.buttonCoin.setOnClickListener { onCoinClick() }
             binding.buttonFavorite.setOnClickListener { onFavoriteClick() }
+            binding.buttonDetail.setOnClickListener { onDescriptionClick(currentDescription) }
+            binding.buttonFollow.setOnClickListener { onFollowClick() }
+
+            val scrollListener = View.OnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    (itemView.parent as? RecyclerView)?.smoothScrollToPosition(0)
+                }
+            }
+            binding.buttonPlay.onFocusChangeListener = scrollListener
+            binding.buttonUploader.onFocusChangeListener = scrollListener
+            binding.buttonLike.onFocusChangeListener = scrollListener
+            binding.buttonCoin.onFocusChangeListener = scrollListener
+            binding.buttonFavorite.onFocusChangeListener = scrollListener
+            binding.buttonFollow.onFocusChangeListener = scrollListener
         }
 
         fun bind(view: VideoView, tags: List<Tag>, isLiked: Boolean, isCoined: Boolean, isFavorited: Boolean) {
@@ -184,7 +213,15 @@ class VideoDetailContentAdapter(
                 )
             }
 
-            binding.textDescription.text = view.desc
+            currentDescription = view.desc.orEmpty()
+            binding.textDescription.text = currentDescription
+            binding.textDescription.post {
+                val layout = binding.textDescription.layout
+                val truncated = layout != null
+                        && layout.lineCount >= 3
+                        && layout.getEllipsisCount(2) > 0
+                binding.buttonDetail.visibility = if (truncated) View.VISIBLE else View.GONE
+            }
 
             updateTagLayout(tags)
             updateActionButtons(isLiked, isCoined, isFavorited)
@@ -220,13 +257,19 @@ class VideoDetailContentAdapter(
                 layoutParams = FlexboxLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
-                )
+                ).apply {
+                    topMargin = 10
+                    bottomMargin = 5
+                    rightMargin = 15
+                }
                 isClickable = true
                 isFocusable = true
             }
         }
 
-        private fun updateActionButtons(isLiked: Boolean, isCoined: Boolean, isFavorited: Boolean) {
+        fun currentRelationAttribute(): Int = relationAttribute
+
+        fun updateActionButtons(isLiked: Boolean, isCoined: Boolean, isFavorited: Boolean) {
             val pink = android.content.res.ColorStateList.valueOf(
                 ContextCompat.getColor(context, R.color.pink)
             )
@@ -236,6 +279,28 @@ class VideoDetailContentAdapter(
             binding.buttonLike.imageTintList = if (isLiked) pink else default
             binding.buttonCoin.imageTintList = if (isCoined) pink else default
             binding.buttonFavorite.imageTintList = if (isFavorited) pink else default
+        }
+
+        fun updateFollowState(attribute: Int) {
+            relationAttribute = attribute
+            val isMutual = attribute == 6
+            val isFollowing = attribute == 2 || attribute == 6
+            if (isMutual) {
+                binding.textFollow.text = context.getString(R.string.follow_as_friend)
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.grey))
+                binding.iconFollow.setImageResource(R.drawable.ic_check)
+                binding.iconFollow.imageTintList = ContextCompat.getColorStateList(context, R.color.grey)
+            } else if (isFollowing) {
+                binding.textFollow.text = context.getString(R.string.followed)
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.grey))
+                binding.iconFollow.setImageResource(R.drawable.ic_check)
+                binding.iconFollow.imageTintList = ContextCompat.getColorStateList(context, R.color.grey)
+            } else {
+                binding.textFollow.text = context.getString(R.string.follow)
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
+                binding.iconFollow.setImageResource(R.drawable.ic_plus)
+                binding.iconFollow.imageTintList = ContextCompat.getColorStateList(context, R.color.colorAccent)
+            }
         }
 
         private fun formatCount(count: Long): String {
@@ -298,10 +363,25 @@ class VideoDetailContentAdapter(
             }
         }
 
-        fun bind(title: String, items: List<VideoModel>, isReverse: Boolean) {
+        fun bind(title: String, items: List<VideoModel>, isReverse: Boolean, currentAid: Long) {
             binding.topTitle.text = title
             binding.textOrder.text = if (isReverse) "正序" else "倒序"
-            videoAdapter.setData(items)
+            videoAdapter.currentPlayingAid = currentAid
+            videoAdapter.setData(items) {
+                scrollToCurrentVideo(items, currentAid)
+            }
+        }
+
+        private fun scrollToCurrentVideo(items: List<VideoModel>, currentAid: Long) {
+            val currentIndex = items.indexOfFirst { it.aid == currentAid }
+            if (currentIndex < 0) return
+            val llm = binding.recyclerView.layoutManager as? LinearLayoutManager ?: return
+            if (currentIndex > 0) {
+                val halfItemWidth = (ScreenUtils.getScreenWidth(binding.root.context) / 5) / 3
+                llm.scrollToPositionWithOffset(currentIndex - 1, -halfItemWidth)
+            } else {
+                llm.scrollToPosition(0)
+            }
         }
     }
 

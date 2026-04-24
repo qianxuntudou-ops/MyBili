@@ -38,6 +38,7 @@ import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.system.ViewUtils
 import com.tutu.myblbl.core.ui.tab.enableTouchNavigation
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
+import com.tutu.myblbl.core.ui.navigation.navigateBackFromUi
 import com.tutu.myblbl.core.ui.tab.focusNearestTabTo
 import com.tutu.myblbl.core.ui.tab.focusSelectedTab
 import kotlinx.coroutines.FlowPreview
@@ -178,6 +179,10 @@ class SearchNewFragment :
     }
 
     private fun setupInput() {
+        binding.buttonSearchBack.setOnClickListener {
+            navigateBackFromUi()
+        }
+
         binding.editText.showSoftInputOnFocus = false
 
         binding.editText.setOnKeyListener { view, keyCode, event ->
