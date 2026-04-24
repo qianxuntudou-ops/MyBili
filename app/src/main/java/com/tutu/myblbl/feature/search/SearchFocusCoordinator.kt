@@ -12,12 +12,13 @@ class SearchFocusCoordinator(
     private var lastResultPanelFocusedView: View? = null
 
     private val globalFocusListener = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
+        val roots = runCatching { searchPanelRoots() }.getOrNull()
+        val result = runCatching { resultPanelRoot() }.getOrNull()
         when {
-            searchPanelRoots().any { isDescendantOf(newFocus, it) } -> {
+            roots != null && roots.any { isDescendantOf(newFocus, it) } -> {
                 lastSearchPanelFocusedView = newFocus
             }
-
-            isDescendantOf(newFocus, resultPanelRoot()) -> {
+            result != null && isDescendantOf(newFocus, result) -> {
                 lastResultPanelFocusedView = newFocus
             }
         }

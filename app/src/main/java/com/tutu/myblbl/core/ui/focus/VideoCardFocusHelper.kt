@@ -118,10 +118,10 @@ object VideoCardFocusHelper {
                     controller.notifyItemVerticalNavigation(target, View.FOCUS_UP)
                 }
                 val atTopEdge = isAtTopEdge(target)
-                if (onTopEdgeUp == null || !atTopEdge) {
-                    return false
+                if (atTopEdge && onTopEdgeUp != null) {
+                    return onTopEdgeUp()
                 }
-                return onTopEdgeUp()
+                false
             }
 
             KeyEvent.KEYCODE_DPAD_DOWN -> {
@@ -133,7 +133,6 @@ object VideoCardFocusHelper {
                 if (loadMoreController != null) {
                     return loadMoreController.handleItemDpadDown(target)
                 }
-                // No controller — handle focus navigation ourselves to prevent escape
                 val rv = target.findParentRecyclerView()
                 if (rv != null) {
                     val nextFocus = FocusFinder.getInstance().findNextFocus(rv, target, View.FOCUS_DOWN)
@@ -141,10 +140,8 @@ object VideoCardFocusHelper {
                         nextFocus.requestFocus()
                         return true
                     }
-                    // No next focus in RV — consume event, don't let framework navigate away
-                    return true
                 }
-                return true
+                false
             }
         }
         return false

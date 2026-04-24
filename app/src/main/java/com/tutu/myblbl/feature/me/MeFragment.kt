@@ -18,9 +18,7 @@ import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
-import com.tutu.myblbl.ui.dialog.UserInfoDialog
 import com.tutu.myblbl.feature.settings.SignInFragment
-import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.core.ui.tab.enableTouchNavigation
 import com.tutu.myblbl.core.ui.tab.focusNearestTabTo
@@ -96,10 +94,6 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
 
         viewPager.currentItem = getDefaultTabIndex()
         viewPager.post { notifyCurrentTab { it.onTabSelected() } }
-
-        binding.imageAvatar.setOnClickListener {
-            onAvatarClick()
-        }
     }
 
     override fun onPause() {
@@ -125,15 +119,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.userInfo.collectLatest { userInfo ->
                     userInfo?.let {
-                        updateUserInfo(it.face)
-                        val oType = it.officialVerify?.type ?: it.official?.let { o -> if (o.role > 0) o.type else -1 } ?: -1
-                        val vStatus = it.vipStatus.coerceAtLeast(it.vip?.vipStatus ?: 0)
-                        val vType = it.vipType.coerceAtLeast(it.vip?.vipType ?: 0)
-                        binding.imageAvatar.setBadge(
-                            officialVerifyType = oType,
-                            vipStatus = vStatus,
-                            vipType = vType
-                        )
+                        // Avatar badge is managed by TabBarView in MainActivity
                     }
                 }
             }
@@ -145,8 +131,7 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
                 viewModel.isLoggedIn.collectLatest { isLoggedIn ->
                     renderLoginState(isLoggedIn)
                     if (!isLoggedIn) {
-                        updateUserInfo("")
-                        binding.imageAvatar.setBadge(officialVerifyType = -1)
+                        // Avatar state is managed by TabBarView in MainActivity
                     }
                 }
             }
@@ -210,27 +195,6 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
                 }
             }
         }
-    }
-
-    private fun updateUserInfo(avatarUrl: String) {
-        if (avatarUrl.isNotEmpty()) {
-            ImageLoader.loadCircle(
-                imageView = binding.imageAvatar,
-                url = avatarUrl,
-                placeholder = R.drawable.default_avatar,
-                error = R.drawable.default_avatar
-            )
-        } else {
-            binding.imageAvatar.setImageResource(R.drawable.default_avatar)
-        }
-    }
-
-    private fun onAvatarClick() {
-        if (!sessionGateway.isLoggedIn()) {
-            openInHostContainer(SignInFragment.newInstance())
-            return
-        }
-        UserInfoDialog(requireContext()).show()
     }
 
     private fun getDefaultTabIndex(): Int {
@@ -298,7 +262,6 @@ class MeFragment : BaseFragment<FragmentMeBinding>(), MainTabFocusTarget {
             return
         }
         binding.rightStateContainer.visibility = if (isLoggedIn) View.GONE else View.VISIBLE
-        binding.imageAvatar.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
         binding.tabLayout.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
         binding.viewPager.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
         binding.rightStateText.text = getString(R.string.need_sign_in)

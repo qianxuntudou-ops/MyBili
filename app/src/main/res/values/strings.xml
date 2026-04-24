@@ -369,6 +369,7 @@
     <string name="series">电视剧</string>
     <string name="series_already_open">选中的内容和当前页面是同一个</string>
     <string name="setting">设置</string>
+    <string name="show_video_detail_page">显示视频详情页</string>
     <string name="show_bottom_progress_bar">显示底部常驻进度条</string>
     <string name="show_debug">显示视频调试信息</string>
     <string name="show_dm_switch">显示弹幕开关按钮</string>

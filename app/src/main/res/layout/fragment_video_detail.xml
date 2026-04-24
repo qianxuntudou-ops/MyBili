@@ -1,49 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?attr/backgroundColor">
-
-    <androidx.appcompat.widget.AppCompatImageView
-        android:id="@+id/button_back"
-        android:layout_width="@dimen/px100"
-        android:layout_height="@dimen/px100"
-        android:layout_marginStart="@dimen/px20"
-        android:layout_marginTop="@dimen/px25"
-        android:background="@drawable/cell_background"
-        android:clickable="true"
-        android:focusable="true"
-        android:padding="@dimen/px30"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@drawable/ic_back"
-        app:tint="?android:attr/textColorPrimary" />
-
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/text_page_title"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/px24"
-        android:layout_marginEnd="@dimen/px40"
-        android:maxLines="1"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textSize="@dimen/px36"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toBottomOf="@+id/button_back"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/button_back"
-        app:layout_constraintTop_toTopOf="@+id/button_back" />
+    android:layout_height="match_parent">
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:fillViewport="true"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_back">
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -79,46 +42,17 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="@dimen/px120"
-        android:layout_height="@dimen/px120"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <FrameLayout
-        android:id="@+id/view_error"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_back">
-
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/image_error"
-                android:layout_width="@dimen/px300"
-                android:layout_height="@dimen/px300"
-                app:srcCompat="@drawable/net_error" />
-
-            <androidx.appcompat.widget.AppCompatTextView
-                android:id="@+id/text_error"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/px30"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="@dimen/px30" />
-        </androidx.appcompat.widget.LinearLayoutCompat>
-    </FrameLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/button_back"
+        android:layout_width="@dimen/px100"
+        android:layout_height="@dimen/px100"
+        android:layout_marginStart="@dimen/px30"
+        android:layout_marginTop="@dimen/px30"
+        android:background="@drawable/cell_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="@dimen/px35"
+        app:srcCompat="@drawable/ic_back"
+        app:tint="?android:attr/textColorPrimary"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
+</merge>

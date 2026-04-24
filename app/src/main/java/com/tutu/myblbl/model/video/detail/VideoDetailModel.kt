@@ -16,7 +16,7 @@ data class VideoDetailModel(
     @SerializedName("Related")
     val related: List<VideoModel>? = null,
     
-    @SerializedName("tags")
+    @SerializedName(value = "tags", alternate = ["Tags"])
     val tags: List<Tag>? = null
 )
 

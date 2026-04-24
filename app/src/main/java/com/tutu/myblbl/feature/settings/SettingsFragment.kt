@@ -192,6 +192,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             SettingModel(getString(R.string.subtitle_text_size), "45"),
             SettingModel(getString(R.string.show_debug), "关"),
             SettingModel(getString(R.string.show_bottom_progress_bar), "关"),
+            SettingModel(getString(R.string.show_video_detail_page), "关"),
             SettingModel(getString(R.string.give_coin_number), "2"),
             SettingModel(getString(R.string.show_next_previous), "关"),
             SettingModel(getString(R.string.show_dm_switch), "关"),
@@ -329,10 +330,11 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             7 -> showPlayerChoiceDialog(position, KEY_SUBTITLE_TEXT_SIZE, arrayOf("35", "40", "45", "50", "55", "60"))
             8 -> toggleSetting(playerSettings, 8, KEY_SHOW_DEBUG)
             9 -> toggleSetting(playerSettings, 9, KEY_SHOW_BOTTOM_PROGRESS_BAR)
-            10 -> showPlayerChoiceDialog(position, KEY_GIVE_COIN_NUMBER, arrayOf("1", "2"))
-            11 -> toggleSetting(playerSettings, 11, KEY_SHOW_NEXT_PREVIOUS)
-            12 -> toggleSetting(playerSettings, 12, KEY_SHOW_DM_SWITCH)
-            13 -> toggleSetting(playerSettings, 13, KEY_IPV4_ONLY)
+            10 -> toggleSetting(playerSettings, 10, KEY_SHOW_VIDEO_DETAIL)
+            11 -> showPlayerChoiceDialog(position, KEY_GIVE_COIN_NUMBER, arrayOf("1", "2"))
+            12 -> toggleSetting(playerSettings, 12, KEY_SHOW_NEXT_PREVIOUS)
+            13 -> toggleSetting(playerSettings, 13, KEY_SHOW_DM_SWITCH)
+            14 -> toggleSetting(playerSettings, 14, KEY_IPV4_ONLY)
         }
     }
 
@@ -712,10 +714,11 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         applySavedValue(playerSettings, 7, KEY_SUBTITLE_TEXT_SIZE)
         applySavedValue(playerSettings, 8, KEY_SHOW_DEBUG)
         applySavedValue(playerSettings, 9, KEY_SHOW_BOTTOM_PROGRESS_BAR)
-        applySavedValue(playerSettings, 10, KEY_GIVE_COIN_NUMBER)
-        applySavedValue(playerSettings, 11, KEY_SHOW_NEXT_PREVIOUS)
-        applySavedValue(playerSettings, 12, KEY_SHOW_DM_SWITCH)
-        applySavedValue(playerSettings, 13, KEY_IPV4_ONLY)
+        applySavedValue(playerSettings, 10, KEY_SHOW_VIDEO_DETAIL)
+        applySavedValue(playerSettings, 11, KEY_GIVE_COIN_NUMBER)
+        applySavedValue(playerSettings, 12, KEY_SHOW_NEXT_PREVIOUS)
+        applySavedValue(playerSettings, 13, KEY_SHOW_DM_SWITCH)
+        applySavedValue(playerSettings, 14, KEY_IPV4_ONLY)
 
         applySavedValue(dmSettings, 0, KEY_DM_SWITCH)
         applySavedValue(dmSettings, 1, KEY_DM_ALPHA)
