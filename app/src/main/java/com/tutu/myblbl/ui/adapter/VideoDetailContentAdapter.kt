@@ -441,6 +441,7 @@ class VideoDetailContentAdapter(
             videoAdapter.setOnItemClickListener { _, item ->
                 onEpisodeClick(item)
             }
+            bindBackButtonOnScroll(binding.recyclerView)
         }
 
         fun bind(title: String, items: List<VideoModel>, isReverse: Boolean, currentAid: Long) {
@@ -482,6 +483,7 @@ class VideoDetailContentAdapter(
             videoAdapter.setOnItemClickListener { _, item ->
                 onVideoClick(item)
             }
+            bindBackButtonOnScroll(binding.recyclerView)
         }
 
         fun bind(items: List<VideoModel>) {
@@ -495,6 +497,24 @@ class VideoDetailContentAdapter(
         private const val VIEW_TYPE_PAGES = 1
         private const val VIEW_TYPE_UGC_SEASON = 2
         private const val VIEW_TYPE_RELATED = 3
+
+        private fun bindBackButtonOnScroll(recyclerView: RecyclerView) {
+            recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                    val llm = rv.layoutManager as? LinearLayoutManager ?: return
+                    val firstPos = llm.findFirstVisibleItemPosition()
+                    for (i in 0 until rv.childCount) {
+                        val child = rv.getChildAt(i)
+                        val vh = rv.getChildViewHolder(child)
+                        child.nextFocusLeftId = if (vh.bindingAdapterPosition == firstPos) {
+                            R.id.button_back_1
+                        } else {
+                            View.NO_ID
+                        }
+                    }
+                }
+            })
+        }
 
         private val RowItemCallback = object : DiffUtil.ItemCallback<Row>() {
             override fun areItemsTheSame(oldItem: Row, newItem: Row): Boolean {

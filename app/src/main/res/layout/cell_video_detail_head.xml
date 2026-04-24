@@ -73,8 +73,7 @@
             android:layout_width="@dimen/px70"
             android:layout_height="@dimen/px70"
             android:layout_marginStart="@dimen/px5"
-            android:layout_marginTop="@dimen/px15"
-            android:layout_marginBottom="@dimen/px15"
+            android:layout_marginEnd="@dimen/px15"
             app:srcCompat="@drawable/default_avatar" />
 
         <androidx.appcompat.widget.AppCompatTextView
@@ -214,6 +213,7 @@
         android:background="@drawable/button_common"
         android:clickable="true"
         android:focusable="true"
+        android:nextFocusLeft="@id/button_back_1"
         android:nextFocusUp="@+id/button_play"
         android:padding="@dimen/px20"
         app:layout_constraintEnd_toStartOf="@+id/button_coin"
@@ -232,6 +232,7 @@
         android:background="@drawable/button_common"
         android:clickable="true"
         android:focusable="true"
+        android:nextFocusLeft="@id/button_back_1"
         android:nextFocusUp="@+id/button_play"
         android:padding="@dimen/px20"
         app:layout_constraintEnd_toStartOf="@+id/button_favorite"
@@ -249,6 +250,7 @@
         android:background="@drawable/button_common"
         android:clickable="true"
         android:focusable="true"
+        android:nextFocusLeft="@id/button_back_1"
         android:nextFocusUp="@+id/button_play"
         android:padding="@dimen/px20"
         app:layout_constraintEnd_toEndOf="@+id/button_play"

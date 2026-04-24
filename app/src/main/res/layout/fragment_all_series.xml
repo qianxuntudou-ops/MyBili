@@ -14,7 +14,7 @@
         app:layout_constraintTop_toTopOf="parent">
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/button_back_1"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/cell_background"
             android:padding="@dimen/px35"
             android:focusable="true"
             android:clickable="true"

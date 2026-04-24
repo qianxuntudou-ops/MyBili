@@ -270,10 +270,21 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
                     )
                 }
             }
-            val ordered = if (ugcReverseOrder) videos.reversed() else videos
+            val ordered = if (ugcReverseOrder) {
+                videos.sortedByDescending { it.pubDate }
+            } else {
+                videos.sortedBy { it.pubDate }
+            }
             if (ordered.isNotEmpty()) {
                 val rawTitle = view.ugcSeason?.title.orEmpty()
-                val seasonTitle = if (rawTitle.isNotBlank()) "合集（$rawTitle）：" else "合集"
+                val currentIdx = ordered.indexOfFirst { it.aid == view.aid }.let { if (it >= 0) it + 1 else 0 }
+                val seasonTitle = buildString {
+                    append("合集")
+                    if (rawTitle.isNotBlank()) {
+                        append("·").append(rawTitle)
+                    }
+                    append("（").append(currentIdx).append("/").append(ordered.size).append("）")
+                }
                 rows.add(
                     VideoDetailContentAdapter.Row.UgcSeason(
                         title = seasonTitle,
@@ -454,9 +465,20 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
                     )
                 }
             }
-            val ordered = if (ugcReverseOrder) videos.reversed() else videos
+            val ordered = if (ugcReverseOrder) {
+                videos.sortedByDescending { it.pubDate }
+            } else {
+                videos.sortedBy { it.pubDate }
+            }
             val rawTitle = view.ugcSeason?.title.orEmpty()
-            val seasonTitle = if (rawTitle.isNotBlank()) "合集（$rawTitle）：" else "合集"
+            val currentIdx = ordered.indexOfFirst { it.aid == view.aid }.let { if (it >= 0) it + 1 else 0 }
+            val seasonTitle = buildString {
+                append("合集")
+                if (rawTitle.isNotBlank()) {
+                    append("·").append(rawTitle)
+                }
+                append("（").append(currentIdx).append("/").append(ordered.size).append("）")
+            }
             val newList = contentAdapter.currentList.toMutableList()
             newList[ugcSeasonIndex] = VideoDetailContentAdapter.Row.UgcSeason(
                 title = seasonTitle,
