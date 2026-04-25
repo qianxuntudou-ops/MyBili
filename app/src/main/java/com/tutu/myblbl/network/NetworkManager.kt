@@ -107,10 +107,10 @@ object NetworkManager {
         )
     }
 
-    fun init(context: Context) {
+    fun init(context: Context, syncWebViewCookies: Boolean = true) {
         val applicationContext = context.applicationContext
         appContext = applicationContext
-        internalCookieManager.init(applicationContext)
+        internalCookieManager.init(applicationContext, syncWebViewCookies)
         userAgentStore.init(applicationContext)
         sessionStore.initPersistence(
             applicationContext.getSharedPreferences("network_session_store", Context.MODE_PRIVATE)
@@ -122,6 +122,10 @@ object NetworkManager {
         gson
         retrofit
         apiService
+    }
+
+    fun syncCookiesFromWebView() {
+        internalCookieManager.syncFromWebView()
     }
 
     fun setWbiInfo(imgKey: String, subKey: String) {

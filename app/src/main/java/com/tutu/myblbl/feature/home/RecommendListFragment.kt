@@ -29,6 +29,7 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
     companion object {
         private const val TAG = "RecommendListFragment"
         private const val CACHE_KEY = "recommendCacheList"
+        private const val MAX_CACHED_RECOMMEND_ITEMS = 100
 
         fun newInstance(): RecommendListFragment {
             return RecommendListFragment()
@@ -42,6 +43,8 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
     private var waitingForFirstLoad = true
     private var cacheRestoreJob: Job? = null
     private var pendingScrollToTopAfterRefresh = false
+    private var initialCacheReadCompleted = false
+    private var restoredInitialCache = false
 
     override val autoLoad: Boolean = false
     override val enableLoadMoreFocusController: Boolean = true
@@ -99,22 +102,31 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
     private fun restoreCacheThenLoad() {
         cacheRestoreJob?.cancel()
         cacheRestoreJob = viewLifecycleOwner.lifecycleScope.launch {
-            val cachedVideos = runCatching {
-                HomeCacheStore.readVideos(CACHE_KEY)
-            }.getOrElse { throwable ->
-                AppLog.e(TAG, "restoreCachedVideos failure: ${throwable.message}", throwable)
-                emptyList()
-            }
-            if (cachedVideos.isNotEmpty() && waitingForFirstLoad) {
+            val startMs = android.os.SystemClock.elapsedRealtime()
+            AppLog.i(TAG, "APP_STARTUP recommend cache read start")
+            val cached = readCachedVideos()
+            initialCacheReadCompleted = true
+            AppLog.i(
+                TAG,
+                "APP_STARTUP recommend cache read end elapsed=${android.os.SystemClock.elapsedRealtime() - startMs}ms count=${cached.items.size} ageMs=${formatCacheAge(cached.savedAtMs)} schema=${cached.schemaVersion}"
+            )
+            if (cached.items.isNotEmpty() && waitingForFirstLoad) {
                 val filtered = withContext(Dispatchers.Default) {
-                    ContentFilter.filterVideos(requireContext(), cachedVideos)
+                    ContentFilter.filterVideos(requireContext(), cached.items)
                 }
-                adapter?.setData(filtered)
-                adapter?.setShowLoadMore(true)
-                showContent()
-                showLoading(false)
-                mainNavigationViewModel.dispatch(MainNavigationViewModel.Event.HomeContentReady)
+                if (filtered.isNotEmpty()) {
+                    restoredInitialCache = true
+                    waitingForFirstLoad = false
+                    currentPage = 1
+                    adapter?.setData(filtered)
+                    adapter?.setShowLoadMore(true)
+                    showContent()
+                    showLoading(false)
+                    mainNavigationViewModel.dispatch(MainNavigationViewModel.Event.HomeContentReady)
+                    return@launch
+                }
             }
+            AppLog.i(TAG, "APP_STARTUP recommend cache miss, request first page")
             loadData(1)
         }
     }
@@ -141,6 +153,8 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
                     scrollToTop()
                 }
                 pendingScrollToTopAfterRefresh = false
+            } else {
+                cacheCurrentItems()
             }
         } else if (page == 1) {
             pendingScrollToTopAfterRefresh = false
@@ -154,6 +168,9 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
                 viewModel.videos.collectLatest { rawVideos ->
                     val videos = withContext(Dispatchers.Default) {
                         ContentFilter.filterVideos(requireContext(), rawVideos)
+                    }
+                    if (videos.isEmpty() && (adapter?.contentCount() ?: 0) > 0) {
+                        return@collectLatest
                     }
                     if (waitingForFirstLoad && videos.isEmpty()) {
                         return@collectLatest
@@ -205,11 +222,15 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
                         isLoading = false
                         setRefreshing(false)
                         if (adapter?.contentCount() == 0) {
-                            restoreCachedVideos(
-                                onMiss = {
-                                    showError(it.ifBlank { getString(R.string.net_error) })
-                                }
-                            )
+                            if (initialCacheReadCompleted && !restoredInitialCache) {
+                                showError(it.ifBlank { getString(R.string.net_error) })
+                            } else {
+                                restoreCachedVideos(
+                                    onMiss = {
+                                        showError(it.ifBlank { getString(R.string.net_error) })
+                                    }
+                                )
+                            }
                         } else {
                             loadMoreFocusController?.clearPendingFocusAfterLoadMore()
                         }
@@ -285,20 +306,25 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
     private fun cacheVideos(videos: List<VideoModel>) {
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching {
-                HomeCacheStore.writeVideos(CACHE_KEY, videos)
+                HomeCacheStore.writeVideos(CACHE_KEY, videos.take(MAX_CACHED_RECOMMEND_ITEMS))
             }.onFailure { throwable ->
                 AppLog.e(TAG, "cacheVideos failure: ${throwable.message}", throwable)
             }
         }
     }
 
-    private suspend fun restoreCachedVideos(onMiss: (() -> Unit)? = null): Boolean {
-        val cachedVideos = runCatching {
-            HomeCacheStore.readVideos(CACHE_KEY)
-        }.getOrElse { throwable ->
-            AppLog.e(TAG, "restoreCachedVideos failure: ${throwable.message}", throwable)
-            emptyList()
+    private fun cacheCurrentItems() {
+        val snapshot = (adapter as? VideoAdapter)
+            ?.getItemsSnapshot()
+            .orEmpty()
+            .take(MAX_CACHED_RECOMMEND_ITEMS)
+        if (snapshot.isNotEmpty()) {
+            cacheVideos(snapshot)
         }
+    }
+
+    private suspend fun restoreCachedVideos(onMiss: (() -> Unit)? = null): Boolean {
+        val cachedVideos = readCachedVideos().items
         if (cachedVideos.isEmpty()) {
             onMiss?.invoke()
             return false
@@ -309,6 +335,23 @@ class RecommendListFragment : BaseListFragment<VideoModel>(), HomeTabPage {
         showLoading(false)
         mainNavigationViewModel.dispatch(MainNavigationViewModel.Event.HomeContentReady)
         return true
+    }
+
+    private suspend fun readCachedVideos(): HomeCacheStore.CachedVideos {
+        return runCatching {
+            HomeCacheStore.readCachedVideos(CACHE_KEY)
+        }.getOrElse { throwable ->
+            AppLog.e(TAG, "restoreCachedVideos failure: ${throwable.message}", throwable)
+            HomeCacheStore.CachedVideos(emptyList())
+        }
+    }
+
+    private fun formatCacheAge(savedAtMs: Long): Long {
+        return if (savedAtMs > 0L) {
+            System.currentTimeMillis() - savedAtMs
+        } else {
+            -1L
+        }
     }
 
 }

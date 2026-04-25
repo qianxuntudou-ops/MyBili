@@ -1,6 +1,8 @@
 package com.tutu.myblbl
 
 import android.app.Application
+import android.os.SystemClock
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.di.appModules
 import com.tutu.myblbl.network.NetworkManager
@@ -22,17 +24,31 @@ class MyBLBLApplication : Application() {
     private val startupPrewarmScheduled = AtomicBoolean(false)
     
     companion object {
+        private const val TAG = "AppStartup"
+
         lateinit var instance: MyBLBLApplication
             private set
     }
     
     override fun onCreate() {
+        val startMs = SystemClock.elapsedRealtime()
+        AppLog.i(TAG, "Application.onCreate start")
         super.onCreate()
         instance = this
         
-        initKoin()
-        initSettings()
-        initNetwork()
+        trace("initKoin", startMs) { initKoin() }
+        trace("initSettings", startMs) { initSettings() }
+        trace("initNetwork", startMs) { initNetwork() }
+        AppLog.i(TAG, "Application.onCreate end elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
+    }
+
+    private inline fun trace(name: String, appStartMs: Long, block: () -> Unit) {
+        val stepStartMs = SystemClock.elapsedRealtime()
+        block()
+        AppLog.i(
+            TAG,
+            "$name end step=${SystemClock.elapsedRealtime() - stepStartMs}ms total=${SystemClock.elapsedRealtime() - appStartMs}ms"
+        )
     }
 
     private fun initSettings() {
@@ -48,9 +64,15 @@ class MyBLBLApplication : Application() {
     }
     
     private fun initNetwork() {
-        NetworkManager.init(this)
+        NetworkManager.init(this, syncWebViewCookies = false)
         appScope.launch {
             NetworkManager.warmUp()
+            val cookieSyncStartMs = SystemClock.elapsedRealtime()
+            NetworkManager.syncCookiesFromWebView()
+            AppLog.i(
+                TAG,
+                "syncCookiesFromWebView end step=${SystemClock.elapsedRealtime() - cookieSyncStartMs}ms"
+            )
         }
     }
 

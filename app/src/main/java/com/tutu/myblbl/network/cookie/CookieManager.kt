@@ -28,9 +28,11 @@ class CookieManager : CookieJar {
         private const val COOKIE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
     }
     
-    fun init(context: Context) {
+    fun init(context: Context, syncWebViewCookies: Boolean = true) {
         loadCookiesFromPrefs()
-        syncFromWebView()
+        if (syncWebViewCookies) {
+            syncFromWebView()
+        }
     }
 
     private fun loadCookiesFromPrefs() {

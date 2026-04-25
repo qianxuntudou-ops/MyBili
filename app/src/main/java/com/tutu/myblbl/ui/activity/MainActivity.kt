@@ -1,6 +1,7 @@
 package com.tutu.myblbl.ui.activity
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -38,10 +39,10 @@ import com.tutu.myblbl.ui.dialog.UserInfoDialog
 import com.tutu.myblbl.feature.player.PlayerInstancePool
 import com.tutu.myblbl.feature.player.PlayerLaunchContext
 import com.tutu.myblbl.feature.player.VideoPlayerFragment
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.ui.navigation.TabBarView
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import java.lang.ref.WeakReference
@@ -57,6 +58,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         private const val SETTINGS_OVERLAY_TAG = "settings"
         private const val SETTINGS_OVERLAY_EXIT_ANIM_MS = 275L
         private const val SEARCH_TAB_INDEX = 5
+        private const val STARTUP_TAG = "AppStartup"
     }
 
     private val fragments = mutableListOf<Fragment>()
@@ -72,6 +74,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     private var pendingFocusRestoreDelayMs = 0L
     private var startupTasksScheduled = false
     private var splashDismissed = false
+    private val activityCreateStartMs = SystemClock.elapsedRealtime()
     private var lastKnownLoggedIn = sessionGateway.isLoggedIn()
     private var restoredFromSavedState = false
     private var restoredTabIndex = -1
@@ -79,6 +82,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     override fun getViewBinding(): ActivityMainBinding = ActivityMainBinding.inflate(layoutInflater)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppLog.i(STARTUP_TAG, "MainActivity.onCreate start")
         if (savedInstanceState == null && shouldFinishDuplicateLauncherLaunch()) {
             super.onCreate(savedInstanceState)
             finish()
@@ -126,6 +130,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
                 }
             }
         }
+        AppLog.i(STARTUP_TAG, "MainActivity.onCreate end elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms")
     }
 
     override fun initView() {
@@ -136,6 +141,8 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     }
 
     override fun initData() {
+        val startMs = SystemClock.elapsedRealtime()
+        AppLog.i(STARTUP_TAG, "MainActivity.initData start")
         if (restoredFromSavedState) {
             restoreUiStateAfterRecreation()
         } else {
@@ -144,6 +151,11 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         refreshAvatar(allowNetworkFetch = false)
         updateNavigationVisibility()
         scheduleDeferredStartupTasks()
+        binding.root.post {
+            AppLog.i(STARTUP_TAG, "MainActivity first root post elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms")
+            dismissSplash()
+        }
+        AppLog.i(STARTUP_TAG, "MainActivity.initData end elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
     }
 
     private fun restoreUiStateAfterRecreation() {
@@ -293,6 +305,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     private fun dismissSplash() {
         if (splashDismissed) return
         splashDismissed = true
+        AppLog.i(STARTUP_TAG, "dismissSplash elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms")
         window.setBackgroundDrawableResource(R.color.systemBackgroundColor)
     }
 
@@ -349,11 +362,10 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
                 PlayerInstancePool.prewarm(this@MainActivity)
             }
             lifecycleScope.launch {
-                mainNavigationViewModel.events.first { it == MainNavigationViewModel.Event.HomeContentReady }
-                MyBLBLApplication.instance.scheduleDeferredSessionPrewarm(delayMillis = 1000L)
+                delay(1000L)
+                MyBLBLApplication.instance.scheduleDeferredSessionPrewarm(delayMillis = 0L)
             }
             lifecycleScope.launch {
-                mainNavigationViewModel.events.first { it == MainNavigationViewModel.Event.HomeContentReady }
                 delay(2000L)
                 runCatching { sessionGateway.ensureWbiKeys() }
             }
