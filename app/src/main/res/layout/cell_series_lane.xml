@@ -25,12 +25,15 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="@dimen/px30"
-        android:background="@drawable/cell_background"
+        android:background="@drawable/button_accent_outline"
         android:clickable="true"
         android:focusable="true"
-        android:gravity="bottom"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="@dimen/px10"
+        android:paddingStart="@dimen/px20"
+        android:paddingTop="@dimen/px10"
+        android:paddingEnd="@dimen/px20"
+        android:paddingBottom="@dimen/px10"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="@id/top_title"
         app:layout_constraintStart_toEndOf="@id/top_title"
@@ -40,7 +43,7 @@
             android:layout_width="@dimen/px40"
             android:layout_height="@dimen/px40"
             app:srcCompat="@drawable/ic_order"
-            app:tint="?android:attr/textColorPrimary" />
+            app:tint="@android:color/white" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/text_order"
@@ -48,7 +51,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/px10"
             android:text="@string/negative_sequence"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="@android:color/white"
             android:textSize="@dimen/px30" />
     </androidx.appcompat.widget.LinearLayoutCompat>
 

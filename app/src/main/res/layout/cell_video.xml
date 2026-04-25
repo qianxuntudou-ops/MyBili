@@ -112,36 +112,57 @@
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="@+id/imageView"
         app:layout_constraintTop_toTopOf="@+id/imageView"/>
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/layout_title"
+        android:orientation="horizontal"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/px10"
+        android:gravity="center_vertical"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toBottomOf="@+id/imageView">
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/icon_playing"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/playing"/>
+        <androidx.appcompat.widget.AppCompatTextView
+            android:textSize="@dimen/px31"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:id="@+id/textView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:layout_weight="1"/>
+    </androidx.appcompat.widget.LinearLayoutCompat>
     <androidx.appcompat.widget.AppCompatTextView
         android:textSize="@dimen/px31"
         android:textStyle="bold"
         android:textColor="?android:attr/textColorPrimary"
-        android:id="@+id/textView"
+        android:id="@+id/text_overflow"
+        android:visibility="gone"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/px10"
         android:text="@string/app_name"
-        android:maxLines="2"
-        android:minLines="2"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:lineSpacingMultiplier="1.1"
         app:layout_constraintEnd_toEndOf="@+id/imageView"
-        app:layout_constraintStart_toEndOf="@+id/icon_playing"
-        app:layout_constraintTop_toBottomOf="@+id/imageView"/>
-    <androidx.appcompat.widget.AppCompatImageView
-        android:id="@+id/icon_playing"
-        android:layout_width="@dimen/px35"
-        android:layout_height="@dimen/px35"
-        android:layout_marginTop="@dimen/px15"
-        android:visibility="gone"
         app:layout_constraintStart_toStartOf="@+id/imageView"
-        app:layout_constraintTop_toBottomOf="@+id/imageView"/>
+        app:layout_constraintTop_toBottomOf="@+id/layout_title"/>
     <FrameLayout
         android:id="@+id/layout_avatar_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="@dimen/px2"
         app:layout_constraintBottom_toBottomOf="@+id/textView_owner"
-        app:layout_constraintStart_toStartOf="@+id/textView"
+        app:layout_constraintStart_toStartOf="@+id/layout_title"
         app:layout_constraintTop_toTopOf="@+id/textView_owner">
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/image_avatar"
@@ -178,5 +199,5 @@
         android:text="@string/app_name"
         android:maxLines="1"
         app:layout_constraintStart_toEndOf="@+id/layout_avatar_container"
-        app:layout_constraintTop_toBottomOf="@+id/textView"/>
+        app:layout_constraintTop_toBottomOf="@+id/text_overflow"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

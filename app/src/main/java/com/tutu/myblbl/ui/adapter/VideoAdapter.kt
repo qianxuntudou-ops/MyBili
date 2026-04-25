@@ -2,6 +2,7 @@ package com.tutu.myblbl.ui.adapter
 
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -281,18 +282,48 @@ class VideoAdapter(
             }
         }
 
+        private var splitRunnable: Runnable? = null
+
         fun bind(video: VideoModel, isCurrentlyPlaying: Boolean = false) {
             currentVideo = video
+            splitRunnable?.let { binding.textView.removeCallbacks(it) }
+            splitRunnable = null
 
-            binding.textView.text = resolveDisplayTitle(video)
+            val title = resolveDisplayTitle(video)
             if (isCurrentlyPlaying) {
                 binding.iconPlaying.visibility = View.VISIBLE
+                val iconSize = binding.textView.textSize.toInt()
+                binding.iconPlaying.layoutParams = binding.iconPlaying.layoutParams.apply {
+                    width = iconSize
+                    height = iconSize
+                }
                 com.bumptech.glide.Glide.with(binding.root.context)
                     .asGif()
                     .load(R.drawable.playing)
                     .into(binding.iconPlaying)
                 val accentColor = ContextCompat.getColor(binding.root.context, R.color.colorAccent)
                 binding.textView.setTextColor(accentColor)
+                binding.textOverflow.setTextColor(accentColor)
+                binding.textView.text = title
+                binding.textView.ellipsize = TextUtils.TruncateAt.END
+                binding.textView.maxLines = 1
+
+                val split = Runnable {
+                    val layout = binding.textView.layout ?: return@Runnable
+                    if (layout.lineCount > 0) {
+                        val ellipsisCount = layout.getEllipsisCount(0)
+                        if (ellipsisCount > 0) {
+                            val visibleEnd = layout.getEllipsisStart(0)
+                            binding.textView.text = title.substring(0, visibleEnd)
+                            binding.textOverflow.text = title.substring(visibleEnd)
+                            binding.textOverflow.visibility = View.VISIBLE
+                        } else {
+                            binding.textOverflow.visibility = View.GONE
+                        }
+                    }
+                }
+                splitRunnable = split
+                binding.textView.post(split)
             } else {
                 binding.iconPlaying.visibility = View.GONE
                 com.bumptech.glide.Glide.with(binding.root.context).clear(binding.iconPlaying)
@@ -300,6 +331,10 @@ class VideoAdapter(
                 val defaultColor = ta.getColor(0, 0)
                 ta.recycle()
                 binding.textView.setTextColor(defaultColor)
+                binding.textView.text = title
+                binding.textView.maxLines = 2
+                binding.textView.ellipsize = TextUtils.TruncateAt.END
+                binding.textOverflow.visibility = View.GONE
             }
             when (displayStyle) {
                 DisplayStyle.DEFAULT -> bindDefault(video)

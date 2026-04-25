@@ -145,6 +145,25 @@ class VideoDetailContentAdapter(
         }
 
         init {
+            binding.cardCover.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    val cardHeight = binding.cardCover.height
+                    if (cardHeight > 0) {
+                        val ringSize = (cardHeight * 0.38f).toInt()
+                        val iconSize = (ringSize * 0.476f).toInt()
+                        binding.viewPlayRing.layoutParams = binding.viewPlayRing.layoutParams.apply {
+                            width = ringSize
+                            height = ringSize
+                        }
+                        binding.iconPlayButton.layoutParams = binding.iconPlayButton.layoutParams.apply {
+                            width = iconSize
+                            height = iconSize
+                        }
+                        binding.cardCover.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    }
+                }
+            })
+
             binding.buttonPlay.setOnClickListener { onPlayClick() }
             binding.buttonPlay.setOnTouchListener { _, event ->
                 when (event.action) {
@@ -402,22 +421,22 @@ class VideoDetailContentAdapter(
             relationAttribute = attribute
             val isMutual = attribute == 6
             val isFollowing = attribute == 2 || attribute == 6
-            val accent = ContextCompat.getColorStateList(context, R.color.colorAccent)
+            val white = ContextCompat.getColorStateList(context, android.R.color.white)
             if (isMutual) {
                 binding.textFollow.text = context.getString(R.string.follow_as_friend)
-                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, android.R.color.white))
                 binding.iconFollow.setImageResource(R.drawable.ic_check)
-                binding.iconFollow.imageTintList = accent
+                binding.iconFollow.imageTintList = white
             } else if (isFollowing) {
                 binding.textFollow.text = context.getString(R.string.followed)
-                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, android.R.color.white))
                 binding.iconFollow.setImageResource(R.drawable.ic_check)
-                binding.iconFollow.imageTintList = accent
+                binding.iconFollow.imageTintList = white
             } else {
                 binding.textFollow.text = context.getString(R.string.follow)
-                binding.textFollow.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
+                binding.textFollow.setTextColor(ContextCompat.getColor(context, android.R.color.white))
                 binding.iconFollow.setImageResource(R.drawable.ic_plus)
-                binding.iconFollow.imageTintList = accent
+                binding.iconFollow.imageTintList = white
             }
         }
 
