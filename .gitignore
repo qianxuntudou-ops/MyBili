@@ -48,7 +48,6 @@ google-services.json
 
 # ========== 调试文件 ==========
 debug.txt
-error.txt
 
 # ========== 第三方库资源（构建时由 AAR 依赖自动合并） ==========
 # AndroidX AppCompat / Material Design
