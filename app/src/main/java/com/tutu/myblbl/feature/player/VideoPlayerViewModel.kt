@@ -143,7 +143,9 @@ class VideoPlayerViewModel(
         val mediaSource: MediaSource,
         val seekPositionMs: Long,
         val playWhenReady: Boolean,
-        val replaceInPlace: Boolean
+        val replaceInPlace: Boolean,
+        val startupTraceId: String = PlaybackStartupTrace.NO_TRACE,
+        val startupTraceStartElapsedMs: Long = 0L
     )
 
     data class ResumeProgressHint(
@@ -176,7 +178,9 @@ class VideoPlayerViewModel(
         val playWhenReady: Boolean,
         val resumeHintPositionMs: Long?,
         val replaceInPlace: Boolean,
-        val requestDurationMs: Long
+        val requestDurationMs: Long,
+        val startupTraceId: String,
+        val startupTraceStartElapsedMs: Long
     )
 
     private data class PreloadedPlayback(
@@ -437,6 +441,9 @@ class VideoPlayerViewModel(
     private var preloadingIdentity: PlayRequestIdentity? = null
     private var preloadJob: Job? = null
     private var hasReachedFirstFrame: Boolean = false
+    private var currentStartupTraceId: String = PlaybackStartupTrace.NO_TRACE
+    private var currentStartupTraceStartElapsedMs: Long = 0L
+    private var firstDanmakuTraceLoggedId: String = PlaybackStartupTrace.NO_TRACE
     private var pendingPlayerExtrasCid: Long = 0L
     private var loadedPlayerExtrasCid: Long = 0L
     private val hardwareSupportedVideoCodecs: Set<VideoCodecEnum>
@@ -513,8 +520,19 @@ class VideoPlayerViewModel(
         seekPositionMs: Long = 0L,
         startEpisodeIndex: Int = -1,
         preferredQualityId: Int = 0,
-        preferredAudioQualityId: Int = 0
+        preferredAudioQualityId: Int = 0,
+        startupTraceId: String = PlaybackStartupTrace.NO_TRACE,
+        startupTraceStartElapsedMs: Long = 0L
     ) {
+        currentStartupTraceId = startupTraceId
+        currentStartupTraceStartElapsedMs = startupTraceStartElapsedMs
+        firstDanmakuTraceLoggedId = PlaybackStartupTrace.NO_TRACE
+        PlaybackStartupTrace.log(
+            traceId = currentStartupTraceId,
+            startElapsedMs = currentStartupTraceStartElapsedMs,
+            step = "load_video_info",
+            message = "aid=${aid ?: 0L} bvid=${bvid.orEmpty()} cid=$cid epId=$epId seasonId=$seasonId"
+        )
         currentSettings = PlayerSettingsStore.load(appContext)
         currentAid = aid?.takeIf { it > 0L }
         currentBvid = bvid?.takeIf { it.isNotBlank() }
@@ -965,7 +983,9 @@ class VideoPlayerViewModel(
             mediaSource = mediaSource,
             seekPositionMs = pendingSeekPositionMs,
             playWhenReady = pendingPlayWhenReady,
-            replaceInPlace = true
+            replaceInPlace = true,
+            startupTraceId = currentStartupTraceId,
+            startupTraceStartElapsedMs = currentStartupTraceStartElapsedMs
         )
     }
 
@@ -1372,6 +1392,13 @@ class VideoPlayerViewModel(
             ?.takeIf { it.isNotBlank() && identity.epId == null }
             ?.let { bvid -> VideoPlayerPlayInfoCache.put(bvid = bvid, cid = identity.cid, playInfo = initialPlayInfo) }
 
+        PlaybackStartupTrace.log(
+            traceId = currentStartupTraceId,
+            startElapsedMs = currentStartupTraceStartElapsedMs,
+            step = "playinfo_ready",
+            message = "cid=${identity.cid} cached=$usedCachedPlayInfo quality=$effectiveRequestedQualityId durationMs=${System.currentTimeMillis() - requestStartMs}"
+        )
+
         viewModelScope.launch(Dispatchers.IO) {
             triggerCdnPreconnectForPlayInfo(initialPlayInfo)
         }
@@ -1479,7 +1506,9 @@ class VideoPlayerViewModel(
             playWhenReady = playWhenReady,
             resumeHintPositionMs = resumeHintPositionMs,
             replaceInPlace = replaceInPlace,
-            requestDurationMs = System.currentTimeMillis() - requestStartMs
+            requestDurationMs = System.currentTimeMillis() - requestStartMs,
+            startupTraceId = currentStartupTraceId,
+            startupTraceStartElapsedMs = currentStartupTraceStartElapsedMs
         )
     }
 
@@ -1508,7 +1537,15 @@ class VideoPlayerViewModel(
             mediaSource = preparedPlayback.mediaSource,
             seekPositionMs = preparedPlayback.seekToStart,
             playWhenReady = preparedPlayback.playWhenReady,
-            replaceInPlace = preparedPlayback.replaceInPlace
+            replaceInPlace = preparedPlayback.replaceInPlace,
+            startupTraceId = preparedPlayback.startupTraceId,
+            startupTraceStartElapsedMs = preparedPlayback.startupTraceStartElapsedMs
+        )
+        PlaybackStartupTrace.log(
+            traceId = preparedPlayback.startupTraceId,
+            startElapsedMs = preparedPlayback.startupTraceStartElapsedMs,
+            step = "playback_request_emitted",
+            message = "cid=${preparedPlayback.identity.cid} seek=${preparedPlayback.seekToStart} replace=${preparedPlayback.replaceInPlace} requestDurationMs=${preparedPlayback.requestDurationMs}"
         )
         preparedPlayback.resumeHintPositionMs?.let { targetPositionMs ->
             _resumeHint.value = ResumeProgressHint(targetPositionMs = targetPositionMs)
@@ -1819,7 +1856,9 @@ class VideoPlayerViewModel(
                 mediaSource = selection.mediaSource,
                 seekPositionMs = seekPositionMs,
                 playWhenReady = true,
-                replaceInPlace = true
+                replaceInPlace = true,
+                startupTraceId = currentStartupTraceId,
+                startupTraceStartElapsedMs = currentStartupTraceStartElapsedMs
             )
             return true
         }
@@ -1860,7 +1899,9 @@ class VideoPlayerViewModel(
                 mediaSource = mediaSource,
                 seekPositionMs = seekPositionMs,
                 playWhenReady = true,
-                replaceInPlace = true
+                replaceInPlace = true,
+                startupTraceId = currentStartupTraceId,
+                startupTraceStartElapsedMs = currentStartupTraceStartElapsedMs
             )
             return true
         } catch (e: Exception) {
@@ -2271,58 +2312,57 @@ class VideoPlayerViewModel(
                 .takeIf { it > 0 } ?: 1
             currentDanmakuSegmentIndex = initialSegment
 
-            // 3. 并行加载当前段 + 特殊弹幕 + 预加载下一段
-            val initialPayload = coroutineScope {
-                val currentSegDeferred = async(Dispatchers.IO) {
-                    loadDanmakuSegmentPayload(
-                        cid = cid,
-                        aid = aid,
-                        segmentIndices = listOf(initialSegment)
-                    )
-                }
-                val specialPayloadDeferred = async(Dispatchers.IO) {
-                    loadSpecialDanmakuPayload(danmakuView?.specialDanmakuUrls.orEmpty())
-                }
-                val nextSegDeferred = if (initialSegment < segmentCount) {
-                    async(Dispatchers.IO) {
-                        initialSegment + 1 to loadDanmakuSegmentPayload(
-                            cid = cid, aid = aid, segmentIndices = listOf(initialSegment + 1)
-                        )
-                    }
-                } else null
-
-                val currentPayload = currentSegDeferred.await()
-                val specialPayload = specialPayloadDeferred.await()
-
-                // 缓存预加载的下一段
-                nextSegDeferred?.await()?.let { (segIdx, payload) ->
-                    if (isActiveDanmakuRequest(loadGeneration)) {
-                        danmakuSegmentItems[segIdx] = payload.regularItems.toList()
-                        danmakuLoadedSegments.add(segIdx)
-                    }
-                }
-
-                SpecialDanmakuPayload(
-                    regularItems = (currentPayload.regularItems + specialPayload.regularItems)
-                        .sortedBy { it.progress },
-                    specialItems = (currentPayload.specialItems + specialPayload.specialItems)
-                        .sortedBy { it.progress }
+            // 3. 当前段先发布；特殊弹幕和下一段后台补，避免首段弹幕被额外请求拖慢。
+            val currentPayload = withContext(Dispatchers.IO) {
+                loadDanmakuSegmentPayload(
+                    cid = cid,
+                    aid = aid,
+                    segmentIndices = listOf(initialSegment)
                 )
             }
             if (!isActiveDanmakuRequest(loadGeneration)) {
                 return@launch
             }
             // 缓存当前段
-            danmakuSegmentItems[initialSegment] = initialPayload.regularItems.toList()
+            danmakuSegmentItems[initialSegment] = currentPayload.regularItems.toList()
             danmakuLoadedSegments.add(initialSegment)
-            publishDanmaku(initialPayload.regularItems, replace = true)
-            _specialDanmaku.value = initialPayload.specialItems
+            publishDanmaku(currentPayload.regularItems, replace = true)
+            _specialDanmaku.value = currentPayload.specialItems
             logDanmakuDiagnostics(
                 label = "segment-$initialSegment",
-                items = initialPayload.regularItems,
+                items = currentPayload.regularItems,
                 danmakuView = danmakuView
             )
             trimDistantDanmakuSegments()
+
+            launch(Dispatchers.IO) {
+                val specialPayload = loadSpecialDanmakuPayload(danmakuView?.specialDanmakuUrls.orEmpty())
+                if (!isActiveDanmakuRequest(loadGeneration)) return@launch
+                withContext(Dispatchers.Main) {
+                    if (!isActiveDanmakuRequest(loadGeneration)) return@withContext
+                    if (specialPayload.regularItems.isNotEmpty()) {
+                        publishDanmaku(specialPayload.regularItems.sortedBy { it.progress }, replace = false)
+                    }
+                    if (specialPayload.specialItems.isNotEmpty()) {
+                        val currentSpecial = _specialDanmaku.value.orEmpty()
+                        _specialDanmaku.value = (currentSpecial + specialPayload.specialItems).sortedBy { it.progress }
+                    }
+                }
+            }
+
+            if (initialSegment < segmentCount) {
+                launch(Dispatchers.IO) {
+                    val nextSegment = initialSegment + 1
+                    val nextPayload = loadDanmakuSegmentPayload(
+                        cid = cid,
+                        aid = aid,
+                        segmentIndices = listOf(nextSegment)
+                    )
+                    if (isActiveDanmakuRequest(loadGeneration)) {
+                        danmakuSegmentItems[nextSegment] = nextPayload.regularItems.toList()
+                    }
+                }
+            }
         }
     }
 
@@ -2546,6 +2586,15 @@ class VideoPlayerViewModel(
     }
 
     private fun publishDanmaku(items: List<DmModel>, replace: Boolean) {
+        if (replace && items.isNotEmpty() && firstDanmakuTraceLoggedId != currentStartupTraceId) {
+            firstDanmakuTraceLoggedId = currentStartupTraceId
+            PlaybackStartupTrace.log(
+                traceId = currentStartupTraceId,
+                startElapsedMs = currentStartupTraceStartElapsedMs,
+                step = "first_danmaku_published",
+                message = "count=${items.size} cid=$currentCid"
+            )
+        }
         _danmaku.value = if (replace) {
             items
         } else {
@@ -2661,6 +2710,13 @@ class VideoPlayerViewModel(
         val cid = currentCid
         val aid = currentAid ?: 0L
         if (cid <= 0L || aid <= 0L) return
+        danmakuSegmentItems[segmentIndex]?.let { cachedItems ->
+            danmakuLoadedSegments.add(segmentIndex)
+            if (cachedItems.isNotEmpty()) {
+                publishDanmaku(cachedItems, replace = false)
+            }
+            return
+        }
         // 先标记避免重复加载
         danmakuLoadedSegments.add(segmentIndex)
         viewModelScope.launch(Dispatchers.IO) {

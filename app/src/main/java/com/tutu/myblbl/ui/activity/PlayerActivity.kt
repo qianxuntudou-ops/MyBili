@@ -40,6 +40,7 @@ import com.tutu.myblbl.core.ui.system.ViewUtils
 import com.tutu.myblbl.databinding.FragmentVideoPlayerBinding
 import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.feature.player.PlayerInstancePool
+import com.tutu.myblbl.feature.player.PlaybackStartupTrace
 import com.tutu.myblbl.feature.player.PlaybackUiCoordinator
 import com.tutu.myblbl.feature.player.UiEvent
 import com.tutu.myblbl.feature.player.PlayerOverlayCoordinator
@@ -84,6 +85,8 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         private const val EXTRA_SEASON_ID = "player_season_id"
         private const val EXTRA_SEEK_MS = "player_seek_ms"
         private const val EXTRA_START_EPISODE = "player_start_episode"
+        private const val EXTRA_STARTUP_TRACE_ID = "player_startup_trace_id"
+        private const val EXTRA_STARTUP_TRACE_START_MS = "player_startup_trace_start_ms"
 
         fun start(
             context: Context,
@@ -95,7 +98,9 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             seekPositionMs: Long = 0L,
             initialVideo: VideoModel? = null,
             playQueue: List<VideoModel> = emptyList(),
-            startEpisodeIndex: Int = -1
+            startEpisodeIndex: Int = -1,
+            startupTraceId: String = PlaybackStartupTrace.NO_TRACE,
+            startupTraceStartElapsedMs: Long = 0L
         ) {
             val resolvedAid = aid.takeIf { it > 0L } ?: initialVideo?.aid ?: 0L
             val resolvedBvid = bvid.takeIf { it.isNotBlank() } ?: initialVideo?.bvid.orEmpty()
@@ -116,6 +121,8 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                 putExtra(EXTRA_SEASON_ID, resolvedSeasonId)
                 putExtra(EXTRA_SEEK_MS, seekPositionMs.coerceAtLeast(0L))
                 putExtra(EXTRA_START_EPISODE, startEpisodeIndex)
+                putExtra(EXTRA_STARTUP_TRACE_ID, startupTraceId)
+                putExtra(EXTRA_STARTUP_TRACE_START_MS, startupTraceStartElapsedMs)
             })
         }
 
@@ -124,7 +131,9 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             video: VideoModel,
             seekPositionMs: Long = 0L,
             playQueue: List<VideoModel> = emptyList(),
-            startEpisodeIndex: Int = -1
+            startEpisodeIndex: Int = -1,
+            startupTraceId: String = PlaybackStartupTrace.NO_TRACE,
+            startupTraceStartElapsedMs: Long = 0L
         ) {
             start(
                 context = context,
@@ -136,7 +145,9 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                 seekPositionMs = seekPositionMs,
                 initialVideo = video,
                 playQueue = playQueue,
-                startEpisodeIndex = startEpisodeIndex
+                startEpisodeIndex = startEpisodeIndex,
+                startupTraceId = startupTraceId,
+                startupTraceStartElapsedMs = startupTraceStartElapsedMs
             )
         }
 
@@ -393,6 +404,14 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         val cid = intent.getLongExtra(EXTRA_CID, 0L)
         val epId = intent.getLongExtra(EXTRA_EP_ID, 0L)
         val seasonId = intent.getLongExtra(EXTRA_SEASON_ID, 0L)
+        val startupTraceId = intent.getStringExtra(EXTRA_STARTUP_TRACE_ID).orEmpty()
+        val startupTraceStartMs = intent.getLongExtra(EXTRA_STARTUP_TRACE_START_MS, 0L)
+        PlaybackStartupTrace.log(
+            traceId = startupTraceId,
+            startElapsedMs = startupTraceStartMs,
+            step = "activity_handle_intent",
+            message = "aid=$aid bvid=$bvid cid=$cid epId=$epId seasonId=$seasonId"
+        )
         if (aid <= 0L && bvid.isBlank() && epId <= 0L && seasonId <= 0L) {
             finish()
             return
@@ -418,7 +437,9 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             seasonId = seasonId,
             epId = epId,
             seekPositionMs = intent.getLongExtra(EXTRA_SEEK_MS, 0L),
-            startEpisodeIndex = intent.getIntExtra(EXTRA_START_EPISODE, -1)
+            startEpisodeIndex = intent.getIntExtra(EXTRA_START_EPISODE, -1),
+            startupTraceId = startupTraceId,
+            startupTraceStartElapsedMs = startupTraceStartMs
         )
     }
 
@@ -429,7 +450,9 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         seasonId: Long,
         epId: Long,
         seekPositionMs: Long,
-        startEpisodeIndex: Int
+        startEpisodeIndex: Int,
+        startupTraceId: String,
+        startupTraceStartElapsedMs: Long
     ) {
         playerView.pauseDanmaku()
         viewModel.loadVideoInfo(
@@ -439,7 +462,9 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             seasonId = seasonId,
             epId = epId,
             seekPositionMs = seekPositionMs,
-            startEpisodeIndex = startEpisodeIndex
+            startEpisodeIndex = startEpisodeIndex,
+            startupTraceId = startupTraceId,
+            startupTraceStartElapsedMs = startupTraceStartElapsedMs
         )
     }
 
@@ -558,6 +583,11 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                     AppLog.i("VideoPlayerViewModel", "PLAYER_PERF breakdown: total=${total}ms cdn=${cdn}ms buffer=${buffer}ms decoder=${decoder}ms render=${render}ms")
                     playerPerfTrace = null
                 }
+                PlaybackStartupTrace.log(
+                    traceId = activeStartupTraceId,
+                    startElapsedMs = activeStartupTraceStartElapsedMs,
+                    step = "first_frame"
+                )
                 viewModel.onPlaybackFirstFrame()
                 startupTrace
                     ?.takeIf { !it.firstFrameLogged }
@@ -711,13 +741,27 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                     sequence = ++startupTraceSequence,
                     startedAtMs = SystemClock.elapsedRealtime()
                 )
+                activeStartupTraceId = playbackRequest.startupTraceId
+                activeStartupTraceStartElapsedMs = playbackRequest.startupTraceStartElapsedMs
                 playerPerfTrace = PlayerPerfTrace(prepareMs = System.currentTimeMillis())
                 suppressPlaybackEnvironmentSync = true
                 try {
                     currentPlayer.playWhenReady = false
                     currentPlayer.stop()
                     currentPlayer.setMediaSource(playbackRequest.mediaSource, playbackRequest.seekPositionMs)
+                    PlaybackStartupTrace.log(
+                        traceId = activeStartupTraceId,
+                        startElapsedMs = activeStartupTraceStartElapsedMs,
+                        step = "media_source_set",
+                        message = "seek=${playbackRequest.seekPositionMs}"
+                    )
                     currentPlayer.prepare()
+                    PlaybackStartupTrace.log(
+                        traceId = activeStartupTraceId,
+                        startElapsedMs = activeStartupTraceStartElapsedMs,
+                        step = "player_prepare_called",
+                        message = "playWhenReady=${playbackRequest.playWhenReady}"
+                    )
                     currentPlayer.playWhenReady = playbackRequest.playWhenReady
                 } finally {
                     suppressPlaybackEnvironmentSync = false
@@ -971,6 +1015,8 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     )
 
     private var playerPerfTrace: PlayerPerfTrace? = null
+    private var activeStartupTraceId: String = PlaybackStartupTrace.NO_TRACE
+    private var activeStartupTraceStartElapsedMs: Long = 0L
 
     private data class PlayerPerfTrace(
         val prepareMs: Long,

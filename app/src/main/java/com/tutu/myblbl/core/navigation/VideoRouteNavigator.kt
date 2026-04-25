@@ -8,6 +8,7 @@ import com.tutu.myblbl.ui.activity.LivePlayerActivity
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.ui.activity.PlayerActivity
 import com.tutu.myblbl.feature.detail.VideoDetailFragment
+import com.tutu.myblbl.feature.player.PlaybackStartupTrace
 import com.tutu.myblbl.core.common.ext.isOpenDetailFirstEnabled
 import com.tutu.myblbl.core.common.ext.toast
 import com.tutu.myblbl.core.common.log.AppLog
@@ -24,6 +25,14 @@ object VideoRouteNavigator {
         startEpisodeIndex: Int = -1,
         forcePlayer: Boolean = false
     ) {
+        val traceId = PlaybackStartupTrace.newTraceId()
+        val traceStartElapsedMs = PlaybackStartupTrace.nowMs()
+        PlaybackStartupTrace.log(
+            traceId = traceId,
+            startElapsedMs = traceStartElapsedMs,
+            step = "card_click",
+            message = "aid=${video.aid} bvid=${video.bvid} cid=${video.cid} title=${video.title.take(32)}"
+        )
         AppLog.d(TAG, "openVideo: bvid=${video.bvid}, aid=${video.aid}, title=${video.title}, forcePlayer=$forcePlayer")
         if (!video.hasPlaybackIdentity) {
             AppLog.w(TAG, "openVideo blocked: missing playback identity, title=${video.title}, cid=${video.cid}")
@@ -45,7 +54,9 @@ object VideoRouteNavigator {
             seekPositionMs = seekPositionMs.takeIf { it > 0L }
                 ?: video.historyProgress * 1000L,
             playQueue = playQueue,
-            startEpisodeIndex = startEpisodeIndex
+            startEpisodeIndex = startEpisodeIndex,
+            startupTraceId = traceId,
+            startupTraceStartElapsedMs = traceStartElapsedMs
         )
     }
 

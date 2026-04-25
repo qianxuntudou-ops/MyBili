@@ -77,15 +77,64 @@ class MyPlayerDanmakuController(
     private var prepareGeneration: Long = 0L
 
     fun setData(data: List<DmModel>) {
-        val sortedData = data.sortedBy { it.progress }
-        val signature = sortedData.fastRawSignature()
-        if (rawDanmakuCount == sortedData.size && rawDanmakuSignature == signature) {
-            return
+        prepareJob?.cancel()
+        val generation = ++prepareGeneration
+        val input = data.toList()
+        prepareJob = controllerScope.launch {
+            val sortedData = input.sortedBy { it.progress }
+            val rawSignature = sortedData.fastRawSignature()
+            val allowVipColorful = isVipColorfulDanmakuAllowed()
+            val filteredData = sortedData
+                .applySmartFilter(level = smartFilterLevel, stage = "full")
+            val preparedData = filteredData
+                .mergeDuplicateDanmaku(mergeDuplicate)
+                .mapIndexedNotNull { index, item ->
+                    item.toDanmakuItemData(index.toLong(), allowVipColorful)
+                }
+            val preparedSignature = preparedData.fastPreparedSignature()
+            val textureStyles = preparedData.map { it.vipGradientStyle }.filter { it.hasTexture }
+            scheduleVipTexturePreload(
+                styles = textureStyles,
+                generation = generation
+            )
+            withContext(Dispatchers.Main.immediate) {
+                if (prepareGeneration != generation) {
+                    return@withContext
+                }
+                if (rawDanmakuCount == sortedData.size &&
+                    rawDanmakuSignature == rawSignature &&
+                    preparedDanmakuCount == preparedData.size &&
+                    preparedDanmakuSignature == preparedSignature &&
+                    danmakuPlayer != null
+                ) {
+                    return@withContext
+                }
+                rawDanmakuData = sortedData
+                rawDanmakuSignature = rawSignature
+                rawDanmakuCount = sortedData.size
+                syncSnapshotPosition()
+                danmakuData = preparedData
+                preparedDanmakuSignature = preparedSignature
+                preparedDanmakuCount = preparedData.size
+                val existingPlayer = danmakuPlayer
+                if (existingPlayer != null) {
+                    existingPlayer.clearData()
+                    existingPlayer.updateData(danmakuData)
+                    if (danmakuPositionMs > 0L) {
+                        seekPlayerTo(
+                            player = existingPlayer,
+                            targetPositionMs = danmakuPositionMs,
+                            currentTimeMs = existingPlayer.getCurrentTimeMs(),
+                            forceSeek = true,
+                            reason = "replace",
+                            bypassDedup = true
+                        )
+                    }
+                } else {
+                    initPlayer()
+                }
+            }
         }
-        rawDanmakuData = sortedData
-        rawDanmakuSignature = signature
-        rawDanmakuCount = sortedData.size
-        rebuildAndApplyData()
     }
 
     fun appendData(data: List<DmModel>) {
