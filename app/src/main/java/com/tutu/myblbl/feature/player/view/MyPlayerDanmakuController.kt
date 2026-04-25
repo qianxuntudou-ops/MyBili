@@ -369,9 +369,10 @@ class MyPlayerDanmakuController(
     }
 
     private fun appendPreparedData(data: List<DmModel>, enableMerge: Boolean = false) {
-        prepareJob?.cancel()
+        val previousJob = prepareJob
         val generation = ++prepareGeneration
         prepareJob = controllerScope.launch {
+            previousJob?.join()
             val allowVipColorful = isVipColorfulDanmakuAllowed()
             val startIndex = danmakuData.size.toLong()
             val filteredData = data
