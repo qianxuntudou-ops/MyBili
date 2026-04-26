@@ -56,6 +56,22 @@ class RecyclerViewFocusOperator(
             }
         }
 
+        scheduleAttachRetry(position, offsetTop, token, retryLeft = 2, onFocused = onFocused)
+        return true
+    }
+
+    /**
+     * ViewPager2 切换 Tab 后，RecyclerView 已测量布局（LayoutManager 认为条目可见），
+     * 但 ViewHolder.itemView.isAttachedToWindow 可能还未触发。
+     * 每帧重试一次，最多 [retryLeft] 次，避免焦点被静默吞掉。
+     */
+    private fun scheduleAttachRetry(
+        position: Int,
+        offsetTop: Int,
+        token: Int,
+        retryLeft: Int,
+        onFocused: ((Int) -> Unit)?
+    ) {
         recyclerView.post {
             if (token != focusToken) {
                 AppLog.w(TAG, "focusPosition post: STALE token=$token current=$focusToken, pos=$position")
@@ -69,11 +85,17 @@ class RecyclerViewFocusOperator(
                 pendingFocusPosition = RecyclerView.NO_POSITION
                 return@post
             }
+            // 条目对 LayoutManager 可见但 View 还未 attach——再等一帧
+            val stillVisible = isPositionVisible(position)
+            if (stillVisible && retryLeft > 0) {
+                AppLog.d(TAG, "focusPosition post: visible but not attached yet, retry=$retryLeft pos=$position")
+                scheduleAttachRetry(position, offsetTop, token, retryLeft - 1, onFocused)
+                return@post
+            }
             AppLog.w(TAG, "focusPosition post: direct focus failed, trying nearestVisible for pos=$position")
             focusNearestVisible(position, onFocused)
             pendingFocusPosition = RecyclerView.NO_POSITION
         }
-        return true
     }
 
     private fun isPositionVisible(position: Int): Boolean {

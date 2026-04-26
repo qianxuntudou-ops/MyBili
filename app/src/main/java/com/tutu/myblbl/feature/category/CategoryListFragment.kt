@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseListFragment
-import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.ui.focus.tv.TvDataChangeReason
@@ -67,40 +66,6 @@ class CategoryListFragment : BaseListFragment<VideoModel>() {
     }
 
     override fun getSpanCount(): Int = 4
-
-    override fun createLayoutManager() = object : WrapContentGridLayoutManager(requireContext(), getSpanCount()) {
-        override fun onFocusSearchFailed(
-            focused: View,
-            direction: Int,
-            recycler: RecyclerView.Recycler,
-            state: RecyclerView.State
-        ): View? {
-            val result = super.onFocusSearchFailed(focused, direction, recycler, state)
-            val dirName = when (direction) {
-                View.FOCUS_UP -> "UP"
-                View.FOCUS_DOWN -> "DOWN"
-                View.FOCUS_LEFT -> "LEFT"
-                View.FOCUS_RIGHT -> "RIGHT"
-                else -> direction.toString()
-            }
-            val focusedPos = getPosition(focused)
-            AppLog.d(TAG, "onFocusSearchFailed: pos=$focusedPos dir=$dirName superResult=${
-                result?.let { getPosition(it) } ?: "null"
-            }")
-            val fallback = if (
-                result == null &&
-                (direction == View.FOCUS_DOWN ||
-                    direction == View.FOCUS_UP ||
-                    direction == View.FOCUS_LEFT ||
-                    direction == View.FOCUS_RIGHT)
-            ) {
-                focused
-            } else {
-                result
-            }
-            return fallback
-        }
-    }
 
     override fun loadData(page: Int) {
         if (viewModel.loading.value) {

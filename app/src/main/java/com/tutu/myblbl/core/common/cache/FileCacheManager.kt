@@ -52,6 +52,22 @@ object FileCacheManager {
         }.start()
     }
 
+    /**
+     * 在 Application.onCreate 里提前将指定缓存 key 对应的文件内容读入 OS 页缓存。
+     * 后续 Fragment 真正调用 getAsync 时命中页缓存，避免冷启动首次磁盘寻道延迟。
+     */
+    fun prewarmKeys(vararg keys: String) {
+        if (keys.isEmpty()) return
+        Thread {
+            for (key in keys) {
+                try {
+                    readFile(key)
+                } catch (_: Exception) {
+                }
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
     private fun scanCacheDir() {
         val files = cacheDir.listFiles() ?: return
         synchronized(fileMap) {

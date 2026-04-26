@@ -204,6 +204,15 @@ class HomeLaneAdapter(
         }
     }
 
+    fun requestFirstCardFocus(outerRV: RecyclerView): Boolean {
+        val holder = outerRV.findViewHolderForAdapterPosition(0) ?: return false
+        return when (holder) {
+            is ScrollableViewHolder -> holder.requestFirstCardFocusPublic()
+            is TimelineViewHolder -> holder.requestFirstCardFocusPublic()
+            else -> false
+        }
+    }
+
     private fun requestChildFocusAt(
         recyclerView: RecyclerView,
         position: Int,
@@ -300,7 +309,7 @@ class HomeLaneAdapter(
         }
 
         fun requestPrimaryFocus(): Boolean {
-            return binding.topTitle.requestFocus() || requestFirstCardFocus()
+            return binding.topTitle.requestFocus() || requestFirstCardFocusPublic()
         }
 
         fun requestHeaderFocus(): Boolean = binding.topTitle.requestFocus()
@@ -308,13 +317,21 @@ class HomeLaneAdapter(
         fun focusedChildPosition(): Int {
             val focused = binding.recyclerView.rootView?.findFocus() ?: return RecyclerView.NO_POSITION
             val child = binding.recyclerView.findContainingItemView(focused) ?: return RecyclerView.NO_POSITION
-            return binding.recyclerView.getChildAdapterPosition(child)
+            val pos = binding.recyclerView.getChildAdapterPosition(child)
+            if (pos == RecyclerView.NO_POSITION) return RecyclerView.NO_POSITION
+            val lm = binding.recyclerView.layoutManager as? GridLayoutManager ?: return pos
+            return lm.spanSizeLookup.getSpanIndex(pos, lm.spanCount)
         }
 
-        fun requestChildFocus(preferredPosition: Int): Boolean {
-            val targetPosition = preferredPosition.coerceIn(0, (adapter.itemCount - 1).coerceAtLeast(0))
-            if (adapter.itemCount <= 0) {
+        fun requestChildFocus(preferredColumn: Int): Boolean {
+            if (adapter.itemCount <= 0 || preferredColumn == RecyclerView.NO_POSITION) {
                 return false
+            }
+            val lm = binding.recyclerView.layoutManager as? GridLayoutManager
+            val targetPosition = if (lm != null) {
+                preferredColumn.coerceIn(0, lm.spanCount - 1).coerceAtMost(adapter.itemCount - 1)
+            } else {
+                preferredColumn.coerceIn(0, adapter.itemCount - 1)
             }
             val holder = binding.recyclerView.findViewHolderForAdapterPosition(targetPosition)
             if (holder is LaneItemAdapter.LaneItemViewHolder && holder.requestFocus()) {
@@ -328,7 +345,7 @@ class HomeLaneAdapter(
             return true
         }
 
-        private fun requestFirstCardFocus(): Boolean {
+        fun requestFirstCardFocusPublic(): Boolean {
             return adapter.requestFirstItemFocus(binding.recyclerView)
         }
     }
@@ -403,7 +420,7 @@ class HomeLaneAdapter(
         fun requestPrimaryFocus(): Boolean {
             return binding.topTitle.requestFocus() ||
                 requestSelectedFilterFocus() ||
-                requestFirstCardFocus()
+                requestFirstCardFocusPublic()
         }
 
         fun requestHeaderFocus(): Boolean = binding.topTitle.requestFocus()
@@ -411,15 +428,23 @@ class HomeLaneAdapter(
         fun focusedChildPosition(): Int {
             val focused = binding.recyclerView.rootView?.findFocus() ?: return RecyclerView.NO_POSITION
             val child = binding.recyclerView.findContainingItemView(focused) ?: return RecyclerView.NO_POSITION
-            return binding.recyclerView.getChildAdapterPosition(child)
+            val pos = binding.recyclerView.getChildAdapterPosition(child)
+            if (pos == RecyclerView.NO_POSITION) return RecyclerView.NO_POSITION
+            val lm = binding.recyclerView.layoutManager as? GridLayoutManager ?: return pos
+            return lm.spanSizeLookup.getSpanIndex(pos, lm.spanCount)
         }
 
-        fun requestChildFocus(preferredPosition: Int): Boolean {
+        fun requestChildFocus(preferredColumn: Int): Boolean {
             val count = binding.recyclerView.adapter?.itemCount ?: 0
-            if (count <= 0 || binding.recyclerView.visibility != View.VISIBLE) {
+            if (count <= 0 || preferredColumn == RecyclerView.NO_POSITION || binding.recyclerView.visibility != View.VISIBLE) {
                 return false
             }
-            val targetPosition = preferredPosition.coerceIn(0, count - 1)
+            val lm = binding.recyclerView.layoutManager as? GridLayoutManager
+            val targetPosition = if (lm != null) {
+                preferredColumn.coerceIn(0, lm.spanCount - 1).coerceAtMost(count - 1)
+            } else {
+                preferredColumn.coerceIn(0, count - 1)
+            }
             val holder = binding.recyclerView.findViewHolderForAdapterPosition(targetPosition)
             if (holder?.itemView?.requestFocus() == true) {
                 return true
@@ -445,7 +470,7 @@ class HomeLaneAdapter(
             return target.requestFocus()
         }
 
-        private fun requestFirstCardFocus(): Boolean {
+        fun requestFirstCardFocusPublic(): Boolean {
             return adapter.requestFirstItemFocus(binding.recyclerView)
         }
 

@@ -27,9 +27,9 @@ class MyBLBLGlideModule : AppGlideModule() {
         val cacheDir = File(context.externalCacheDir ?: context.cacheDir, "glide_cache")
         builder.setDiskCache(DiskLruCacheFactory(cacheDir.absolutePath, 512L * 1024 * 1024))
 
-        // 限制并发图片加载线程数，避免冷启动时大量封面图同时下载拖慢TV性能
+        // 首屏一次性加载 12 张封面，5 个线程减少排队等待；TV 设备 CPU 核心数一般 ≥ 4
         builder.setSourceExecutor(
-            GlideExecutor.newSourceBuilder().setThreadCount(3).build()
+            GlideExecutor.newSourceBuilder().setThreadCount(5).build()
         )
     }
 

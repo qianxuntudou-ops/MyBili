@@ -253,7 +253,12 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
         if (sections.isNotEmpty()) {
             showContent()
             if (pendingScrollToTopAfterRefresh) {
-                recyclerView?.post { scrollToTop() }
+                recyclerView?.post {
+                    scrollToTop()
+                    val rv = recyclerView ?: return@post
+                    val adp = laneAdapter ?: return@post
+                    adp.requestFirstCardFocus(rv)
+                }
             }
         } else {
             laneAdapter?.setShowLoadMore(false)

@@ -15,7 +15,9 @@ import com.tutu.myblbl.network.ua.DesktopUserAgentStore
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.network.cookie.CookieManager
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
 import org.koin.mp.KoinPlatform
 import retrofit2.Retrofit
@@ -122,6 +124,21 @@ object NetworkManager {
         gson
         retrofit
         apiService
+        prefetchDns()
+    }
+
+    /**
+     * 在后台线程预解析 Bilibili API 主域名，并触发一次 TCP+TLS 预连接。
+     * 冷启动时 warmUp() 在 IO 协程里调用，预连接完成后首包请求可直接复用连接。
+     */
+    private fun prefetchDns() {
+        try {
+            val url = API_BASE.toHttpUrl()
+            val request = Request.Builder().url(url).head().build()
+            internalOkHttpClient.newCall(request).execute().use { /* 只建连，不消费 body */ }
+        } catch (_: Exception) {
+            // 预连接失败不影响正常流程，静默忽略
+        }
     }
 
     fun syncCookiesFromWebView() {
