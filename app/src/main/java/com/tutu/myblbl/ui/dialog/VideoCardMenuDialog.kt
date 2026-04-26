@@ -234,12 +234,18 @@ class VideoCardMenuDialog(
                     dismiss()
                 } else {
                     val msg = response.errorMessage
-                    if (sessionGateway.handleResponseAuthError(response.code, msg)) {
-                        handleAuthExpired()
-                    } else if (msg.contains("90001") || msg.contains("上限") || msg.contains("已满")) {
-                        toast(context.getString(R.string.toast_watch_later_full))
-                    } else {
-                        toast(context.getString(R.string.toast_add_watch_later_failed))
+                    when (val error = sessionGateway.classifyActionError(response.code, msg)) {
+                        is NetworkSessionGateway.ActionError.SessionExpired -> handleAuthExpired()
+                        is NetworkSessionGateway.ActionError.CsrfMismatch -> toast(context.getString(R.string.toast_add_watch_later_failed))
+                        is NetworkSessionGateway.ActionError.RiskControl -> toast(context.getString(R.string.toast_add_watch_later_failed))
+                        is NetworkSessionGateway.ActionError.Other -> {
+                            if (msg.contains("90001") || msg.contains("上限") || msg.contains("已满")) {
+                                toast(context.getString(R.string.toast_watch_later_full))
+                            } else {
+                                toast(context.getString(R.string.toast_add_watch_later_failed))
+                            }
+                        }
+                        is NetworkSessionGateway.ActionError.CsrfMissing -> handleAuthExpired()
                     }
                 }
                 setActionInProgress(false)
@@ -337,11 +343,7 @@ class VideoCardMenuDialog(
                     }
                     dismiss()
                 } else {
-                    if (sessionGateway.handleResponseAuthError(response.code, response.errorMessage)) {
-                        handleAuthExpired()
-                    } else {
-                        toast(response.errorMessage)
-                    }
+                    handleActionError(response.code, response.errorMessage)
                 }
                 setActionInProgress(false)
             }.onFailure {
@@ -574,14 +576,21 @@ class VideoCardMenuDialog(
 
     private fun checkCsrfAndLogin(): Boolean {
         if (!checkLogin()) return false
-        if (sessionGateway.getCsrfToken().isBlank()) {
-            sessionGateway.clearUserSession("no_csrf_token")
-            appEventHub.dispatch(AppEventHub.Event.UserSessionChanged)
-            toast(context.getString(R.string.login_expired))
-            dismiss()
+        if (sessionGateway.requireCsrfToken() == null) {
+            handleAuthExpired()
             return false
         }
         return true
+    }
+
+    private fun handleActionError(code: Int, message: String?) {
+        when (val error = sessionGateway.classifyActionError(code, message)) {
+            is NetworkSessionGateway.ActionError.SessionExpired -> handleAuthExpired()
+            is NetworkSessionGateway.ActionError.CsrfMismatch -> toast("操作失败，请稍后重试")
+            is NetworkSessionGateway.ActionError.RiskControl -> toast("账号被风控了，请到B站官方App或网页端完成验证后再试")
+            is NetworkSessionGateway.ActionError.Other -> toast(error.message)
+            is NetworkSessionGateway.ActionError.CsrfMissing -> handleAuthExpired()
+        }
     }
 
     private fun handleAuthExpired() {

@@ -254,6 +254,11 @@ class OwnerDetailDialog(
     }
 
     private fun toggleFollow() {
+        val csrf = sessionGateway.getCsrfToken()
+        if (csrf.isBlank()) {
+            toast(context.getString(R.string.login_expired))
+            return
+        }
         val action = if (isFollowing()) 2 else 1
         scope.launch {
             userRepository.modifyRelation(owner.mid, action)
@@ -267,11 +272,7 @@ class OwnerDetailDialog(
                         )
                         toast(if (action == 1) "关注成功" else "已取消关注")
                     } else {
-                        if (sessionGateway.handleResponseAuthError(response.code, response.message)) {
-                            toast(context.getString(R.string.login_expired))
-                        } else {
-                            toast(response.message)
-                        }
+                        toast(response.errorMessage)
                     }
                 }
                 .onFailure {

@@ -53,12 +53,14 @@ class FavoriteRepository(
 
     suspend fun addFavorite(rid: Long, addMediaIds: String): Result<BaseResponse<CollectionResultModel>> =
         runCatching {
+            val csrf = sessionGateway.requireCsrfToken()
+                ?: return Result.success(BaseResponse(code = -111, message = "csrf token is blank"))
             sessionGateway.syncAuthState(
                 apiService.dealFavorite(
-                rid = rid,
-                addMediaIds = addMediaIds,
-                delMediaIds = null,
-                csrf = sessionGateway.getCsrfToken()
+                    rid = rid,
+                    addMediaIds = addMediaIds,
+                    delMediaIds = null,
+                    csrf = csrf
                 ),
                 source = "favorite.addFavorite"
             )
@@ -66,12 +68,14 @@ class FavoriteRepository(
 
     suspend fun removeFavorite(rid: Long, delMediaIds: String): Result<BaseResponse<CollectionResultModel>> =
         runCatching {
+            val csrf = sessionGateway.requireCsrfToken()
+                ?: return Result.success(BaseResponse(code = -111, message = "csrf token is blank"))
             sessionGateway.syncAuthState(
                 apiService.dealFavorite(
-                rid = rid,
-                addMediaIds = null,
-                delMediaIds = delMediaIds,
-                csrf = sessionGateway.getCsrfToken()
+                    rid = rid,
+                    addMediaIds = null,
+                    delMediaIds = delMediaIds,
+                    csrf = csrf
                 ),
                 source = "favorite.removeFavorite"
             )

@@ -80,14 +80,7 @@ class PlayerActionDialog(
                         ).show()
                     } else {
                         AppLog.w("PlayerAction", "like failed: code=${response.code}, message=${response.message}")
-                        if (sessionGateway.handleResponseAuthError(response.code, response.message)) {
-                            handleAuthExpired()
-                        } else if (isRiskControl(response.code, response.message)) {
-                            AppLog.w("PlayerAction", "like risk control detected: code=${response.code}, message=${response.message}")
-                            showRiskControlHint()
-                        } else {
-                            toast(response.message)
-                        }
+                        handleActionError(response.code, response.message)
                     }
                 }.onFailure {
                     AppLog.e("PlayerAction", "like failed", it)
@@ -111,14 +104,7 @@ class PlayerActionDialog(
                         renderState()
                         toast("投币成功")
                     } else {
-                        if (sessionGateway.handleResponseAuthError(response.code, response.message)) {
-                            handleAuthExpired()
-                        } else if (isRiskControl(response.code, response.message)) {
-                            AppLog.w("PlayerAction", "coin risk control detected: code=${response.code}, message=${response.message}")
-                            showRiskControlHint()
-                        } else {
-                            toast(response.message)
-                        }
+                        handleActionError(response.code, response.message)
                     }
                 }.onFailure {
                     AppLog.e("PlayerAction", "coin failed", it)
@@ -166,13 +152,7 @@ class PlayerActionDialog(
                             else "取消收藏"
                         )
                     } else {
-                        if (sessionGateway.handleResponseAuthError(response.code, response.errorMessage)) {
-                            handleAuthExpired()
-                        } else if (isRiskControl(response.code, response.errorMessage)) {
-                            showRiskControlHint()
-                        } else {
-                            toast(response.errorMessage)
-                        }
+                        handleActionError(response.code, response.errorMessage)
                     }
                 }.onFailure { toast(it.message ?: "操作失败") }
             }
@@ -197,13 +177,7 @@ class PlayerActionDialog(
                         renderState()
                         toast(context.getString(R.string.triple_action))
                     } else {
-                        if (sessionGateway.handleResponseAuthError(response.code, response.message)) {
-                            handleAuthExpired()
-                        } else if (isRiskControl(response.code, response.message)) {
-                            showRiskControlHint()
-                        } else {
-                            toast(response.errorMessage)
-                        }
+                        handleActionError(response.code, response.message)
                     }
                 }.onFailure {
                     AppLog.e("PlayerActionDialog", "tripleAction failed", it)
@@ -230,13 +204,7 @@ class PlayerActionDialog(
                             else context.getString(R.string.later_watch_removed)
                         )
                     } else {
-                        if (sessionGateway.handleResponseAuthError(response.code, response.errorMessage)) {
-                            handleAuthExpired()
-                        } else if (isRiskControl(response.code, response.errorMessage)) {
-                            showRiskControlHint()
-                        } else {
-                            toast(response.errorMessage)
-                        }
+                        handleActionError(response.code, response.errorMessage)
                     }
                 }.onFailure {
                     AppLog.e("PlayerAction", "watchLater failed", it)
@@ -495,10 +463,24 @@ class PlayerActionDialog(
         return super.onKeyLongPress(keyCode, event)
     }
 
-    private fun isRiskControl(code: Int, message: String?): Boolean {
-        if (code == -352 || code == -412 || code == -351) return true
-        val msg = message.orEmpty()
-        return msg.contains("风控") || msg.contains("拦截") || msg.contains("异常") || msg.contains("非法")
+    private fun handleActionError(code: Int, message: String?) {
+        when (val error = sessionGateway.classifyActionError(code, message)) {
+            is NetworkSessionGateway.ActionError.SessionExpired -> {
+                toast(context.getString(R.string.login_expired))
+                dismiss()
+            }
+            is NetworkSessionGateway.ActionError.CsrfMismatch -> {
+                toast("操作失败，请稍后重试")
+            }
+            is NetworkSessionGateway.ActionError.RiskControl -> {
+                Toast.makeText(context, "账号被风控了，请到B站官方App或网页端完成验证后再试", Toast.LENGTH_LONG).show()
+            }
+            is NetworkSessionGateway.ActionError.Other -> toast(error.message)
+            is NetworkSessionGateway.ActionError.CsrfMissing -> {
+                toast(context.getString(R.string.login_expired))
+                dismiss()
+            }
+        }
     }
 
     private fun handleAuthExpired() {

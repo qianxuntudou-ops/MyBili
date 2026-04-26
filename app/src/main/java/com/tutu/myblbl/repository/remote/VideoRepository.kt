@@ -152,11 +152,15 @@ class VideoRepository(
                 AppLog.e(TAG, "tripleAction first attempt hit risk control/401: aid=$avid, bvid=$bvid, code=${firstResponse.code}")
                 delay(1500L)
                 securityGateway.prewarmWebSession(forceUaRefresh = true)
-                val freshCsrf = sessionGateway.getCsrfToken()
-                sessionGateway.syncAuthState(
-                    apiService.tripleAction(avid, bvid, freshCsrf),
-                    source = "video.tripleAction.second"
-                )
+                val freshCsrf = sessionGateway.requireCsrfToken()
+                if (freshCsrf == null) {
+                    firstResponse
+                } else {
+                    sessionGateway.syncAuthState(
+                        apiService.tripleAction(avid, bvid, freshCsrf),
+                        source = "video.tripleAction.second"
+                    )
+                }
             } else {
                 firstResponse
             }

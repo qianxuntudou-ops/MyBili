@@ -42,7 +42,8 @@ class VideoRepository(
     }
 
     suspend fun like(avid: Long?, bvid: String?, like: Int): BaseResponse<Int> {
-        val csrf = sessionGateway.getCsrfToken()
+        val csrf = sessionGateway.requireCsrfToken()
+            ?: return BaseResponse(code = -111, message = "csrf token is blank")
         return delegate.like(avid, bvid, like, csrf).getOrThrow()
     }
 
@@ -56,7 +57,8 @@ class VideoRepository(
         multiply: Int,
         selectLike: Int = 0
     ): BaseResponse<GiveCoinResultModel> {
-        val csrf = sessionGateway.getCsrfToken()
+        val csrf = sessionGateway.requireCsrfToken()
+            ?: return BaseResponse(code = -111, message = "csrf token is blank")
         return delegate.giveCoin(avid, bvid, multiply, selectLike, csrf).getOrThrow()
     }
 
@@ -65,7 +67,8 @@ class VideoRepository(
     }
 
     suspend fun tripleAction(avid: Long?, bvid: String?): BaseResponse<TripleActionResultModel> {
-        val csrf = sessionGateway.getCsrfToken()
+        val csrf = sessionGateway.requireCsrfToken()
+            ?: return BaseResponse(code = -111, message = "csrf token is blank")
         return delegate.tripleAction(avid, bvid, csrf).getOrThrow()
     }
 
@@ -85,12 +88,14 @@ class VideoRepository(
     }
 
     suspend fun addWatchLater(aid: Long?, bvid: String? = null): BaseBaseResponse {
-        val csrf = sessionGateway.getCsrfToken()
+        val csrf = sessionGateway.requireCsrfToken()
+            ?: return BaseBaseResponse(code = -111, message = "csrf token is blank")
         return delegate.addWatchLater(aid, bvid, csrf).getOrThrow()
     }
 
     suspend fun removeWatchLater(aid: Long?, bvid: String? = null): BaseBaseResponse {
-        val csrf = sessionGateway.getCsrfToken()
+        val csrf = sessionGateway.requireCsrfToken()
+            ?: return BaseBaseResponse(code = -111, message = "csrf token is blank")
         return delegate.removeWatchLater(aid, bvid, csrf).getOrThrow()
     }
 
@@ -101,7 +106,8 @@ class VideoRepository(
     }
 
     suspend fun dislikeFeed(video: VideoModel, reasonId: Int): BaseBaseResponse {
-        val csrf = sessionGateway.getCsrfToken()
+        val csrf = sessionGateway.requireCsrfToken()
+            ?: return BaseBaseResponse(code = -111, message = "csrf token is blank")
         return delegate.dislikeFeed(video, reasonId, csrf).getOrThrow()
     }
 }

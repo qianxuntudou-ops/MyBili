@@ -85,7 +85,7 @@ val repositoryModule = module {
 @OptIn(UnstableApi::class)
 val viewModelModule = module {
     viewModel { RecommendViewModel(get(), androidContext()) }
-    viewModel { HotViewModel(get(), get(), androidContext()) }
+    viewModel { HotViewModel(get(), androidContext()) }
     viewModel { (type: Int) -> HomeLaneViewModel(type, get()) }
     viewModel { MainNavigationViewModel(get()) }
     viewModel { VideoPlayerViewModel(get(), get(), get(), get(), get(), get(), get(named("noCookie")), androidContext(), get()) }

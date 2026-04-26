@@ -16,8 +16,6 @@ import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.BaseBaseResponse
 import com.tutu.myblbl.core.common.log.AppLog
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
@@ -30,7 +28,7 @@ class UserRepository(
 
     private val detailCache = mutableMapOf<String, Any>()
     private val detailSemaphore = Semaphore(3)
-    
+
     suspend fun getUserDetailInfo(): BaseResponse<UserDetailInfoModel> {
         return apiService.getUserDetailInfo().also { response ->
             sessionGateway.syncUserSession(response, source = "getUserDetailInfo")
@@ -125,37 +123,17 @@ class UserRepository(
             )
         }
 
-    suspend fun batchCheckFollowed(mids: List<Long>): Set<Long> {
-        if (!isLoggedIn() || mids.isEmpty()) return emptySet()
-        return try {
-            coroutineScope {
-                mids.map { mid ->
-                    async {
-                        runCatching {
-                            val response = sessionGateway.syncAuthState(
-                                apiService.checkUserRelation(mid.toString()),
-                                source = "batchCheckFollowed"
-                            )
-                            if (response.isSuccess && response.data?.attribute?.and(2) != 0) mid else null
-                        }.getOrNull()
-                    }
-                }.awaitAll().filterNotNull().toSet()
-            }
-        } catch (e: Exception) {
-            AppLog.w("UserRepository", "batchCheckFollowed failed: ${e.message}")
-            emptySet()
-        }
-    }
-
     suspend fun modifyRelation(
         fid: Long,
         action: Int
     ): Result<BaseBaseResponse> =
         runCatching {
+            val csrf = sessionGateway.requireCsrfToken()
+                ?: return Result.success(BaseBaseResponse(code = -101, message = "csrf token is blank"))
             val params = mapOf(
                 "fid" to fid.toString(),
                 "act" to action.toString(),
-                "csrf" to sessionGateway.getCsrfToken()
+                "csrf" to csrf
             )
             sessionGateway.syncAuthState(
                 apiService.userRelationModify(params),

@@ -86,6 +86,7 @@ class NetworkSessionStore(
 
     fun syncUserSession(
         response: BaseResponse<UserDetailInfoModel>,
+        context: AuthContext = AuthContext.FOREGROUND,
         onAuthInvalid: (() -> Unit)? = null
     ): UserDetailInfoModel? {
         val info = response.data?.takeIf { response.isSuccess }
@@ -94,12 +95,14 @@ class NetworkSessionStore(
             return userInfo
         }
         if (isAuthInvalid(response.code)) {
-            val wasLoggedIn = userInfo != null
-            clearUserSession()
-            // Extract WBI keys from -101 response if available (nav returns wbi_img even for unauthenticated users)
+            // 即使是 BACKGROUND，也尝试从 -101 响应中提取 WBI keys
             extractWbiKeysFromData(response.data)
-            if (wasLoggedIn) {
-                onAuthInvalid?.invoke()
+            if (context.shouldClearSession) {
+                val wasLoggedIn = userInfo != null
+                clearUserSession()
+                if (wasLoggedIn) {
+                    onAuthInvalid?.invoke()
+                }
             }
         }
         return null
@@ -107,9 +110,11 @@ class NetworkSessionStore(
 
     fun handleAuthFailureCode(
         code: Int,
+        context: AuthContext = AuthContext.FOREGROUND,
         onAuthInvalid: (() -> Unit)? = null
     ) {
         if (isAuthInvalid(code)) {
+            if (!context.shouldClearSession) return
             val wasLoggedIn = userInfo != null
             clearUserSession()
             if (wasLoggedIn) {
@@ -120,25 +125,28 @@ class NetworkSessionStore(
 
     fun <T> syncAuthState(
         response: BaseResponse<T>,
+        context: AuthContext = AuthContext.FOREGROUND,
         onAuthInvalid: (() -> Unit)? = null
     ): BaseResponse<T> {
-        handleAuthFailureCode(response.code, onAuthInvalid)
+        handleAuthFailureCode(response.code, context, onAuthInvalid)
         return response
     }
 
     fun syncAuthState(
         response: BaseBaseResponse,
+        context: AuthContext = AuthContext.FOREGROUND,
         onAuthInvalid: (() -> Unit)? = null
     ): BaseBaseResponse {
-        handleAuthFailureCode(response.code, onAuthInvalid)
+        handleAuthFailureCode(response.code, context, onAuthInvalid)
         return response
     }
 
     fun <T> syncAuthState(
         response: Base2Response<T>,
+        context: AuthContext = AuthContext.FOREGROUND,
         onAuthInvalid: (() -> Unit)? = null
     ): Base2Response<T> {
-        handleAuthFailureCode(response.code, onAuthInvalid)
+        handleAuthFailureCode(response.code, context, onAuthInvalid)
         return response
     }
 

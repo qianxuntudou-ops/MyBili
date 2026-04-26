@@ -6,6 +6,7 @@ import com.tutu.myblbl.model.player.VideoSnapshotData
 import com.tutu.myblbl.network.WbiGenerator
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.security.NetworkSecurityGateway
+import com.tutu.myblbl.network.session.AuthContext
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.network.response.Base2Response
 import com.tutu.myblbl.network.response.PlayerInfoDataWrapper
@@ -99,7 +100,8 @@ class VideoPlayerPlayInfoGateway(
             AppLog.w(logTag, "requestPlayInfo v_voucher detected: cid=$cid, qn=$qualityId, vVoucherLen=${extractedVVoucher.length}")
         }
 
-        if (isRiskControlSignal(primaryCode, primaryResult?.data, primaryMessage)) {
+        if (sessionGateway.isRiskControl(primaryCode, primaryMessage) ||
+            (primaryCode == 0 && primaryResult?.data != null && !hasPlayableMedia(primaryResult.data))) {
             AppLog.w(logTag, "requestPlayInfo risk-control detected: code=$primaryCode, falling back to try_look, cid=$cid, qn=$qualityId")
             val tryLookResult = requestTryLookPlayInfo(
                 aid = aid,
@@ -386,13 +388,6 @@ class VideoPlayerPlayInfoGateway(
             )
         }
         return null
-    }
-
-    private fun isRiskControlSignal(code: Int, data: PlayInfoModel?, message: String): Boolean {
-        if (code == -351 || code == -412 || code == -352) return true
-        if (code == 0 && data != null && !hasPlayableMedia(data)) return true
-        val riskKeywords = listOf("风控", "风险", "拦截", "神秘力量", "risk", "blocked")
-        return riskKeywords.any { message.contains(it, ignoreCase = true) }
     }
 
     suspend fun requestPlayerInfoData(
@@ -746,18 +741,16 @@ class VideoPlayerPlayInfoGateway(
         if (hasWbiKeys() && !sessionGateway.areWbiKeysStale()) {
             return
         }
+        // 使用无 cookie 的客户端，防止 -101 响应清除关键 cookie
         val response = runCatching {
-            apiService.getUserDetailInfo()
+            noCookieApiService.getUserDetailInfo()
         }.onFailure { throwable ->
             AppLog.e(logTag, "ensureWbiKeys exception: ${throwable.message}", throwable)
         }.getOrNull() ?: return
-        if (sessionGateway.syncUserSession(response, source = "ensureWbiKeys") != null) {
-        } else if (response.code == -101) {
-            val data = response.data
-            if (data != null) {
-                sessionGateway.syncUserSession(response, source = "ensureWbiKeys")
-            }
-        } else {
+        if (response.isSuccess && response.data != null) {
+            // 只更新 userInfo 和 WBI keys，不触发 session 清除
+            sessionGateway.syncUserSession(response, source = "ensureWbiKeys", context = AuthContext.BACKGROUND)
+        } else if (response.code != -101) {
             AppLog.e(logTag, "ensureWbiKeys failed: code=${response.code}, message=${response.errorMessage}")
         }
     }

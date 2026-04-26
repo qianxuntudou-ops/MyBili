@@ -45,7 +45,8 @@ class SeriesRepository(
 
     suspend fun followSeries(seasonId: Long): Result<FollowSeriesResult> {
         return runCatching {
-            val csrf = sessionGateway.getCsrfToken()
+            val csrf = sessionGateway.requireCsrfToken()
+                ?: throw IllegalStateException("csrf token is blank")
             val response = sessionGateway.syncAuthState(
                 apiService.followSeries(seasonId, csrf),
                 source = "series.followSeries"
@@ -64,7 +65,8 @@ class SeriesRepository(
 
     suspend fun cancelFollowSeries(seasonId: Long): Result<FollowSeriesResult> {
         return runCatching {
-            val csrf = sessionGateway.getCsrfToken()
+            val csrf = sessionGateway.requireCsrfToken()
+                ?: throw IllegalStateException("csrf token is blank")
             val response = sessionGateway.syncAuthState(
                 apiService.cancelFollowSeries(seasonId, csrf),
                 source = "series.cancelFollowSeries"
