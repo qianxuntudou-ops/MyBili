@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class LivePlayerViewModel(
     private val repository: LiveRepository
@@ -34,8 +36,12 @@ class LivePlayerViewModel(
     private val _selectedQuality = MutableStateFlow<LiveQualityInfo?>(null)
     val selectedQuality: StateFlow<LiveQualityInfo?> = _selectedQuality.asStateFlow()
 
+    private val _liveDuration = MutableStateFlow("")
+    val liveDuration: StateFlow<String> = _liveDuration.asStateFlow()
+
     private var currentRoomId: Long = 0
     private var heartbeatJob: Job? = null
+    private var durationJob: Job? = null
 
     fun loadLiveStream(roomId: Long) {
         currentRoomId = roomId
@@ -53,6 +59,8 @@ class LivePlayerViewModel(
                     val durl = data.durl
                     if (!durl.isNullOrEmpty()) {
                         _playUrl.value = durl[0].url
+
+                        data.liveTime?.let { startLiveDuration(it) }
 
                         data.qualityDescription?.let { qualities ->
                             val mappedQualities = qualities.map {
@@ -119,6 +127,26 @@ class LivePlayerViewModel(
         }
     }
 
+    private fun startLiveDuration(liveTime: String) {
+        durationJob?.cancel()
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val startMs = runCatching { sdf.parse(liveTime)?.time }.getOrNull() ?: return
+        durationJob = viewModelScope.launch {
+            while (true) {
+                val elapsed = (System.currentTimeMillis() - startMs) / 1000
+                val h = elapsed / 3600
+                val m = (elapsed % 3600) / 60
+                val s = elapsed % 60
+                _liveDuration.value = if (h > 0) {
+                    String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
+                } else {
+                    String.format(Locale.getDefault(), "%02d:%02d", m, s)
+                }
+                delay(1000)
+            }
+        }
+    }
+
     fun switchQuality(qn: Int) {
         if (currentRoomId > 0) {
             viewModelScope.launch {
@@ -157,6 +185,8 @@ class LivePlayerViewModel(
         super.onCleared()
         heartbeatJob?.cancel()
         heartbeatJob = null
+        durationJob?.cancel()
+        durationJob = null
     }
 }
 

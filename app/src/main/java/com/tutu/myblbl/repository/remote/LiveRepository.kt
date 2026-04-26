@@ -52,7 +52,7 @@ class LiveRepository(
                 )
             )
             if (v2Response.code == 0 && v2Response.data != null) {
-                parseV2PlayInfo(v2Response.data)?.let { playInfo ->
+                parseV2PlayInfo(v2Response.data, roomInfo.liveTime)?.let { playInfo ->
                     return@runCatching playInfo
                 }
                 AppLog.e(
@@ -68,7 +68,7 @@ class LiveRepository(
 
             val legacyResponse = apiService.getLivePlayInfo(roomInfo.realRoomId, quality)
             if (legacyResponse.code == 0 && legacyResponse.data != null) {
-                legacyResponse.data
+                legacyResponse.data.copy(liveTime = roomInfo.liveTime)
             } else {
                 AppLog.e(
                     TAG,
@@ -236,10 +236,11 @@ class LiveRepository(
         val liveStatus = data.int("live_status")
             ?: data.objectOrNull("room_info")?.int("live_status")
             ?: 0
-        return ResolvedRoomInfo(realRoomId, liveStatus)
+        val liveTime = data.string("live_time").takeIf { it.isNotBlank() }
+        return ResolvedRoomInfo(realRoomId, liveStatus, liveTime)
     }
 
-    private fun parseV2PlayInfo(data: JsonObject): LivePlayUrlDataModel? {
+    private fun parseV2PlayInfo(data: JsonObject, liveTime: String?): LivePlayUrlDataModel? {
         val playUrl = data.objectOrNull("playurl_info")
             ?.objectOrNull("playurl")
             ?: return null
@@ -275,7 +276,8 @@ class LiveRepository(
                 currentQuality = currentQn,
                 currentQn = currentQn,
                 qualityDescription = qualityDescription,
-                durl = urls
+                durl = urls,
+                liveTime = liveTime
             )
         }
     }
@@ -422,7 +424,8 @@ class LiveRepository(
 
     private data class ResolvedRoomInfo(
         val realRoomId: Long,
-        val liveStatus: Int
+        val liveStatus: Int,
+        val liveTime: String? = null
     )
 
     private data class LiveStreamCandidate(

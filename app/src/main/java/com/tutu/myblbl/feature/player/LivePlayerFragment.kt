@@ -212,6 +212,12 @@ class LivePlayerFragment : Fragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.liveDuration.collect { duration ->
+                binding.playerView.setSubTitle(duration)
+            }
+        }
     }
 
     override fun onStart() {

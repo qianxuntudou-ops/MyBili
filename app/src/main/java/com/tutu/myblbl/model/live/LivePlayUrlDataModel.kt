@@ -13,5 +13,7 @@ data class LivePlayUrlDataModel(
     @SerializedName("quality_description")
     val qualityDescription: List<LiveQualityModel>? = null,
     @SerializedName("durl")
-    val durl: List<LiveDUrlModel>? = null
+    val durl: List<LiveDUrlModel>? = null,
+    @SerializedName("live_time")
+    val liveTime: String? = null
 ) : Serializable
