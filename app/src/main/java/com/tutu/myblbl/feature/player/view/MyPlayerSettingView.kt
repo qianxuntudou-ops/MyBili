@@ -159,13 +159,18 @@ class MyPlayerSettingView @JvmOverloads constructor(
     }
 
     fun onBack(): Boolean {
-        return when (menuLevel) {
-            LEVEL_MAIN -> {
+        return when {
+            menuLevel == LEVEL_MAIN -> {
                 showHide(false)
                 true
             }
 
-            LEVEL_DM -> {
+            adapter.currentMenuKey == ITEM_LIVE_QUALITY -> {
+                showHide(false)
+                true
+            }
+
+            menuLevel == LEVEL_DM -> {
                 showDmSettingMenu()
                 true
             }
@@ -318,8 +323,23 @@ class MyPlayerSettingView @JvmOverloads constructor(
     fun showLiveQualityMenu() {
         if (panelState.liveQualities.isEmpty()) return
         if (!isShowing()) {
-            showHide(true)
-            post { showLiveQualitySubMenu() }
+            visibility = VISIBLE
+            menuLevel = LEVEL_SUB
+            updateBackIcon()
+            showLiveQualitySubMenu()
+            translationX = panelWidthPx.toFloat()
+            alpha = 0f
+            animate()
+                .translationX(0f)
+                .alpha(1f)
+                .setDuration(PANEL_ANIMATION_DURATION_MS)
+                .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        requestMenuFocus()
+                        onVisibilityStateChanged?.invoke(true)
+                    }
+                })
+                .start()
         } else {
             showLiveQualitySubMenu()
         }
