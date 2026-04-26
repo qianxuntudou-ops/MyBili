@@ -175,7 +175,11 @@ class PlayerActionDialog(
                         isCoined = true
                         isFavorited = true
                         renderState()
-                        toast(context.getString(R.string.triple_action))
+                        if (response.data?.isRisk == true) {
+                            Toast.makeText(context, "三连成功，但账号被标记风控，后续操作可能受限", Toast.LENGTH_LONG).show()
+                        } else {
+                            toast(context.getString(R.string.triple_action))
+                        }
                     } else {
                         handleActionError(response.code, response.message)
                     }
@@ -219,25 +223,16 @@ class PlayerActionDialog(
             return
         }
         scope.launch {
-            runCatching { videoRepository.hasLike(aid, safeBvid) }
+            runCatching { videoRepository.getArchiveRelation(aid, safeBvid) }
                 .onSuccess { response ->
                     if (response.isSuccess) {
-                        isLiked = response.data == 1
-                        renderState()
-                    }
-                }
-            runCatching { videoRepository.hasGiveCoin(aid, safeBvid) }
-                .onSuccess { response ->
-                    if (response.isSuccess) {
-                        isCoined = (response.data?.multiply ?: 0) > 0
-                        renderState()
-                    }
-                }
-            favoriteRepository.checkFavorite(aid)
-                .onSuccess { response ->
-                    if (response.isSuccess) {
-                        isFavorited = response.data?.favoured == true
-                        renderState()
+                        val data = response.data
+                        if (data != null) {
+                            isLiked = data.like
+                            isCoined = data.coin > 0
+                            isFavorited = data.favorite
+                            renderState()
+                        }
                     }
                 }
             runCatching { videoRepository.checkWatchLater(aid, bvid) }
@@ -470,6 +465,9 @@ class PlayerActionDialog(
             }
             is NetworkSessionGateway.ActionError.RiskControl -> {
                 Toast.makeText(context, "账号被风控了，请到B站官方App或网页端完成验证后再试", Toast.LENGTH_LONG).show()
+            }
+            is NetworkSessionGateway.ActionError.FrequencyLimit -> {
+                toast(error.message)
             }
             is NetworkSessionGateway.ActionError.Other -> toast(error.message)
             is NetworkSessionGateway.ActionError.CsrfMissing -> {

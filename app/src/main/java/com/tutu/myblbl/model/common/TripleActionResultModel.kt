@@ -11,5 +11,7 @@ data class TripleActionResultModel(
     @SerializedName("like")
     val like: Boolean = false,
     @SerializedName("multiply")
-    val multiply: Int = 0
+    val multiply: Int = 0,
+    @SerializedName("is_risk")
+    val isRisk: Boolean = false
 ) : Serializable

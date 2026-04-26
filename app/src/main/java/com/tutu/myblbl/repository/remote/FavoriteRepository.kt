@@ -8,11 +8,13 @@ import com.tutu.myblbl.model.favorite.FavoriteFolderModel
 import com.tutu.myblbl.model.favorite.FavoriteFoldersWrapper
 import com.tutu.myblbl.model.favorite.FolderDetailModel
 import com.tutu.myblbl.network.api.ApiService
+import com.tutu.myblbl.network.security.NetworkSecurityGateway
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 
 class FavoriteRepository(
     private val apiService: ApiService,
-    private val sessionGateway: NetworkSessionGateway
+    private val sessionGateway: NetworkSessionGateway,
+    private val securityGateway: NetworkSecurityGateway
 ) {
 
     suspend fun checkFavorite(aid: Long?): Result<BaseResponse<CheckFavoriteModel>> =
@@ -53,6 +55,7 @@ class FavoriteRepository(
 
     suspend fun addFavorite(rid: Long, addMediaIds: String): Result<BaseResponse<CollectionResultModel>> =
         runCatching {
+            securityGateway.ensureHealthyForPlay()
             val csrf = sessionGateway.requireCsrfToken()
                 ?: return Result.success(BaseResponse(code = -111, message = "csrf token is blank"))
             sessionGateway.syncAuthState(
@@ -68,6 +71,7 @@ class FavoriteRepository(
 
     suspend fun removeFavorite(rid: Long, delMediaIds: String): Result<BaseResponse<CollectionResultModel>> =
         runCatching {
+            securityGateway.ensureHealthyForPlay()
             val csrf = sessionGateway.requireCsrfToken()
                 ?: return Result.success(BaseResponse(code = -111, message = "csrf token is blank"))
             sessionGateway.syncAuthState(

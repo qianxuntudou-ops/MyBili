@@ -81,10 +81,14 @@ class TvListFocusController(
         if (reason == TvDataChangeReason.APPEND) {
             // Clear the pending flag. Don't auto-move focus — let the user's next DOWN press
             // navigate into the newly loaded items naturally.
-            // Fall through to the common anchor-restore logic below: if focus is still valid
-            // inside the RV we return immediately; if it was lost (e.g. ViewHolder recycled
-            // during fast scroll) we restore it to the anchor so it doesn't stay stranded.
+            // Fall through to the common anchor-restore logic only when the anchor is still
+            // near the current viewport. If the user flung the list far past the anchor (e.g.
+            // anchor=10 but now at row 90), restoring would violently scroll the list back up.
             pendingMoveAfterLoadMore = null
+            val anchor = currentAnchor ?: capturedAnchor
+            if (anchor == null || !isAnchorNearViewport(anchor)) {
+                return
+            }
         }
 
         if (hasValidFocusedItem()) {
@@ -307,5 +311,20 @@ class TvListFocusController(
         View.FOCUS_LEFT -> "LEFT"
         View.FOCUS_RIGHT -> "RIGHT"
         else -> "UNKNOWN($direction)"
+    }
+
+    /**
+     * Returns true if [anchor]'s adapter position is within one screen's worth of the current
+     * visible range. Used to guard APPEND focus-restore from scrolling the list back up when
+     * the user has flung far past the anchor position.
+     */
+    private fun isAnchorNearViewport(anchor: TvFocusAnchor): Boolean {
+        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return true
+        val first = lm.findFirstVisibleItemPosition()
+        val last = lm.findLastVisibleItemPosition()
+        if (first == RecyclerView.NO_POSITION || last == RecyclerView.NO_POSITION) return true
+        val screenSize = (last - first + 1).coerceAtLeast(1)
+        val pos = anchor.adapterPosition
+        return pos >= first - screenSize && pos <= last + screenSize
     }
 }

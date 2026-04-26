@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import com.tutu.myblbl.model.BaseResponse
 import com.tutu.myblbl.model.common.CollectionResultModel
 import com.tutu.myblbl.model.common.GiveCoinResultModel
+import com.tutu.myblbl.model.common.ArchiveRelationModel
 import com.tutu.myblbl.model.common.CheckGiveCoinModel
 import com.tutu.myblbl.model.common.TripleActionResultModel
 import com.tutu.myblbl.model.user.UserStatModel
@@ -225,6 +226,12 @@ interface ApiService {
         @Query("avid") avid: Long?,
         @Query("bvid") bvid: String?
     ): BaseResponse<Int>
+
+    @GET("x/web-interface/archive/relation")
+    suspend fun getArchiveRelation(
+        @Query("aid") aid: Long?,
+        @Query("bvid") bvid: String?
+    ): BaseResponse<ArchiveRelationModel>
 
     @POST("x/web-interface/coin/add")
     @FormUrlEncoded

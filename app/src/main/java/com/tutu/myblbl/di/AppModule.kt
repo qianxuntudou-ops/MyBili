@@ -62,11 +62,11 @@ val networkModule = module {
 val repositoryModule = module {
     single { com.tutu.myblbl.repository.remote.AllSeriesRepository(get()) }
     single { com.tutu.myblbl.repository.remote.AuthRepository(get(), get()) }
-    single { com.tutu.myblbl.repository.remote.FavoriteRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.FavoriteRepository(get(), get(), get()) }
     single { com.tutu.myblbl.repository.remote.HomeLaneRepository(get(), get(), get()) }
     single { com.tutu.myblbl.repository.remote.LiveRepository(get(), get()) }
     single { com.tutu.myblbl.repository.remote.SearchRepository(get(), get()) }
-    single { com.tutu.myblbl.repository.remote.SeriesRepository(get(), get()) }
+    single { com.tutu.myblbl.repository.remote.SeriesRepository(get(), get(), get()) }
     single { com.tutu.myblbl.repository.remote.VideoRepository(get(), get(), get()) }
     single { AllSeriesRepository(get()) }
     single { AuthRepository(get()) }
@@ -76,7 +76,7 @@ val repositoryModule = module {
     single { SearchRepository(get()) }
     single { SeriesRepository(get()) }
     single { VideoRepository(get(), get()) }
-    single { UserRepository(get(), get()) }
+    single { UserRepository(get(), get(), get()) }
     single { RecommendFeedRepository(get()) }
     single { HotFeedRepository(get()) }
     single { HomeLaneFeedRepository(get()) }

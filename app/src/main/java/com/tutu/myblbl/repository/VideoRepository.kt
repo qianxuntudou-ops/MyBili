@@ -1,6 +1,7 @@
 package com.tutu.myblbl.repository
 
 import com.tutu.myblbl.model.BaseResponse
+import com.tutu.myblbl.model.common.ArchiveRelationModel
 import com.tutu.myblbl.model.common.CheckGiveCoinModel
 import com.tutu.myblbl.model.common.GiveCoinResultModel
 import com.tutu.myblbl.model.common.TripleActionResultModel
@@ -49,6 +50,10 @@ class VideoRepository(
 
     suspend fun hasLike(avid: Long?, bvid: String?): BaseResponse<Int> {
         return delegate.hasLike(avid, bvid).getOrThrow()
+    }
+
+    suspend fun getArchiveRelation(aid: Long?, bvid: String?): BaseResponse<ArchiveRelationModel> {
+        return delegate.getArchiveRelation(aid, bvid).getOrThrow()
     }
 
     suspend fun giveCoin(

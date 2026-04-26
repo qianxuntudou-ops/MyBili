@@ -46,6 +46,10 @@ class VideoPlayerEpisodeCatalogBuilder(
                 .orEmpty()
         }
 
+        if (pages.size <= 1) {
+            return emptyList()
+        }
+
         return pages.mapIndexed { index, page ->
             page.toPlayableEpisode(index, view)
         }

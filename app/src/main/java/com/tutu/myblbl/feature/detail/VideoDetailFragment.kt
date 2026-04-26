@@ -410,25 +410,16 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         val currentBvid = videoView?.bvid ?: videoModel?.bvid
 
         lifecycleScope.launch {
-            runCatching { videoRepository.hasLike(currentAid, currentBvid) }
+            runCatching { videoRepository.getArchiveRelation(currentAid, currentBvid) }
                 .onSuccess { response ->
                     if (response.isSuccess) {
-                        isLiked = response.data == 1
-                        updateActionStateAndRefresh()
-                    }
-                }
-            runCatching { videoRepository.hasGiveCoin(currentAid, currentBvid) }
-                .onSuccess { response ->
-                    if (response.isSuccess) {
-                        isCoined = (response.data?.multiply ?: 0) > 0
-                        updateActionStateAndRefresh()
-                    }
-                }
-            favoriteRepository.checkFavorite(currentAid)
-                .onSuccess { response ->
-                    if (response.isSuccess) {
-                        isFavorited = response.data?.favoured == true
-                        updateActionStateAndRefresh()
+                        val data = response.data
+                        if (data != null) {
+                            isLiked = data.like
+                            isCoined = data.coin > 0
+                            isFavorited = data.favorite
+                            updateActionStateAndRefresh()
+                        }
                     }
                 }
         }
@@ -769,22 +760,24 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         }
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return
         val currentBvid = videoView?.bvid ?: videoModel?.bvid
-        if (!isLiked) toggleLike()
-        if (!isCoined) {
-            val coinCount = appSettings.getCachedString("give_coin_number")?.toIntOrNull()?.coerceIn(1, 2) ?: 2
-            lifecycleScope.launch {
-                runCatching { videoRepository.giveCoin(currentAid, currentBvid, multiply = coinCount) }
-                    .onSuccess { response ->
-                        if (response.isSuccess) {
-                            isCoined = true
-                            updateActionButtonsDirectly()
+        lifecycleScope.launch {
+            runCatching { videoRepository.tripleAction(null, currentBvid) }
+                .onSuccess { response ->
+                    if (response.isSuccess) {
+                        isLiked = true
+                        isCoined = true
+                        isFavorited = true
+                        updateActionButtonsDirectly()
+                        if (response.data?.isRisk == true) {
+                            Toast.makeText(requireContext(), "三连成功，但账号被标记风控，后续操作可能受限", Toast.LENGTH_LONG).show()
                         } else {
-                            toast(response.message)
+                            toast(getString(R.string.triple_action))
                         }
-                    }.onFailure { toast(it.message ?: "投币失败") }
-            }
+                    } else {
+                        toast(response.message)
+                    }
+                }.onFailure { toast(it.message ?: "操作失败") }
         }
-        if (!isFavorited) toggleFavorite()
     }
 
     private fun updateActionButtonsDirectly() {

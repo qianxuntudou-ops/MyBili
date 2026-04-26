@@ -95,14 +95,16 @@ interface NetworkSessionGateway {
         data class CsrfMismatch(val message: String) : ActionError
         data class CsrfMissing(val message: String) : ActionError
         data class RiskControl(val message: String) : ActionError
+        data class FrequencyLimit(val message: String) : ActionError
         data class Other(val message: String) : ActionError
     }
 }
 
 class NetworkManagerSessionGateway : NetworkSessionGateway {
 
-    private val riskControlCodes = setOf(-352, -412, -351)
-    private val riskControlKeywords = listOf("风控", "拦截", "异常", "非法", "风险", "神秘力量", "risk", "blocked")
+    private val riskControlCodes = setOf(-352, -351)
+    private val frequencyLimitCodes = setOf(-412)
+    private val riskControlKeywords = listOf("风控", "拦截", "风险", "神秘力量", "risk", "blocked")
 
     override fun getCsrfToken(): String = NetworkManager.getCsrfToken()
 
@@ -225,6 +227,10 @@ class NetworkManagerSessionGateway : NetworkSessionGateway {
             NetworkManager.clearUserSession(reason = "session_expired")
             dispatchSessionChanged()
             return NetworkSessionGateway.ActionError.SessionExpired(msg.ifEmpty { "登录已过期" })
+        }
+        // 频率限制（-412）
+        if (code in frequencyLimitCodes) {
+            return NetworkSessionGateway.ActionError.FrequencyLimit(msg.ifEmpty { "操作过于频繁，请稍后再试" })
         }
         // 风控
         if (isRiskControl(code, message)) {

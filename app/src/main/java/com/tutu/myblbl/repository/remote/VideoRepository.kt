@@ -1,6 +1,7 @@
 package com.tutu.myblbl.repository.remote
 
 import com.tutu.myblbl.model.BaseResponse
+import com.tutu.myblbl.model.common.ArchiveRelationModel
 import com.tutu.myblbl.model.common.CheckGiveCoinModel
 import com.tutu.myblbl.model.common.GiveCoinResultModel
 import com.tutu.myblbl.model.common.TripleActionResultModel
@@ -111,6 +112,7 @@ class VideoRepository(
 
     suspend fun like(avid: Long?, bvid: String?, like: Int, csrf: String): Result<BaseResponse<Int>> =
         runCatching {
+            securityGateway.ensureHealthyForPlay()
             sessionGateway.syncAuthState(
                 apiService.like(avid, bvid, like, csrf),
                 source = "video.like"
@@ -125,8 +127,17 @@ class VideoRepository(
             )
         }
 
+    suspend fun getArchiveRelation(aid: Long?, bvid: String?): Result<BaseResponse<ArchiveRelationModel>> =
+        runCatching {
+            sessionGateway.syncAuthState(
+                apiService.getArchiveRelation(aid, bvid),
+                source = "video.getArchiveRelation"
+            )
+        }
+
     suspend fun giveCoin(avid: Long?, bvid: String?, multiply: Int, selectLike: Int, csrf: String): Result<BaseResponse<GiveCoinResultModel>> =
         runCatching {
+            securityGateway.ensureHealthyForPlay()
             sessionGateway.syncAuthState(
                 apiService.giveCoin(avid, bvid, multiply, selectLike, csrf),
                 source = "video.giveCoin"
@@ -143,7 +154,7 @@ class VideoRepository(
 
     suspend fun tripleAction(avid: Long?, bvid: String?, csrf: String): Result<BaseResponse<TripleActionResultModel>> =
         runCatching {
-            securityGateway.prewarmWebSession()
+            securityGateway.ensureHealthyForPlay()
             val firstResponse = sessionGateway.syncAuthState(
                 apiService.tripleAction(avid, bvid, csrf),
                 source = "video.tripleAction.first"
@@ -168,6 +179,7 @@ class VideoRepository(
 
     suspend fun addWatchLater(aid: Long?, bvid: String?, csrf: String): Result<BaseBaseResponse> =
         runCatching {
+            securityGateway.ensureHealthyForPlay()
             val result = sessionGateway.syncAuthState(
                 apiService.addWatchLater(aid, bvid, csrf),
                 source = "video.addWatchLater"
@@ -178,6 +190,7 @@ class VideoRepository(
 
     suspend fun removeWatchLater(aid: Long?, bvid: String?, csrf: String): Result<BaseBaseResponse> =
         runCatching {
+            securityGateway.ensureHealthyForPlay()
             val resolvedAid = resolveWatchLaterAid(aid, bvid)
                 ?: error("缺少稍后再看视频标识")
             val result = sessionGateway.syncAuthState(
@@ -221,7 +234,7 @@ class VideoRepository(
 
     suspend fun dislikeFeed(video: VideoModel, reasonId: Int, csrf: String): Result<BaseBaseResponse> =
         runCatching {
-            securityGateway.prewarmWebSession()
+            securityGateway.ensureHealthyForPlay()
             val firstParams = buildFeedbackWbiParams()
             val firstForm = buildDislikeForm(video = video, reasonId = reasonId, csrf = csrf)
             val firstResponse = sessionGateway.syncAuthState(

@@ -238,6 +238,7 @@ class VideoCardMenuDialog(
                         is NetworkSessionGateway.ActionError.SessionExpired -> handleAuthExpired()
                         is NetworkSessionGateway.ActionError.CsrfMismatch -> toast(context.getString(R.string.toast_add_watch_later_failed))
                         is NetworkSessionGateway.ActionError.RiskControl -> toast(context.getString(R.string.toast_add_watch_later_failed))
+                        is NetworkSessionGateway.ActionError.FrequencyLimit -> toast(error.message)
                         is NetworkSessionGateway.ActionError.Other -> {
                             if (msg.contains("90001") || msg.contains("上限") || msg.contains("已满")) {
                                 toast(context.getString(R.string.toast_watch_later_full))
@@ -584,6 +585,7 @@ class VideoCardMenuDialog(
             is NetworkSessionGateway.ActionError.SessionExpired -> handleAuthExpired()
             is NetworkSessionGateway.ActionError.CsrfMismatch -> toast("操作失败，请稍后重试")
             is NetworkSessionGateway.ActionError.RiskControl -> toast("账号被风控了，请到B站官方App或网页端完成验证后再试")
+            is NetworkSessionGateway.ActionError.FrequencyLimit -> toast(error.message)
             is NetworkSessionGateway.ActionError.Other -> toast(error.message)
             is NetworkSessionGateway.ActionError.CsrfMissing -> toast("登录凭据异常，请稍后重试")
         }
