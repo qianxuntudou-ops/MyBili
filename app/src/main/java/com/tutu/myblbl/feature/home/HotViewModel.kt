@@ -32,25 +32,6 @@ class HotViewModel(
         if (hasLoadedInitial) return
         hasLoadedInitial = true
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                loadingInitial = true,
-                errorMessage = null,
-                listChange = FeedListChange.NONE
-            )
-            val cachedItems = runCatching { repository.readCachedFeed().items }
-                .getOrDefault(emptyList())
-                .filterForDisplay()
-            if (cachedItems.isNotEmpty()) {
-                currentPage = 1
-                _uiState.value = FeedUiState(
-                    items = cachedItems,
-                    source = FeedSource.CACHE,
-                    listChange = FeedListChange.REPLACE,
-                    loadingInitial = false,
-                    hasMore = true
-                )
-                return@launch
-            }
             loadPage(page = 1, replace = true, fromInitial = true)
         }
     }

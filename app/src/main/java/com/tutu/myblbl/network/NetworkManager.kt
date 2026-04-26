@@ -114,6 +114,7 @@ object NetworkManager {
     fun init(context: Context, syncWebViewCookies: Boolean = true) {
         val applicationContext = context.applicationContext
         appContext = applicationContext
+        java.io.File(applicationContext.cacheDir, "http_cache").deleteRecursively()
         internalCookieManager.init(applicationContext, syncWebViewCookies)
         userAgentStore.init(applicationContext)
         sessionStore.initPersistence(

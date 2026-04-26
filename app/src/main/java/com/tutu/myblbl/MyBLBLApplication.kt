@@ -2,7 +2,6 @@ package com.tutu.myblbl
 
 import android.app.Application
 import android.os.SystemClock
-import com.tutu.myblbl.core.common.cache.FileCacheManager
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.di.appModules
@@ -40,7 +39,6 @@ class MyBLBLApplication : Application() {
         trace("initKoin", startMs) { initKoin() }
         trace("initSettings", startMs) { initSettings() }
         trace("initNetwork", startMs) { initNetwork() }
-        prewarmCaches()
         AppLog.i(TAG, "Application.onCreate end elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
     }
 
@@ -65,13 +63,6 @@ class MyBLBLApplication : Application() {
         }
     }
     
-    private fun prewarmCaches() {
-        FileCacheManager.prewarmKeys(
-            "recommendCacheList",
-            "hotCacheList"
-        )
-    }
-
     private fun initNetwork() {
         NetworkManager.init(this, syncWebViewCookies = false)
         appScope.launch {
