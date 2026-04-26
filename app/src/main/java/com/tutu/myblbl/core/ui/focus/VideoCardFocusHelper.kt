@@ -113,6 +113,15 @@ object VideoCardFocusHelper {
         if (event.action != KeyEvent.ACTION_DOWN) {
             return false
         }
+        if (!target.isAttachedToWindow || !target.isShown) {
+            AppLog.d(TAG, "ignore key=$keyCode on detached/hidden target=${target.javaClass.simpleName}")
+            return false
+        }
+        val currentFocus = target.rootView.findFocus()
+        if (currentFocus == null || (currentFocus !== target && !isDescendantOf(currentFocus, target))) {
+            AppLog.d(TAG, "ignore key=$keyCode because current focus is not target: focus=${currentFocus?.javaClass?.simpleName}")
+            return false
+        }
         val rv = target.findParentRecyclerView()
         val pos = rv?.getChildAdapterPosition(target) ?: RecyclerView.NO_POSITION
         when (keyCode) {

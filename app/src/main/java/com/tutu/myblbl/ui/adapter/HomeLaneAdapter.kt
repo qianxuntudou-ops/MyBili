@@ -149,6 +149,21 @@ class HomeLaneAdapter(
 
     private fun focusNextSectionFrom(currentHolder: RecyclerView.ViewHolder): Boolean {
         val outerRV = outerRecyclerView ?: currentHolder.itemView.findParentRecyclerView() ?: return true
+        val focused = outerRV.rootView.findFocus()
+        if (
+            focused == null ||
+            !currentHolder.itemView.isAttachedToWindow ||
+            !currentHolder.itemView.isShown ||
+            !isDescendantOf(focused, currentHolder.itemView)
+        ) {
+            AppLog.d(
+                TAG,
+                "focusNextSection ignored: holder=${currentHolder.javaClass.simpleName} " +
+                    "attached=${currentHolder.itemView.isAttachedToWindow} shown=${currentHolder.itemView.isShown} " +
+                    "focus=${describeCurrentFocus(outerRV)}"
+            )
+            return false
+        }
         val currentPosition = currentHolder.bindingAdapterPosition
         if (currentPosition == RecyclerView.NO_POSITION) {
             return restoreFocusToVisibleLane(outerRV)
@@ -159,18 +174,25 @@ class HomeLaneAdapter(
             is TimelineViewHolder -> currentHolder.focusedChildPosition()
             else -> RecyclerView.NO_POSITION
         }
-        AppLog.d(TAG, "focusNextSection: section=$currentPosition → $targetPosition childCol=$preferredChildPosition")
+        AppLog.d(
+            TAG,
+            "focusNextSection: section=$currentPosition(${sectionLabel(currentPosition)}) → " +
+                "$targetPosition(${sectionLabel(targetPosition)}) childCol=$preferredChildPosition " +
+                "visible=${visibleRange(outerRV)} focus=${describeCurrentFocus(outerRV)}"
+        )
 
-        // Try immediate focus if target section is already attached
-        if (requestChildFocusAt(outerRV, targetPosition, preferredChildPosition) ||
-            requestHeaderFocusAt(outerRV, targetPosition) ||
-            requestPrimaryFocusAt(outerRV, targetPosition)
-        ) {
+        val immediate = requestSectionFocusAt(outerRV, targetPosition, preferredChildPosition)
+        val immediateLanded = isFocusOnSection(outerRV, targetPosition)
+        AppLog.d(
+            TAG,
+            "focusNextSection immediate: requested=$immediate landed=$immediateLanded " +
+                "targetHolder=${describeSectionHolder(outerRV, targetPosition)} focus=${describeCurrentFocus(outerRV)}"
+        )
+        if (immediateLanded) {
             return true
         }
 
-        // Target not attached - scroll to it, then post focus with retry
-        outerRV.scrollToPosition(targetPosition)
+        scrollSectionIntoView(outerRV, targetPosition)
         postSectionFocus(outerRV, targetPosition, preferredChildPosition, retryCount = 0)
         return true
     }
@@ -182,16 +204,129 @@ class HomeLaneAdapter(
         retryCount: Int
     ) {
         outerRV.post {
-            val success = requestChildFocusAt(outerRV, targetPosition, preferredChildPosition) ||
-                requestHeaderFocusAt(outerRV, targetPosition) ||
-                requestPrimaryFocusAt(outerRV, targetPosition)
-            if (!success && retryCount < 3) {
-                AppLog.d(TAG, "focusNextSection retry: section→$targetPosition attempt=${retryCount + 1}")
-                outerRV.postDelayed({
+            AppLog.d(
+                TAG,
+                "focusNextSection post start: target=$targetPosition retry=$retryCount " +
+                    "visible=${visibleRange(outerRV)} targetHolder=${describeSectionHolder(outerRV, targetPosition)} " +
+                    "focus=${describeCurrentFocus(outerRV)}"
+            )
+            val requested = requestSectionFocusAt(outerRV, targetPosition, preferredChildPosition)
+            outerRV.postDelayed({
+                val focusLanded = isFocusOnSection(outerRV, targetPosition)
+                AppLog.d(
+                    TAG,
+                    "focusNextSection post result: target=$targetPosition retry=$retryCount " +
+                        "requested=$requested landed=$focusLanded visible=${visibleRange(outerRV)} " +
+                        "targetHolder=${describeSectionHolder(outerRV, targetPosition)} focus=${describeCurrentFocus(outerRV)}"
+                )
+                if (!focusLanded && retryCount < 5) {
+                    AppLog.d(TAG, "focusNextSection retry: section→$targetPosition attempt=${retryCount + 1}")
+                    scrollSectionIntoView(outerRV, targetPosition)
                     postSectionFocus(outerRV, targetPosition, preferredChildPosition, retryCount + 1)
-                }, 80L)
-            }
+                }
+            }, 100L)
         }
+    }
+
+    private fun requestSectionFocusAt(
+        recyclerView: RecyclerView,
+        position: Int,
+        preferredChildPosition: Int
+    ): Boolean {
+        AppLog.d(
+            TAG,
+            "requestSectionFocusAt: position=$position(${sectionLabel(position)}) preferredChild=$preferredChildPosition " +
+                "holder=${describeSectionHolder(recyclerView, position)} focusBefore=${describeCurrentFocus(recyclerView)}"
+        )
+        val focusedChild = requestChildFocusAt(recyclerView, position, preferredChildPosition)
+        AppLog.d(
+            TAG,
+            "requestSectionFocusAt child: result=$focusedChild landed=${isFocusOnSection(recyclerView, position)} " +
+                "focus=${describeCurrentFocus(recyclerView)}"
+        )
+        if (focusedChild && isFocusOnSection(recyclerView, position)) {
+            return true
+        }
+        val focusedHeader = requestHeaderFocusAt(recyclerView, position)
+        AppLog.d(
+            TAG,
+            "requestSectionFocusAt header: result=$focusedHeader landed=${isFocusOnSection(recyclerView, position)} " +
+                "focus=${describeCurrentFocus(recyclerView)}"
+        )
+        if (focusedHeader && isFocusOnSection(recyclerView, position)) {
+            return true
+        }
+        val focusedPrimary = requestPrimaryFocusAt(recyclerView, position)
+        AppLog.d(
+            TAG,
+            "requestSectionFocusAt primary: result=$focusedPrimary landed=${isFocusOnSection(recyclerView, position)} " +
+                "focus=${describeCurrentFocus(recyclerView)}"
+        )
+        return focusedPrimary && isFocusOnSection(recyclerView, position)
+    }
+
+    private fun scrollSectionIntoView(recyclerView: RecyclerView, position: Int) {
+        AppLog.d(
+            TAG,
+            "scrollSectionIntoView: position=$position beforeVisible=${visibleRange(recyclerView)} " +
+                "holder=${describeSectionHolder(recyclerView, position)}"
+        )
+        val lm = recyclerView.layoutManager as? LinearLayoutManager
+        if (lm != null) {
+            lm.scrollToPositionWithOffset(position, 0)
+        } else {
+            recyclerView.scrollToPosition(position)
+        }
+    }
+
+    private fun visibleRange(recyclerView: RecyclerView): String {
+        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return "unknown"
+        return "${lm.findFirstVisibleItemPosition()}..${lm.findLastVisibleItemPosition()}"
+    }
+
+    private fun describeSectionHolder(recyclerView: RecyclerView, position: Int): String {
+        val holder = recyclerView.findViewHolderForAdapterPosition(position)
+            ?: return "null"
+        return "${holder.javaClass.simpleName}(attached=${holder.itemView.isAttachedToWindow}, " +
+            "shown=${holder.itemView.isShown}, hasFocus=${holder.itemView.hasFocus()})"
+    }
+
+    private fun describeCurrentFocus(recyclerView: RecyclerView): String {
+        val focused = recyclerView.rootView.findFocus() ?: return "null"
+        val outerItem = recyclerView.findContainingItemView(focused)
+        val outerPosition = outerItem?.let { recyclerView.getChildAdapterPosition(it) }
+            ?: RecyclerView.NO_POSITION
+        val innerRecycler = focused.findParentRecyclerView()
+        val innerItem = innerRecycler?.findContainingItemView(focused)
+        val innerPosition = if (innerRecycler != null && innerRecycler !== recyclerView && innerItem != null) {
+            innerRecycler.getChildAdapterPosition(innerItem)
+        } else {
+            RecyclerView.NO_POSITION
+        }
+        val idName = runCatching {
+            if (focused.id != View.NO_ID) focused.resources.getResourceEntryName(focused.id) else "no_id"
+        }.getOrDefault("${focused.id}")
+        return "${focused.javaClass.simpleName}($idName outer=$outerPosition inner=$innerPosition)"
+    }
+
+    private fun sectionLabel(position: Int): String {
+        val section = items.getOrNull(position) ?: return "missing"
+        return when {
+            section.style == "follow" -> section.title.ifBlank { "follow" }
+            section.timelineDays.isNotEmpty() -> "timeline"
+            else -> section.title.ifBlank { section.style.ifBlank { "untitled" } }
+        }.take(24)
+    }
+
+    private fun isFocusOnSection(rv: RecyclerView, position: Int): Boolean {
+        val focused = rv.rootView.findFocus() ?: return false
+        val sectionView = rv.findViewHolderForAdapterPosition(position)?.itemView ?: return false
+        if (!sectionView.isAttachedToWindow || !sectionView.isShown) {
+            return false
+        }
+        return isDescendantOf(focused, sectionView) &&
+            focused.isAttachedToWindow &&
+            focused.isShown
     }
 
     private fun restoreFocusToVisibleLane(rv: RecyclerView): Boolean {
@@ -208,7 +343,10 @@ class HomeLaneAdapter(
     }
 
     private fun requestHeaderFocusAt(recyclerView: RecyclerView, position: Int): Boolean {
-        return when (val holder = recyclerView.findViewHolderForAdapterPosition(position)) {
+        val holder = recyclerView.findViewHolderForAdapterPosition(position)
+            ?.takeIf { it.itemView.isAttachedToWindow && it.itemView.isShown }
+            ?: return false
+        return when (holder) {
             is ScrollableViewHolder -> holder.requestHeaderFocus()
             is TimelineViewHolder -> holder.requestHeaderFocus()
             else -> false
@@ -216,7 +354,10 @@ class HomeLaneAdapter(
     }
 
     private fun requestPrimaryFocusAt(recyclerView: RecyclerView, position: Int): Boolean {
-        return when (val holder = recyclerView.findViewHolderForAdapterPosition(position)) {
+        val holder = recyclerView.findViewHolderForAdapterPosition(position)
+            ?.takeIf { it.itemView.isAttachedToWindow && it.itemView.isShown }
+            ?: return false
+        return when (holder) {
             is ScrollableViewHolder -> holder.requestPrimaryFocus()
             is TimelineViewHolder -> holder.requestPrimaryFocus()
             else -> false
@@ -243,7 +384,10 @@ class HomeLaneAdapter(
         if (preferredChildPosition == RecyclerView.NO_POSITION) {
             return false
         }
-        return when (val holder = recyclerView.findViewHolderForAdapterPosition(position)) {
+        val holder = recyclerView.findViewHolderForAdapterPosition(position)
+            ?.takeIf { it.itemView.isAttachedToWindow && it.itemView.isShown }
+            ?: return false
+        return when (holder) {
             is ScrollableViewHolder -> holder.requestChildFocus(preferredChildPosition)
             is TimelineViewHolder -> holder.requestChildFocus(preferredChildPosition)
             else -> false
@@ -283,6 +427,11 @@ class HomeLaneAdapter(
 
                     KeyEvent.KEYCODE_DPAD_LEFT -> {
                         view.context.findMainActivity()?.focusLeftFunctionArea(view) == true
+                    }
+
+                    KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        requestFirstCardFocusPublic()
                     }
 
                     else -> false
@@ -368,7 +517,17 @@ class HomeLaneAdapter(
         }
 
         fun requestFirstCardFocusPublic(): Boolean {
-            return adapter.requestFirstItemFocus(binding.recyclerView)
+            if (adapter.requestFirstItemFocus(binding.recyclerView)) {
+                return true
+            }
+            if (adapter.itemCount <= 0) {
+                return false
+            }
+            binding.recyclerView.scrollToPosition(0)
+            binding.recyclerView.post {
+                adapter.requestFirstItemFocus(binding.recyclerView)
+            }
+            return true
         }
     }
 
