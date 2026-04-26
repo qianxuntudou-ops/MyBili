@@ -169,12 +169,7 @@ abstract class VideoFeedFragment : BaseListFragment<VideoModel>(), HomeTabPage {
         }
 
         when (listChange) {
-            FeedListChange.NONE -> {
-                state.followStatusUpdatedMids?.let { mids ->
-                    (adapter as? VideoAdapter)?.applyFollowStatus(mids)
-                    feedViewModel.consumeFollowStatusUpdate()
-                }
-            }
+            FeedListChange.NONE -> Unit
             FeedListChange.REPLACE -> applyReplacedVideos(state.items)
             FeedListChange.APPEND -> applyAppendedVideos(state.items)
         }

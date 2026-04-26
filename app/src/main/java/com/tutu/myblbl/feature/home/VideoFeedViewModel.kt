@@ -13,6 +13,4 @@ interface VideoFeedViewModel {
     fun loadMore()
 
     fun consumeListChange()
-
-    fun consumeFollowStatusUpdate() {}
 }

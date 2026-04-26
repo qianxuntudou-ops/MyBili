@@ -20,6 +20,5 @@ data class FeedUiState<T>(
     val refreshing: Boolean = false,
     val appending: Boolean = false,
     val hasMore: Boolean = true,
-    val errorMessage: String? = null,
-    val followStatusUpdatedMids: Set<Long>? = null
+    val errorMessage: String? = null
 )

@@ -28,6 +28,8 @@ import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.focus.tv.GridTvFocusStrategy
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.tutu.myblbl.core.ui.focus.tv.OffsetTvFocusableAdapter
 import com.tutu.myblbl.core.ui.focus.tv.TvDataChangeReason
 import com.tutu.myblbl.core.ui.focus.tv.TvListFocusController
@@ -260,7 +262,9 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
 
                 if (response.isSuccess) {
                     response.data?.let { page ->
-                        val items = ContentFilter.filterVideos(requireContext(), page.archives)
+                        val items = withContext(Dispatchers.Default) {
+                        ContentFilter.filterVideos(requireContext(), page.archives)
+                    }
                         hasMore = page.hasMore
                         if (currentPage == 1) {
                             videoAdapter.setData(items)

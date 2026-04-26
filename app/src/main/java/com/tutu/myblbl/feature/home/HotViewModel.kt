@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +14,6 @@ import kotlinx.coroutines.withContext
 
 class HotViewModel(
     private val repository: HotFeedRepository,
-    private val userRepository: UserRepository,
     context: Context
 ) : ViewModel(), VideoFeedViewModel {
 
@@ -51,7 +49,6 @@ class HotViewModel(
                     loadingInitial = false,
                     hasMore = true
                 )
-                enrichFollowStatus(cachedItems)
                 return@launch
             }
             loadPage(page = 1, replace = true, fromInitial = true)
@@ -79,13 +76,6 @@ class HotViewModel(
         val state = _uiState.value
         if (state.listChange != FeedListChange.NONE) {
             _uiState.value = state.copy(listChange = FeedListChange.NONE)
-        }
-    }
-
-    override fun consumeFollowStatusUpdate() {
-        val state = _uiState.value
-        if (state.followStatusUpdatedMids != null) {
-            _uiState.value = state.copy(followStatusUpdatedMids = null)
         }
     }
 
@@ -121,7 +111,6 @@ class HotViewModel(
                 )
                 if (mergedItems.isNotEmpty()) {
                     repository.writeCache(repository.trimCacheItems(mergedItems))
-                    enrichFollowStatus(mergedItems)
                 }
             }.onFailure { throwable ->
                 _uiState.value = current.copy(
@@ -132,26 +121,6 @@ class HotViewModel(
                     listChange = FeedListChange.NONE
                 )
             }
-    }
-
-    private fun enrichFollowStatus(videos: List<VideoModel>) {
-        val mids = videos.mapNotNull { it.owner?.mid }.distinct()
-        if (mids.isEmpty()) return
-        viewModelScope.launch {
-            val followedMids = userRepository.batchCheckFollowed(mids)
-            if (followedMids.isEmpty()) return@launch
-            val current = _uiState.value
-            val followedMidsSet = followedMids.toHashSet()
-            val updatedItems = current.items.map { video ->
-                val mid = video.owner?.mid ?: 0L
-                if (mid in followedMidsSet && !video.isFollowed) video.copy(isFollowed = true) else video
-            }
-            _uiState.value = current.copy(
-                items = updatedItems,
-                listChange = FeedListChange.NONE,
-                followStatusUpdatedMids = followedMidsSet
-            )
-        }
     }
 
     private suspend fun List<VideoModel>.filterForDisplay(): List<VideoModel> {

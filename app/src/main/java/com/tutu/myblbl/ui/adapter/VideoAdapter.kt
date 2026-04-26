@@ -93,17 +93,6 @@ class VideoAdapter(
         onItemClickListener = listener
     }
 
-    fun applyFollowStatus(followedMids: Set<Long>) {
-        if (followedMids.isEmpty()) return
-        for (index in items.indices) {
-            val video = items[index]
-            val mid = video.owner?.mid ?: 0L
-            if (mid in followedMids && !video.isFollowed) {
-                items[index] = video.copy(isFollowed = true)
-                notifyItemChanged(index)
-            }
-        }
-    }
 
     fun addData(newItems: List<VideoModel>) {
         val existingKeys = items.mapTo(HashSet(items.size)) { videoKey(it) }
