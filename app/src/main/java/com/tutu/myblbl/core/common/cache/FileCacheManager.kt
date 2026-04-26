@@ -213,6 +213,34 @@ object FileCacheManager {
         return length
     }
 
+    fun remove(key: String) {
+        init()
+        val file = keyToFile(key)
+        synchronized(fileMap) {
+            if (file.exists()) {
+                val length = file.length()
+                if (file.delete()) {
+                    fileMap.remove(file)
+                    totalSize.addAndGet(-length)
+                    totalCount.decrementAndGet()
+                }
+            }
+        }
+    }
+
+    fun clearUserCaches() {
+        val userCacheKeys = listOf(
+            "followingAnimationCacheList",
+            "followingSeriesCacheList",
+            "historyCacheList",
+            "watchLaterCacheList",
+            "collectionCacheList"
+        )
+        for (key in userCacheKeys) {
+            remove(key)
+        }
+    }
+
     fun clear() {
         synchronized(fileMap) {
             val files = cacheDir.listFiles() ?: return

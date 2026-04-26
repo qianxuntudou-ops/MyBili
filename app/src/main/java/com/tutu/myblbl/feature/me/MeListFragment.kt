@@ -644,6 +644,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
     }
 
     private fun restoreCachedContent() {
+        if (!viewModel.isLoggedIn()) return
         when (type) {
             TYPE_HISTORY -> {
                 val cachedVideos = runCatching {

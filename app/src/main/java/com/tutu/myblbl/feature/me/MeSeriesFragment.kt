@@ -323,6 +323,7 @@ class MeSeriesFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
     }
 
     private fun restoreCachedContent() {
+        if (!sessionGateway.isLoggedIn()) return
         val cachedSeries = runCatching {
             val cacheType = object : TypeToken<List<com.tutu.myblbl.model.series.SeriesModel>>() {}.type
             FileCacheManager.get<List<com.tutu.myblbl.model.series.SeriesModel>>(cacheKey(), cacheType).orEmpty()

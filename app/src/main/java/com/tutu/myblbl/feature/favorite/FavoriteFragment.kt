@@ -414,6 +414,7 @@ class FavoriteFragment : BaseFragment<FragmentFavoriteBinding>(), MeTabPage {
     }
 
     private fun restoreCachedFolders() {
+        if (!sessionGateway.isLoggedIn()) return
         val cachedFolders = runCatching {
             val cacheType = object : TypeToken<List<com.tutu.myblbl.model.favorite.FavoriteFolderModel>>() {}.type
             FileCacheManager.get<List<com.tutu.myblbl.model.favorite.FavoriteFolderModel>>(COLLECTION_CACHE_KEY, cacheType).orEmpty()

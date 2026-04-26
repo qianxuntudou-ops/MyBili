@@ -13,6 +13,7 @@ import com.tutu.myblbl.R
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.ui.base.BaseAdapter
 import com.tutu.myblbl.core.ui.base.BaseListFragment
+import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
 import com.tutu.myblbl.feature.series.AllSeriesFragment
@@ -24,6 +25,7 @@ import com.tutu.myblbl.ui.dialog.MyFollowingDialog
 import com.tutu.myblbl.ui.fragment.main.MainNavigationViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.core.parameter.parametersOf
 
@@ -44,6 +46,7 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
     }
 
     private val mainNavigationViewModel: MainNavigationViewModel by activityViewModels()
+    private val appEventHub: AppEventHub by inject()
     private val viewModel: HomeLaneViewModel by viewModel { parametersOf(type) }
 
     private var type: Int = TYPE_ANIMATION
@@ -198,6 +201,16 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
 
                         MainNavigationViewModel.Event.BackPressed -> scrollToTop()
                         else -> Unit
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appEventHub.events.collectLatest { event ->
+                    if (event == AppEventHub.Event.UserSessionChanged && isResumed && !isLoading) {
+                        refresh()
                     }
                 }
             }

@@ -17,6 +17,7 @@ import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.feature.detail.UserSpaceFragment
 import com.tutu.myblbl.feature.user.FollowUserListFragment
+import com.tutu.myblbl.core.common.cache.FileCacheManager
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +86,7 @@ class UserInfoDialog(context: Context) : AppCompatDialog(context, R.style.Dialog
         }
         binding.buttonSignOut.setOnClickListener {
             sessionGateway.clearUserSession(reason = "userInfoDialog.signOut")
+            FileCacheManager.clearUserCaches()
             appEventHub.dispatch(AppEventHub.Event.UserSessionChanged)
             dismiss()
         }

@@ -11,6 +11,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentSignInBinding
 import com.tutu.myblbl.event.AppEventHub
+import com.tutu.myblbl.core.common.cache.FileCacheManager
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.cookie.CookieManager
@@ -173,6 +174,7 @@ class SignInFragment : BaseFragment<FragmentSignInBinding>() {
     }
 
     private fun onLoginSuccess() {
+        FileCacheManager.clearUserCaches()
         viewLifecycleOwner.lifecycleScope.launch {
             userRepository.refreshCurrentUserInfo()
             parentFragmentManager.popBackStackImmediate()
