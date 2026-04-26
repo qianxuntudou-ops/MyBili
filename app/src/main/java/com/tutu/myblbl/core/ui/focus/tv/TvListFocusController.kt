@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import android.view.View
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.tutu.myblbl.core.common.log.AppLog
 
 class TvListFocusController(
     private val recyclerView: RecyclerView,
@@ -12,6 +13,10 @@ class TvListFocusController(
     private val canLoadMore: () -> Boolean,
     private val loadMore: () -> Unit
 ) {
+    companion object {
+        private const val TAG = "TvListFocus"
+    }
+
     private val operator = RecyclerViewFocusOperator(recyclerView, adapter)
     private var currentAnchor: TvFocusAnchor? = null
     private var capturedAnchor: TvFocusAnchor? = null
@@ -19,9 +24,12 @@ class TvListFocusController(
 
     fun onItemFocused(view: View, position: Int) {
         if (!adapter.isFocusablePosition(position)) {
+            AppLog.w(TAG, "onItemFocused: pos=$position NOT focusable, itemCount=${adapter.focusableItemCount()}")
             return
         }
         currentAnchor = createAnchor(view, position, TvFocusAnchor.Source.FOCUS)
+        val anchor = currentAnchor
+        AppLog.d(TAG, "onItemFocused: pos=$position row=${anchor?.row} col=${anchor?.column} key=${anchor?.stableKey}")
     }
 
     fun handleKey(view: View, keyCode: Int, event: KeyEvent): Boolean {
@@ -35,17 +43,28 @@ class TvListFocusController(
             KeyEvent.KEYCODE_DPAD_RIGHT -> View.FOCUS_RIGHT
             else -> return false
         }
+        val dirName = directionName(direction)
         if (direction != View.FOCUS_DOWN) {
             pendingMoveAfterLoadMore = null
         }
         val position = resolveAdapterPosition(view)
+        if (position == RecyclerView.NO_POSITION) {
+            val itemView = recyclerView.findContainingItemView(view)
+            if (itemView == null) {
+                AppLog.w(TAG, "handleKey: $dirName view not in this RV, releasing anchor and returning false")
+                currentAnchor = null
+                return false
+            }
+        }
         if (position != RecyclerView.NO_POSITION && adapter.isFocusablePosition(position)) {
             currentAnchor = createAnchor(view, position, TvFocusAnchor.Source.FOCUS)
         }
+        AppLog.d(TAG, "handleKey: dir=$dirName pos=$position anchor=${currentAnchor?.adapterPosition}(${currentAnchor?.row},${currentAnchor?.column}) itemCount=${adapter.focusableItemCount()}")
         return move(direction)
     }
 
     fun onDataChanged(reason: TvDataChangeReason = TvDataChangeReason.REPLACE_PRESERVE_ANCHOR) {
+        AppLog.d(TAG, "onDataChanged: reason=$reason itemCount=${adapter.focusableItemCount()} hasValidFocused=${hasValidFocusedItem()} currentAnchor=${currentAnchor?.adapterPosition} capturedAnchor=${capturedAnchor?.adapterPosition}")
         if (adapter.focusableItemCount() <= 0) {
             currentAnchor = null
             capturedAnchor = null
@@ -155,33 +174,45 @@ class TvListFocusController(
     }
 
     private fun move(direction: Int): Boolean {
+        val dirName = directionName(direction)
         val itemCount = adapter.focusableItemCount()
         if (itemCount <= 0) {
+            AppLog.w(TAG, "move: $dirName BLOCKED — itemCount=0")
             return false
         }
-        val anchor = currentAnchor ?: anchorFromFocusedOrVisible() ?: return false
+        val anchor = currentAnchor ?: anchorFromFocusedOrVisible()
+        if (anchor == null) {
+            AppLog.w(TAG, "move: $dirName BLOCKED — no anchor, currentFocus=${recyclerView.rootView?.findFocus()?.let { resolveAdapterPosition(it) }}")
+            return false
+        }
         val target = strategy.nextPosition(anchor, direction, itemCount)
+        AppLog.d(TAG, "move: $dirName anchor=${anchor.adapterPosition}(${anchor.row},${anchor.column}) → target=$target itemCount=$itemCount")
         if (target != null) {
             return focusPosition(target, anchor.offsetTop, "move")
         }
-        if (direction == View.FOCUS_DOWN && canLoadMore()) {
+        if (direction == View.FOCUS_DOWN && canLoadMore() && pendingMoveAfterLoadMore == null) {
+            AppLog.d(TAG, "move: DOWN at bottom, triggering loadMore")
             pendingMoveAfterLoadMore = anchor.copy(source = TvFocusAnchor.Source.PENDING_LOAD_MORE)
             loadMore()
             return true
         }
         if (direction == View.FOCUS_DOWN && pendingMoveAfterLoadMore != null) {
+            AppLog.d(TAG, "move: DOWN pending loadMore, consuming key")
             return true
         }
+        AppLog.d(TAG, "move: $dirName at edge, returning false (not handled)")
         return false
     }
 
     private fun focusPosition(position: Int, offsetTop: Int, reason: String): Boolean {
+        AppLog.d(TAG, "focusPosition: pos=$position offset=$offsetTop reason=$reason")
         return operator.focusPosition(position, offsetTop, reason) { focusedPosition ->
             currentAnchor = strategy.anchorFor(
                 position = focusedPosition,
                 stableKey = adapter.stableKeyAt(focusedPosition),
                 offsetTop = offsetTop
             )
+            AppLog.d(TAG, "focusPosition OK: focused=$focusedPosition row=${currentAnchor?.row} col=${currentAnchor?.column}")
         }
     }
 
@@ -252,5 +283,13 @@ class TvListFocusController(
             ?: holder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION }
             ?: holder.layoutPosition.takeIf { it != RecyclerView.NO_POSITION }
             ?: recyclerView.getChildAdapterPosition(itemView)
+    }
+
+    private fun directionName(direction: Int): String = when (direction) {
+        View.FOCUS_UP -> "UP"
+        View.FOCUS_DOWN -> "DOWN"
+        View.FOCUS_LEFT -> "LEFT"
+        View.FOCUS_RIGHT -> "RIGHT"
+        else -> "UNKNOWN($direction)"
     }
 }

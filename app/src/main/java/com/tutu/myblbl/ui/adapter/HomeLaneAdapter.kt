@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.databinding.CellLaneSeriesTimeLineBinding
 import com.tutu.myblbl.databinding.CellLaneScrollableBinding
 import com.tutu.myblbl.model.lane.HomeLaneSection
@@ -52,6 +53,7 @@ class HomeLaneAdapter(
     }
 
     companion object {
+        private const val TAG = "HomeLaneFocus"
         private const val VIEW_TYPE_SCROLLABLE = 100
         private const val VIEW_TYPE_TIMELINE = 101
         private const val VIEW_TYPE_LOAD_MORE = -1000
@@ -157,6 +159,7 @@ class HomeLaneAdapter(
             is TimelineViewHolder -> currentHolder.focusedChildPosition()
             else -> RecyclerView.NO_POSITION
         }
+        AppLog.d(TAG, "focusNextSection: section=$currentPosition → $targetPosition childCol=$preferredChildPosition")
         if (requestChildFocusAt(outerRV, targetPosition, preferredChildPosition) ||
             requestHeaderFocusAt(outerRV, targetPosition) ||
             requestPrimaryFocusAt(outerRV, targetPosition)
@@ -487,9 +490,6 @@ class HomeLaneAdapter(
             binding.imageEmpty.visibility = View.GONE
             binding.recyclerView.visibility = View.VISIBLE
             adapter.setData(episodes)
-            binding.recyclerView.post {
-                adapter.notifyDataSetChanged()
-            }
         }
 
         private fun showEmpty() {

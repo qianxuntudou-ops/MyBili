@@ -1,12 +1,14 @@
 package com.tutu.myblbl.feature.home
 
 import android.view.View
+import android.view.ViewTreeObserver
 import androidx.core.os.bundleOf
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.ui.base.BaseAdapter
@@ -97,6 +99,57 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
         super.initView()
         recyclerView?.setHasFixedSize(true)
         adapter?.setShowLoadMore(false)
+        installFocusDebugListeners()
+    }
+
+    private var globalFocusListener: ViewTreeObserver.OnGlobalFocusChangeListener? = null
+
+    private fun installFocusDebugListeners() {
+        val rootView = view ?: return
+        globalFocusListener = ViewTreeObserver.OnGlobalFocusChangeListener { oldFocus, newFocus ->
+            val rv = recyclerView ?: return@OnGlobalFocusChangeListener
+            val oldPos = oldFocus?.let { findCardPositionInLane(it, rv) }
+            val newPos = newFocus?.let { findCardPositionInLane(it, rv) }
+            val oldSection = oldFocus?.let { findSectionTitle(it, rv) }
+            val newSection = newFocus?.let { findSectionTitle(it, rv) }
+            if (newPos != null || newSection != null) {
+                val oldDesc = oldFocus?.let { viewId(it) } ?: "null"
+                val newDesc = newFocus?.let { viewId(it) } ?: "null"
+                AppLog.d(TAG, "focusChange: $oldDesc(section=$oldSection card=$oldPos) → $newDesc(section=$newSection card=$newPos)")
+            }
+        }
+        rootView.viewTreeObserver.addOnGlobalFocusChangeListener(globalFocusListener)
+    }
+
+    private fun findCardPositionInLane(view: View, outerRV: RecyclerView): Int? {
+        val innerRV = findParentRecyclerView(view) ?: return null
+        if (innerRV === outerRV) return null
+        val pos = innerRV.getChildAdapterPosition(view.parent as? View ?: view)
+        return pos.takeIf { it != RecyclerView.NO_POSITION }
+    }
+
+    private fun findSectionTitle(view: View, outerRV: RecyclerView): String? {
+        val innerRV = findParentRecyclerView(view) ?: return null
+        if (innerRV === outerRV) return null
+        val sectionView = innerRV.parent as? View ?: return null
+        val outerPos = outerRV.getChildAdapterPosition(sectionView)
+        if (outerPos == RecyclerView.NO_POSITION) return null
+        val section = (adapter as? HomeLaneAdapter)?.items?.getOrNull(outerPos) ?: return null
+        return section.title.take(10)
+    }
+
+    private fun findParentRecyclerView(view: View): RecyclerView? {
+        var current = view.parent
+        while (current != null) {
+            if (current is RecyclerView) return current
+            current = current.parent
+        }
+        return null
+    }
+
+    private fun viewId(view: View): String {
+        val idName = try { view.context.resources.getResourceEntryName(view.id) } catch (_: Exception) { "${view.id}" }
+        return "${view.javaClass.simpleName}($idName)"
     }
 
     override fun initData() {
@@ -339,5 +392,13 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
             }
         )
         dialog.show()
+    }
+
+    override fun onDestroyView() {
+        globalFocusListener?.let {
+            view?.viewTreeObserver?.removeOnGlobalFocusChangeListener(it)
+        }
+        globalFocusListener = null
+        super.onDestroyView()
     }
 }

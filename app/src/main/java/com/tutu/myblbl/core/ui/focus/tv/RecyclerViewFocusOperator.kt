@@ -3,11 +3,16 @@ package com.tutu.myblbl.core.ui.focus.tv
 import android.view.View
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.tutu.myblbl.core.common.log.AppLog
 
 class RecyclerViewFocusOperator(
     private val recyclerView: RecyclerView,
     private val adapter: TvFocusableAdapter
 ) {
+    companion object {
+        private const val TAG = "RVFocusOp"
+    }
+
     private var focusToken = 0
     private var pendingFocusPosition = RecyclerView.NO_POSITION
 
@@ -23,6 +28,11 @@ class RecyclerViewFocusOperator(
         onFocused: ((Int) -> Unit)? = null
     ): Boolean {
         if (!adapter.isFocusablePosition(position)) {
+            AppLog.w(TAG, "focusPosition: pos=$position NOT focusable, reason=$reason")
+            return false
+        }
+        if (!recyclerView.isAttachedToWindow) {
+            AppLog.w(TAG, "focusPosition: pos=$position RV not attached, reason=$reason")
             return false
         }
         if (position != pendingFocusPosition) {
@@ -36,24 +46,42 @@ class RecyclerViewFocusOperator(
         }
 
         val layoutManager = recyclerView.layoutManager
-        if (layoutManager is LinearLayoutManager) {
-            layoutManager.scrollToPositionWithOffset(position, offsetTop)
-        } else {
-            recyclerView.scrollToPosition(position)
+        val alreadyVisible = isPositionVisible(position)
+        AppLog.d(TAG, "focusPosition: pos=$position reason=$reason visible=$alreadyVisible attached=${recyclerView.isAttachedToWindow}")
+        if (!alreadyVisible) {
+            if (layoutManager is LinearLayoutManager) {
+                layoutManager.scrollToPositionWithOffset(position, offsetTop)
+            } else {
+                recyclerView.scrollToPosition(position)
+            }
         }
 
         recyclerView.post {
-            if (token != focusToken || !recyclerView.isAttachedToWindow) {
+            if (token != focusToken) {
+                AppLog.w(TAG, "focusPosition post: STALE token=$token current=$focusToken, pos=$position")
+                return@post
+            }
+            if (!recyclerView.isAttachedToWindow) {
+                AppLog.w(TAG, "focusPosition post: RV detached, pos=$position")
                 return@post
             }
             if (requestAttachedPositionFocus(position, onFocused)) {
                 pendingFocusPosition = RecyclerView.NO_POSITION
                 return@post
             }
+            AppLog.w(TAG, "focusPosition post: direct focus failed, trying nearestVisible for pos=$position")
             focusNearestVisible(position, onFocused)
             pendingFocusPosition = RecyclerView.NO_POSITION
         }
         return true
+    }
+
+    private fun isPositionVisible(position: Int): Boolean {
+        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return false
+        val first = lm.findFirstVisibleItemPosition()
+        val last = lm.findLastVisibleItemPosition()
+        if (first == RecyclerView.NO_POSITION || last == RecyclerView.NO_POSITION) return false
+        return position in first..last
     }
 
     fun focusNearestVisible(
@@ -100,16 +128,29 @@ class RecyclerViewFocusOperator(
         if (!adapter.isFocusablePosition(position)) {
             return false
         }
-        val itemView = recyclerView.findViewHolderForAdapterPosition(position)?.itemView ?: return false
-        if (itemView.visibility != View.VISIBLE || !itemView.isAttachedToWindow) {
+        val holder = recyclerView.findViewHolderForAdapterPosition(position)
+        if (holder == null) {
+            AppLog.d(TAG, "requestFocus: pos=$position NO holder (not attached)")
+            return false
+        }
+        val itemView = holder.itemView
+        if (itemView.visibility != View.VISIBLE) {
+            AppLog.w(TAG, "requestFocus: pos=$position visibility=${itemView.visibility}")
+            return false
+        }
+        if (!itemView.isAttachedToWindow) {
+            AppLog.w(TAG, "requestFocus: pos=$position not attachedToWindow")
             return false
         }
         if (!isPartiallyVisible(itemView)) {
+            AppLog.w(TAG, "requestFocus: pos=$position not partiallyVisible top=${itemView.top} bottom=${itemView.bottom} rvHeight=${recyclerView.height}")
             return false
         }
         val handled = itemView.requestFocus()
         if (handled) {
             onFocused?.invoke(position)
+        } else {
+            AppLog.w(TAG, "requestFocus: pos=$position requestFocus returned FALSE")
         }
         return handled
     }

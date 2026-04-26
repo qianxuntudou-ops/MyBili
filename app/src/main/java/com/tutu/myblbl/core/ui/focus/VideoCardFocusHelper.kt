@@ -9,9 +9,11 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.ui.activity.MainActivity
 
 object VideoCardFocusHelper {
+    private const val TAG = "VideoCardFocus"
     private val TAG_DETACH_LISTENER = R.id.tag_focus_detach_listener
 
     fun bindSidebarExit(
@@ -97,22 +99,30 @@ object VideoCardFocusHelper {
         if (event.action != KeyEvent.ACTION_DOWN) {
             return false
         }
+        val rv = target.findParentRecyclerView()
+        val pos = rv?.getChildAdapterPosition(target) ?: RecyclerView.NO_POSITION
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 val atLeftEdge = isAtLeftEdge(target)
+                AppLog.d(TAG, "DPAD_LEFT pos=$pos atLeft=$atLeftEdge")
                 if (!atLeftEdge) {
                     return false
                 }
-                return onLeftEdge?.invoke()
+                val result = onLeftEdge?.invoke()
                     ?: (target.context.findMainActivity()?.focusLeftFunctionArea() == true)
+                AppLog.d(TAG, "DPAD_LEFT pos=$pos edge→sidebar=$result")
+                return result
             }
 
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 val atRightEdge = isAtRightEdge(target)
+                AppLog.d(TAG, "DPAD_RIGHT pos=$pos atRight=$atRightEdge")
                 if (!atRightEdge) {
                     return false
                 }
-                return onRightEdge?.invoke() ?: true
+                val result = onRightEdge?.invoke() ?: true
+                AppLog.d(TAG, "DPAD_RIGHT pos=$pos edge→handled=$result")
+                return result
             }
 
             KeyEvent.KEYCODE_DPAD_UP -> {
@@ -120,32 +130,47 @@ object VideoCardFocusHelper {
                     controller.notifyItemVerticalNavigation(target, View.FOCUS_UP)
                 }
                 val atTopEdge = isAtTopEdge(target)
+                AppLog.d(TAG, "DPAD_UP pos=$pos atTop=$atTopEdge")
                 if (atTopEdge && onTopEdgeUp != null) {
-                    return onTopEdgeUp()
+                    val result = onTopEdgeUp()
+                    AppLog.d(TAG, "DPAD_UP pos=$pos topEdge→handled=$result")
+                    return result
                 }
                 false
             }
 
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 val atBottomEdge = isAtBottomEdge(target)
+                AppLog.d(TAG, "DPAD_DOWN pos=$pos atBottom=$atBottomEdge handleList=$handleListDpadDown")
                 if (atBottomEdge && onBottomEdgeDown != null) {
-                    return onBottomEdgeDown()
+                    val result = onBottomEdgeDown()
+                    AppLog.d(TAG, "DPAD_DOWN pos=$pos bottomEdge→handled=$result")
+                    return result
                 }
                 if (!handleListDpadDown) {
+                    AppLog.d(TAG, "DPAD_DOWN pos=$pos not handled by card, passing through")
                     return false
                 }
                 val loadMoreController = RecyclerViewLoadMoreFocusController.fromView(target)
                 if (loadMoreController != null) {
-                    return loadMoreController.handleItemDpadDown(target)
+                    val result = loadMoreController.handleItemDpadDown(target)
+                    AppLog.d(TAG, "DPAD_DOWN pos=$pos loadMoreCtrl=$result")
+                    return result
                 }
-                val rv = target.findParentRecyclerView()
                 if (rv != null) {
                     val nextFocus = FocusFinder.getInstance().findNextFocus(rv, target, View.FOCUS_DOWN)
+                    AppLog.d(TAG, "DPAD_DOWN pos=$pos FocusFinder next=${
+                        nextFocus?.let {
+                            val nPos = rv.getChildAdapterPosition(it)
+                            "${it.javaClass.simpleName}(pos=$nPos)"
+                        } ?: "null"
+                    }")
                     if (nextFocus != null && isDescendantOf(nextFocus, rv)) {
                         nextFocus.requestFocus()
                         return true
                     }
                 }
+                AppLog.d(TAG, "DPAD_DOWN pos=$pos no next focus found, returning false")
                 false
             }
         }

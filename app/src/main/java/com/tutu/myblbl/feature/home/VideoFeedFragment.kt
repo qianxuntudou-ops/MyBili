@@ -169,7 +169,12 @@ abstract class VideoFeedFragment : BaseListFragment<VideoModel>(), HomeTabPage {
         }
 
         when (listChange) {
-            FeedListChange.NONE -> Unit
+            FeedListChange.NONE -> {
+                state.followStatusUpdatedMids?.let { mids ->
+                    (adapter as? VideoAdapter)?.applyFollowStatus(mids)
+                    feedViewModel.consumeFollowStatusUpdate()
+                }
+            }
             FeedListChange.REPLACE -> applyReplacedVideos(state.items)
             FeedListChange.APPEND -> applyAppendedVideos(state.items)
         }
@@ -216,6 +221,7 @@ abstract class VideoFeedFragment : BaseListFragment<VideoModel>(), HomeTabPage {
             dispatchContentReadyIfNeeded()
             if (pendingScrollToTopAfterRefresh && !isPendingReturnRestore()) {
                 scrollToTop()
+                tvFocusController?.requestFocusPosition(0)
             }
             pendingScrollToTopAfterRefresh = false
         } else {

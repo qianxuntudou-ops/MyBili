@@ -3,6 +3,7 @@ package com.tutu.myblbl.feature.category
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewTreeObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -12,6 +13,7 @@ import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseListFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.ui.focus.tv.TvDataChangeReason
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
@@ -74,6 +76,17 @@ class CategoryListFragment : BaseListFragment<VideoModel>() {
             state: RecyclerView.State
         ): View? {
             val result = super.onFocusSearchFailed(focused, direction, recycler, state)
+            val dirName = when (direction) {
+                View.FOCUS_UP -> "UP"
+                View.FOCUS_DOWN -> "DOWN"
+                View.FOCUS_LEFT -> "LEFT"
+                View.FOCUS_RIGHT -> "RIGHT"
+                else -> direction.toString()
+            }
+            val focusedPos = getPosition(focused)
+            AppLog.d(TAG, "onFocusSearchFailed: pos=$focusedPos dir=$dirName superResult=${
+                result?.let { getPosition(it) } ?: "null"
+            }")
             val fallback = if (
                 result == null &&
                 (direction == View.FOCUS_DOWN ||
@@ -106,6 +119,24 @@ class CategoryListFragment : BaseListFragment<VideoModel>() {
     override fun initView() {
         super.initView()
         adapter?.showLoadMore = false
+        installFocusDebugListeners()
+    }
+
+    private var globalFocusListener: ViewTreeObserver.OnGlobalFocusChangeListener? = null
+
+    private fun installFocusDebugListeners() {
+        val rootView = view ?: return
+        globalFocusListener = ViewTreeObserver.OnGlobalFocusChangeListener { oldFocus, newFocus ->
+            val rv = recyclerView ?: return@OnGlobalFocusChangeListener
+            val oldPos = oldFocus?.let { rv.findContainingItemView(it) }?.let { rv.getChildAdapterPosition(it) }
+            val newPos = newFocus?.let { rv.findContainingItemView(it) }?.let { rv.getChildAdapterPosition(it) }
+            val oldDesc = oldFocus?.let { viewId(it) } ?: "null"
+            val newDesc = newFocus?.let { viewId(it) } ?: "null"
+            if (oldPos != null || newPos != null) {
+                AppLog.d(TAG, "focusChange: $oldDesc(pos=$oldPos) → $newDesc(pos=$newPos)")
+            }
+        }
+        rootView.viewTreeObserver.addOnGlobalFocusChangeListener(globalFocusListener)
     }
 
     private var childDetachListener: RecyclerView.OnChildAttachStateChangeListener? = null
@@ -156,6 +187,10 @@ class CategoryListFragment : BaseListFragment<VideoModel>() {
     }
 
     override fun onDestroyView() {
+        globalFocusListener?.let {
+            view?.viewTreeObserver?.removeOnGlobalFocusChangeListener(it)
+        }
+        globalFocusListener = null
         childDetachListener?.let {
             recyclerView?.removeOnChildAttachStateChangeListener(it)
         }

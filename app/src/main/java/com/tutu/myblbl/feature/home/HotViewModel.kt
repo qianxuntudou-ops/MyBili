@@ -82,6 +82,13 @@ class HotViewModel(
         }
     }
 
+    override fun consumeFollowStatusUpdate() {
+        val state = _uiState.value
+        if (state.followStatusUpdatedMids != null) {
+            _uiState.value = state.copy(followStatusUpdatedMids = null)
+        }
+    }
+
     private suspend fun loadPage(
         page: Int,
         replace: Boolean,
@@ -134,13 +141,15 @@ class HotViewModel(
             val followedMids = userRepository.batchCheckFollowed(mids)
             if (followedMids.isEmpty()) return@launch
             val current = _uiState.value
-            val updated = current.items.map { video ->
+            val followedMidsSet = followedMids.toHashSet()
+            val updatedItems = current.items.map { video ->
                 val mid = video.owner?.mid ?: 0L
-                if (mid in followedMids && !video.isFollowed) video.copy(isFollowed = true) else video
+                if (mid in followedMidsSet && !video.isFollowed) video.copy(isFollowed = true) else video
             }
             _uiState.value = current.copy(
-                items = updated,
-                listChange = if (current.items.isNotEmpty()) FeedListChange.REPLACE else FeedListChange.NONE
+                items = updatedItems,
+                listChange = FeedListChange.NONE,
+                followStatusUpdatedMids = followedMidsSet
             )
         }
     }

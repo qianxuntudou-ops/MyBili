@@ -57,6 +57,27 @@ class VideoAdapter(
         }
     }
 
+    override fun areItemsSame(old: VideoModel, new: VideoModel): Boolean =
+        videoKey(old) == videoKey(new)
+
+    override fun areContentsSame(old: VideoModel, new: VideoModel): Boolean =
+        old.title == new.title &&
+        old.coverUrl == new.coverUrl &&
+        old.viewCount == new.viewCount &&
+        old.danmakuCount == new.danmakuCount &&
+        old.isFollowed == new.isFollowed &&
+        old.isPortrait == new.isPortrait &&
+        old.isChargingExclusive == new.isChargingExclusive &&
+        old.historyProgress == new.historyProgress &&
+        old.durationValue == new.durationValue &&
+        old.authorName == new.authorName &&
+        old.pubDate == new.pubDate &&
+        old.createTime == new.createTime &&
+        old.bangumi == new.bangumi &&
+        old.historyBadge == new.historyBadge &&
+        old.historyBusiness == new.historyBusiness &&
+        old.historyViewAt == new.historyViewAt
+
     init {
         setHasStableIds(true)
     }
@@ -70,6 +91,18 @@ class VideoAdapter(
 
     fun setOnItemClickListener(listener: (View, VideoModel) -> Unit) {
         onItemClickListener = listener
+    }
+
+    fun applyFollowStatus(followedMids: Set<Long>) {
+        if (followedMids.isEmpty()) return
+        for (index in items.indices) {
+            val video = items[index]
+            val mid = video.owner?.mid ?: 0L
+            if (mid in followedMids && !video.isFollowed) {
+                items[index] = video.copy(isFollowed = true)
+                notifyItemChanged(index)
+            }
+        }
     }
 
     fun addData(newItems: List<VideoModel>) {
@@ -192,6 +225,12 @@ class VideoAdapter(
 
         private var currentVideo: VideoModel? = null
         private val handler = Handler(Looper.getMainLooper())
+        private val defaultTextColor: Int = run {
+            val ta = binding.root.context.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
+            val color = ta.getColor(0, 0)
+            ta.recycle()
+            color
+        }
         private var longPressRunnable: Runnable? = null
         private var longPressTriggered = false
 
@@ -327,10 +366,7 @@ class VideoAdapter(
             } else {
                 binding.iconPlaying.visibility = View.GONE
                 com.bumptech.glide.Glide.with(binding.root.context).clear(binding.iconPlaying)
-                val ta = binding.root.context.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
-                val defaultColor = ta.getColor(0, 0)
-                ta.recycle()
-                binding.textView.setTextColor(defaultColor)
+                binding.textView.setTextColor(defaultTextColor)
                 binding.textView.text = title
                 binding.textView.maxLines = 2
                 binding.textView.ellipsize = TextUtils.TruncateAt.END
