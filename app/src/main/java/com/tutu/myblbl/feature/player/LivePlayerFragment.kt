@@ -126,9 +126,18 @@ class LivePlayerFragment : Fragment() {
         binding.playerView.setShowHideOwnerInfo(false)
         binding.playerView.showSettingButton(false)
         binding.playerView.showHideLiveSettingButton(false)
+        binding.playerView.showHideTimeBar(false)
+        binding.playerView.setClockMode(true)
+        binding.playerView.showHideRefreshButton(true)
         binding.playerView.setOnVideoSettingChangeListener(object : com.tutu.myblbl.feature.player.view.OnVideoSettingChangeListener {
             override fun onLiveSettings() {
                 binding.playerView.showLiveQualityMenu()
+            }
+
+            override fun onRefresh() {
+                if (roomId > 0) {
+                    viewModel.refreshLiveStream(roomId)
+                }
             }
 
             override fun onClose() {

@@ -19,6 +19,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.TimeBar
 import com.tutu.myblbl.R
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.LazyThreadSafetyMode
 
@@ -68,6 +71,15 @@ class MyPlayerControlView @JvmOverloads constructor(
             handler.postDelayed(this, delayMs)
         }
     }
+
+    private val clockFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    private val clockRunnable = object : Runnable {
+        override fun run() {
+            if (!clockMode) return
+            exoPosition.text = clockFormat.format(Date())
+            handler.postDelayed(this, 1000)
+        }
+    }
     
     private lateinit var textTitle: TextView
     private lateinit var textSubTitle: TextView
@@ -88,6 +100,7 @@ class MyPlayerControlView @JvmOverloads constructor(
     private lateinit var buttonRelated: ImageView
     private lateinit var buttonRepeat: ImageView
     private lateinit var buttonLiveSettings: ImageView
+    private lateinit var buttonRefresh: ImageView
     private lateinit var buttonClose: ImageView
     private lateinit var loadingProgressBar: ProgressBar
     private lateinit var titleContainer: View
@@ -98,6 +111,7 @@ class MyPlayerControlView @JvmOverloads constructor(
     private var ffDuration: Long = DEFAULT_FAST_FORWARD_MS
     private var needToHideBars: Boolean = true
     private var isScrubbing: Boolean = false
+    private var clockMode: Boolean = false
     private var timeBarMinUpdateIntervalMs: Int = DEFAULT_TIME_BAR_MIN_UPDATE_INTERVAL_MS
     private var showMultiWindowTimeBar: Boolean = false
     private var seekPreviewListener: SeekPreviewListener? = null
@@ -179,6 +193,7 @@ class MyPlayerControlView @JvmOverloads constructor(
         buttonRelated = findViewById(R.id.button_related)
         buttonRepeat = findViewById(R.id.button_repeat)
         buttonLiveSettings = findViewById(R.id.button_live_settings)
+        buttonRefresh = findViewById(R.id.button_refresh)
         buttonClose = findViewById(R.id.button_close)
         loadingProgressBar = findViewById(R.id.loading_progress_bar)
         centerControls = findViewById(R.id.exo_center_controls)
@@ -203,6 +218,7 @@ class MyPlayerControlView @JvmOverloads constructor(
             buttonRelated = buttonRelated,
             buttonRepeat = buttonRepeat,
             buttonLiveSettings = buttonLiveSettings,
+            buttonRefresh = buttonRefresh,
             buttonClose = buttonClose,
             timeBar = timeBar,
             bottomBar = bottomBar
@@ -225,6 +241,7 @@ class MyPlayerControlView @JvmOverloads constructor(
             buttonRelated,
             buttonRepeat,
             buttonLiveSettings,
+            buttonRefresh,
             buttonClose,
             timeBar
         )
@@ -308,6 +325,11 @@ class MyPlayerControlView @JvmOverloads constructor(
         buttonLiveSettings.setOnClickListener {
             removeHideCallbacks()
             onVideoSettingChangeListener?.onLiveSettings()
+        }
+
+        buttonRefresh.setOnClickListener {
+            resetHideCallbacks()
+            onVideoSettingChangeListener?.onRefresh()
         }
 
         buttonClose.setOnClickListener {
@@ -557,6 +579,41 @@ class MyPlayerControlView @JvmOverloads constructor(
 
     fun showHideLiveSettingButton(show: Boolean) {
         setButtonVisibility(buttonLiveSettings, show)
+    }
+
+    fun showHideRefreshButton(show: Boolean) {
+        setButtonVisibility(buttonRefresh, show)
+    }
+
+    fun showHideTimeBar(show: Boolean) {
+        timeBar.visibility = if (show) VISIBLE else GONE
+    }
+
+    fun setClockMode(enabled: Boolean) {
+        clockMode = enabled
+        if (enabled) {
+            handler.removeCallbacks(clockRunnable)
+            exoDuration.visibility = GONE
+            val timeParent = exoPosition.parent as? ViewGroup
+            timeParent?.let { parent ->
+                for (i in 0 until parent.childCount) {
+                    val child = parent.getChildAt(i)
+                    if (child !== exoPosition && child !== exoDuration) {
+                        child.visibility = GONE
+                    }
+                }
+            }
+            handler.post(clockRunnable)
+        } else {
+            handler.removeCallbacks(clockRunnable)
+            exoDuration.visibility = VISIBLE
+            val timeParent = exoPosition.parent as? ViewGroup
+            timeParent?.let { parent ->
+                for (i in 0 until parent.childCount) {
+                    parent.getChildAt(i).visibility = VISIBLE
+                }
+            }
+        }
     }
 
     fun showSettingButton(show: Boolean) {
@@ -816,6 +873,7 @@ class MyPlayerControlView @JvmOverloads constructor(
             buttonRelated,
             buttonRepeat,
             buttonLiveSettings,
+            buttonRefresh,
             buttonClose
         ).forEach { button ->
             controlViewLayoutManager.setShowButton(button, button.visibility == VISIBLE)
@@ -932,6 +990,7 @@ class MyPlayerControlView @JvmOverloads constructor(
         controlViewLayoutManager.onDetachedFromWindow()
         attachedToWindow = false
         handler.removeCallbacks(progressRunnable)
+        handler.removeCallbacks(clockRunnable)
         focusCoordinator.clearPendingFocusStabilization(handler)
         removeHideCallbacks()
     }

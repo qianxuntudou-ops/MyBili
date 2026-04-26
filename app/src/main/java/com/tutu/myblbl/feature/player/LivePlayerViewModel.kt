@@ -137,6 +137,22 @@ class LivePlayerViewModel(
         }
     }
 
+    fun refreshLiveStream(roomId: Long) {
+        viewModelScope.launch {
+            _error.value = null
+            repository.getLivePlayInfo(roomId).fold(
+                onSuccess = { data ->
+                    data.durl?.firstOrNull()?.let { durl ->
+                        _playUrl.value = durl.url
+                    }
+                },
+                onFailure = { e ->
+                    _error.value = e.message ?: "刷新直播失败"
+                }
+            )
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         heartbeatJob?.cancel()

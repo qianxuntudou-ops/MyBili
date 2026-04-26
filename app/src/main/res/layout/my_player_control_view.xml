@@ -109,6 +109,18 @@
                     <requestFocus/>
                 </com.tutu.myblbl.feature.player.view.PlayerControlButton>
                 <com.tutu.myblbl.feature.player.view.PlayerControlButton
+                    android:id="@+id/button_refresh"
+                    android:background="@drawable/cell_background"
+                    android:padding="14dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@id/exo_progress"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:src="@drawable/ic_refresh"
+                    android:visibility="gone"
+                    android:contentDescription="@string/refresh"/>
+                <com.tutu.myblbl.feature.player.view.PlayerControlButton
                     android:id="@+id/button_previous"
                     android:background="@drawable/cell_background"
                     android:padding="14dp"

@@ -20,5 +20,6 @@ interface OnVideoSettingChangeListener {
     fun onVideoInfo() {}
     fun onLiveSettings() {}
     fun onLiveQualityChange(qn: Int) {}
+    fun onRefresh() {}
     fun onClose() {}
 }

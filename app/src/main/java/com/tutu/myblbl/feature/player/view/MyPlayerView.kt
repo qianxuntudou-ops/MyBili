@@ -1326,6 +1326,18 @@ class MyPlayerView @JvmOverloads constructor(
         controller?.showHideLiveSettingButton(show)
     }
 
+    fun showHideRefreshButton(show: Boolean) {
+        controller?.showHideRefreshButton(show)
+    }
+
+    fun showHideTimeBar(show: Boolean) {
+        controller?.showHideTimeBar(show)
+    }
+
+    fun setClockMode(enabled: Boolean) {
+        controller?.setClockMode(enabled)
+    }
+
     fun showSettingButton(show: Boolean) {
         controller?.showSettingButton(show)
     }
