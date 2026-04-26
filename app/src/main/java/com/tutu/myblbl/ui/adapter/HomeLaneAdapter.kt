@@ -406,7 +406,7 @@ class HomeLaneAdapter(
 
         private val adapter = LaneItemAdapter(
             onItemClick = onSeriesClick,
-            onBottomEdgeDown = onBottomEdgeDown
+            onEdgeBottomDown = onBottomEdgeDown
         )
         private var moreSeasonType: Int? = null
         private var currentMoreUrl: String = ""

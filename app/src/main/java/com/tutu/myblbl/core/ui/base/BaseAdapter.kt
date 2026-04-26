@@ -84,9 +84,18 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
 
     abstract fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): VH
 
-    fun setData(data: List<MODEL>, onComplete: (() -> Unit)? = null) {
+    open fun setData(data: List<MODEL>, onComplete: (() -> Unit)? = null) {
         pendingSetDataJob?.cancel()
         val oldItems = items.toList()
+        if (oldItems.isEmpty()) {
+            items.clear()
+            items.addAll(data)
+            if (data.isNotEmpty()) {
+                notifyItemRangeInserted(0, if (showLoadMore) data.size + 1 else data.size)
+            }
+            onComplete?.invoke()
+            return
+        }
         pendingSetDataJob = adapterScope.launch {
             val diffResult = withContext(Dispatchers.Default) {
                 DiffUtil.calculateDiff(object : DiffUtil.Callback() {
@@ -103,9 +112,6 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
             items.clear()
             items.addAll(data)
             diffResult.dispatchUpdatesTo(this@BaseAdapter)
-            // When showLoadMore is true, getItemCount() adds +1 only when items is non-empty.
-            // DiffUtil only covers content items. We must notify the load more item
-            // appearing or disappearing when crossing the empty/non-empty boundary.
             if (showLoadMore) {
                 if (oldEmpty && items.isNotEmpty()) {
                     notifyItemInserted(items.size)

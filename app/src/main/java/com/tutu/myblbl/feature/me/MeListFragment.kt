@@ -293,7 +293,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage {
     private fun onHistoryVideoClick(video: HistoryVideoModel) {
         val mapped = video.toVideoModel()
         if (mapped.aid != 0L || mapped.bvid.isNotEmpty()) {
-            lastFocusedHistoryPosition = historyAdapter?.getFocusedPosition() ?: RecyclerView.NO_POSITION
+            lastFocusedHistoryPosition = historyAdapter?.focusedItemPosition() ?: RecyclerView.NO_POSITION
             lastFocusedHistoryKey = historyItemKey(video)
             pendingRestoreFocus = true
             pendingHistoryReturnRestore = true

@@ -1,135 +1,76 @@
 package com.tutu.myblbl.ui.adapter
 
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewConfiguration
 import androidx.appcompat.widget.AppCompatTextView
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.HistoryVideoModel
+import com.tutu.myblbl.core.ui.base.BaseVideoAdapter
+import com.tutu.myblbl.core.ui.base.BaseVideoViewHolder
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
-import com.tutu.myblbl.core.ui.focus.tv.TvFocusableAdapter
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
 
 class HistoryVideoAdapter(
     private val onItemClick: (HistoryVideoModel) -> Unit,
-    private val onTopEdgeUp: (() -> Boolean)? = null,
-    private val onItemFocused: ((Int) -> Unit)? = null,
-    private val onItemFocusedWithView: ((View, Int) -> Unit)? = null,
-    private val onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null,
-    private val onItemsChanged: (() -> Unit)? = null
-) : ListAdapter<HistoryVideoModel, HistoryVideoAdapter.ViewHolder>(DiffCallback), TvFocusableAdapter {
-
-    private var focusedPosition = RecyclerView.NO_POSITION
+    onTopEdgeUp: (() -> Boolean)? = null,
+    onItemFocused: ((Int) -> Unit)? = null,
+    onItemFocusedWithView: ((View, Int) -> Unit)? = null,
+    onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null,
+    onItemsChanged: (() -> Unit)? = null
+) : BaseVideoAdapter<HistoryVideoModel, HistoryVideoAdapter.ViewHolder>() {
 
     init {
         setHasStableIds(true)
+        setShowLoadMore(false)
+        this.onTopEdgeUp = onTopEdgeUp
+        this.onItemFocused = onItemFocused
+        this.onItemFocusedWithView = onItemFocusedWithView
+        this.onItemDpad = onItemDpad
+        this.onItemsChanged = onItemsChanged
     }
 
-    fun setData(
+    override fun itemKey(item: HistoryVideoModel): String {
+        return when {
+            item.bvid.isNotBlank() -> "bvid:${item.bvid}"
+            (item.history?.oid ?: 0L) > 0L -> "aid:${item.history?.oid}"
+            else -> "title:${item.title}|cover:${item.cover}"
+        }
+    }
+
+    override fun areContentsSame(old: HistoryVideoModel, new: HistoryVideoModel): Boolean = old == new
+
+    override fun setData(
         newItems: List<HistoryVideoModel>,
-        onCommitted: (() -> Unit)? = null
+        onCommitted: (() -> Unit)?
     ) {
-        val deduplicated = newItems.distinctBy(::itemKey)
-        focusedPosition = focusedPosition
-            .takeIf { it != RecyclerView.NO_POSITION && it < deduplicated.size }
-            ?: RecyclerView.NO_POSITION
-        submitList(deduplicated) {
+        val savedPosition = focusedPosition
+        setDataDeduplicated(newItems) {
+            if (savedPosition != RecyclerView.NO_POSITION && savedPosition < items.size) {
+                focusedPosition = savedPosition
+            }
             onCommitted?.invoke()
         }
     }
 
-    fun addData(newItems: List<HistoryVideoModel>) {
-        val deduplicated = newItems
-            .distinctBy(::itemKey)
-            .filter { incoming -> currentList.none { existing -> itemKey(existing) == itemKey(incoming) } }
-        if (deduplicated.isEmpty()) return
-        submitList(currentList + deduplicated)
-    }
+    fun focusedItemPosition(): Int = focusedPosition
 
-    fun getFocusedPosition(): Int = focusedPosition
+    fun findPositionByKey(key: String): Int = findPositionByStableKey(key)
 
-    fun getItemsSnapshot(): List<HistoryVideoModel> = currentList.toList()
-
-    fun findPositionByKey(key: String): Int = currentList.indexOfFirst { itemKey(it) == key }
-
-    override fun focusableItemCount(): Int = itemCount
-
-    override fun stableKeyAt(position: Int): String? {
-        return currentList.getOrNull(position)?.let(::itemKey)
-    }
-
-    override fun findPositionByStableKey(key: String): Int {
-        return currentList.indexOfFirst { itemKey(it) == key }
-            .takeIf { it >= 0 }
-            ?: RecyclerView.NO_POSITION
-    }
-
-    fun clearFocusMemory() {
-        val previous = focusedPosition
-        focusedPosition = RecyclerView.NO_POSITION
-        if (previous != RecyclerView.NO_POSITION) {
-            notifyItemChanged(previous)
-        }
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+    override fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = CellVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ViewHolder(
-            binding = binding,
-            onItemClick = onItemClick,
-            onTopEdgeUp = onTopEdgeUp,
-            onItemFocused = onItemFocused,
-            updateFocusedState = { view, position ->
-                val previous = focusedPosition
-                focusedPosition = position
-                if (previous != RecyclerView.NO_POSITION && previous != position) {
-                    notifyItemChanged(previous)
-                }
-                setFocusedState(view, true)
-                onItemFocusedWithView?.invoke(view, position)
-            },
-            clearFocusedState = { view ->
-                setFocusedState(view, false)
-            },
-            onItemDisliked = { item -> removeDislikedItem(item) },
-            onUpDisliked = { upName -> removeBlockedItems(upName) },
-            onItemDpad = onItemDpad,
-        )
+        return ViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(getItem(position), position == focusedPosition)
-    }
-
-    override fun getItemId(position: Int): Long = itemKey(getItem(position)).hashCode().toLong()
-
-    private fun removeBlockedItems(blockedName: String) {
-        val filtered = currentList.filter { !it.authorName.equals(blockedName, ignoreCase = true) }
-        if (filtered.size == currentList.size) return
-        submitList(filtered) {
-            onItemsChanged?.invoke()
-        }
-    }
-
-    private fun removeDislikedItem(item: HistoryVideoModel) {
-        val key = itemKey(item)
-        val filtered = currentList.filter { itemKey(it) != key }
-        if (filtered.size == currentList.size) return
-        submitList(filtered) {
-            onItemsChanged?.invoke()
-        }
+    override fun onBindContentViewHolder(holder: ViewHolder, position: Int) {
+        val item = getItem(position) ?: return
+        holder.bind(item, position == focusedPosition)
     }
 
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
@@ -138,32 +79,21 @@ class HistoryVideoAdapter(
     }
 
     override fun onViewRecycled(holder: ViewHolder) {
-        setFocusedState(holder.itemView, false)
+        applyFocusState(holder.itemView, false)
         super.onViewRecycled(holder)
     }
 
-    private fun setFocusedState(view: View?, focused: Boolean) {
+    private fun applyFocusState(view: View?, focused: Boolean) {
         view ?: return
         view.isSelected = focused
         view.findViewById<AppCompatTextView>(com.tutu.myblbl.R.id.textView)?.isSelected = focused
     }
 
-    class ViewHolder(
-        private val binding: CellVideoBinding,
-        private val onItemClick: (HistoryVideoModel) -> Unit,
-        onTopEdgeUp: (() -> Boolean)?,
-        private val onItemFocused: ((Int) -> Unit)?,
-        private val updateFocusedState: (View, Int) -> Unit,
-        private val clearFocusedState: (View) -> Unit,
-        private val onItemDisliked: ((HistoryVideoModel) -> Unit)? = null,
-        private val onUpDisliked: ((String) -> Unit)? = null,
-        private val onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null
-    ) : RecyclerView.ViewHolder(binding.root) {
+    inner class ViewHolder(
+        private val binding: CellVideoBinding
+    ) : BaseVideoViewHolder(binding.root) {
 
         private var currentItem: HistoryVideoModel? = null
-        private val handler = Handler(Looper.getMainLooper())
-        private var longPressRunnable: Runnable? = null
-        private var longPressTriggered = false
 
         private val keyListener = View.OnKeyListener { view, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -183,31 +113,16 @@ class HistoryVideoAdapter(
             }
         }
 
-        private fun showCardMenu() {
+        override fun showCardMenu() {
             cancelLongPress()
             val item = currentItem ?: return
             val video = item.toVideoModel()
             VideoCardMenuDialog(
                 context = itemView.context,
                 video = video,
-                onDislikeVideo = { onItemDisliked?.invoke(item) },
-                onDislikeUp = { upName -> onUpDisliked?.invoke(upName) }
+                onDislikeVideo = { removeItems { itemKey(it) == itemKey(item) } },
+                onDislikeUp = { upName -> removeItems { it.authorName.equals(upName, ignoreCase = true) } }
             ).show()
-        }
-
-        private fun startLongPress() {
-            cancelLongPress()
-            longPressTriggered = false
-            longPressRunnable = Runnable {
-                longPressTriggered = true
-                showCardMenu()
-            }
-            handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
-        }
-
-        private fun cancelLongPress() {
-            longPressRunnable?.let { handler.removeCallbacks(it) }
-            longPressRunnable = null
         }
 
         init {
@@ -219,7 +134,13 @@ class HistoryVideoAdapter(
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     onItemFocused?.invoke(position)
-                    updateFocusedState(binding.root, position)
+                    val previous = focusedPosition
+                    focusedPosition = position
+                    if (previous != RecyclerView.NO_POSITION && previous != position) {
+                        notifyItemChanged(previous)
+                    }
+                    applyFocusState(binding.root, true)
+                    onItemFocusedWithView?.invoke(binding.root, position)
                 }
                 currentItem?.let(onItemClick)
             }
@@ -237,9 +158,15 @@ class HistoryVideoAdapter(
                 }
                 if (hasFocus) {
                     onItemFocused?.invoke(position)
-                    updateFocusedState(view, position)
+                    val previous = focusedPosition
+                    focusedPosition = position
+                    if (previous != RecyclerView.NO_POSITION && previous != position) {
+                        notifyItemChanged(previous)
+                    }
+                    applyFocusState(view, true)
+                    onItemFocusedWithView?.invoke(view, position)
                 } else {
-                    clearFocusedState(binding.root)
+                    applyFocusState(binding.root, false)
                 }
             }
             VideoCardFocusHelper.bindSidebarExit(
@@ -293,25 +220,5 @@ class HistoryVideoAdapter(
                 url = item.cover.ifBlank { item.covers?.firstOrNull().orEmpty() }
             )
         }
-    }
-
-    companion object {
-        private val DiffCallback = object : DiffUtil.ItemCallback<HistoryVideoModel>() {
-            override fun areItemsTheSame(oldItem: HistoryVideoModel, newItem: HistoryVideoModel): Boolean {
-                return itemKey(oldItem) == itemKey(newItem)
-            }
-
-            override fun areContentsTheSame(oldItem: HistoryVideoModel, newItem: HistoryVideoModel): Boolean {
-                return oldItem == newItem
-            }
-        }
-    }
-}
-
-private fun itemKey(item: HistoryVideoModel): String {
-    return when {
-        item.bvid.isNotBlank() -> "bvid:${item.bvid}"
-        (item.history?.oid ?: 0L) > 0L -> "aid:${item.history?.oid}"
-        else -> "title:${item.title}|cover:${item.cover}"
     }
 }

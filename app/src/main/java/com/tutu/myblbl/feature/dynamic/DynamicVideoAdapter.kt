@@ -1,67 +1,64 @@
 package com.tutu.myblbl.feature.dynamic
 
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewConfiguration
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
-import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.NO_POSITION
-import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.VideoModel
+import com.tutu.myblbl.core.ui.base.BaseVideoAdapter
+import com.tutu.myblbl.core.ui.base.BaseVideoViewHolder
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
-import com.tutu.myblbl.core.ui.focus.tv.TvFocusableAdapter
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
 
 class DynamicVideoAdapter(
     private val onItemClick: (VideoModel) -> Unit,
-    private val onItemFocused: (Int) -> Unit,
-    private val onLeftEdge: () -> Boolean = { false },
-    private val onItemFocusedWithView: ((View, Int) -> Unit)? = null,
-    private val onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null,
-    private val onItemsChanged: (() -> Unit)? = null
-) : ListAdapter<VideoModel, DynamicVideoAdapter.ViewHolder>(DiffCallback), TvFocusableAdapter {
+    onItemFocused: (Int) -> Unit,
+    onLeftEdge: () -> Boolean = { false },
+    onItemFocusedWithView: ((View, Int) -> Unit)? = null,
+    onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null,
+    onItemsChanged: (() -> Unit)? = null
+) : BaseVideoAdapter<VideoModel, DynamicVideoAdapter.ViewHolder>() {
 
-    private var focusedPosition = RecyclerView.NO_POSITION
+    init {
+        setShowLoadMore(false)
+        this.onItemFocused = onItemFocused
+        this.onItemFocusedWithView = onItemFocusedWithView
+        this.onLeftEdge = onLeftEdge
+        this.onItemDpad = onItemDpad
+        this.onItemsChanged = onItemsChanged
+    }
+
+    override fun itemKey(item: VideoModel): String {
+        return when {
+            item.bvid.isNotBlank() -> "bvid:${item.bvid}"
+            item.aid > 0 -> "aid:${item.aid}"
+            item.cid > 0 -> "cid:${item.cid}"
+            else -> "title:${item.title}|cover:${item.coverUrl}"
+        }
+    }
+
+    override fun areContentsSame(old: VideoModel, new: VideoModel): Boolean = old == new
 
     fun setData(list: List<VideoModel>) {
-        val deduplicated = deduplicate(list)
-        focusedPosition = RecyclerView.NO_POSITION
-        submitList(deduplicated)
+        setDataDeduplicated(list)
     }
 
-    fun addData(list: List<VideoModel>) {
-        val deduplicated = deduplicate(list).filter { incoming ->
-            currentList.none { existing -> dynamicVideoKey(existing) == dynamicVideoKey(incoming) }
-        }
-        if (deduplicated.isEmpty()) return
-        submitList(currentList + deduplicated)
+
+    private fun removeBlockedItems(blockedName: String) {
+        removeItems { it.authorName.equals(blockedName, ignoreCase = true) }
     }
 
-    fun getItemsSnapshot(): List<VideoModel> = currentList.toList()
-
-    override fun focusableItemCount(): Int = itemCount
-
-    override fun stableKeyAt(position: Int): String? {
-        return currentList.getOrNull(position)?.let(::dynamicVideoKey)
+    private fun removeDislikedItem(video: VideoModel) {
+        removeItems { itemKey(it) == itemKey(video) }
     }
 
-    override fun findPositionByStableKey(key: String): Int {
-        return currentList.indexOfFirst { dynamicVideoKey(it) == key }
-            .takeIf { it >= 0 }
-            ?: RecyclerView.NO_POSITION
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+    override fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = CellVideoBinding.inflate(
             LayoutInflater.from(parent.context),
             parent,
@@ -70,41 +67,16 @@ class DynamicVideoAdapter(
         return ViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(getItem(position))
-    }
-
-    private fun deduplicate(source: List<VideoModel>): List<VideoModel> {
-        if (source.isEmpty()) return emptyList()
-        val seenKeys = LinkedHashSet<String>(source.size)
-        return source.filter { seenKeys.add(dynamicVideoKey(it)) }
-    }
-
-    private fun removeBlockedItems(blockedName: String) {
-        val filtered = currentList.filter { !it.authorName.equals(blockedName, ignoreCase = true) }
-        if (filtered.size == currentList.size) return
-        submitList(filtered) {
-            onItemsChanged?.invoke()
-        }
-    }
-
-    private fun removeDislikedItem(video: VideoModel) {
-        val key = dynamicVideoKey(video)
-        val filtered = currentList.filter { dynamicVideoKey(it) != key }
-        if (filtered.size == currentList.size) return
-        submitList(filtered) {
-            onItemsChanged?.invoke()
-        }
+    override fun onBindContentViewHolder(holder: ViewHolder, position: Int) {
+        val item = getItem(position) ?: return
+        holder.bind(item)
     }
 
     inner class ViewHolder(
         private val binding: CellVideoBinding
-    ) : RecyclerView.ViewHolder(binding.root) {
+    ) : BaseVideoViewHolder(binding.root) {
 
         private var currentItem: VideoModel? = null
-        private val handler = Handler(Looper.getMainLooper())
-        private var longPressRunnable: Runnable? = null
-        private var longPressTriggered = false
 
         private val keyListener = View.OnKeyListener { view, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -133,16 +105,17 @@ class DynamicVideoAdapter(
                 val position = bindingAdapterPosition
                 if (position != NO_POSITION) {
                     focusedPosition = position
-                    onItemFocused(position)
+                    onItemFocused?.invoke(position)
                     onItemFocusedWithView?.invoke(binding.root, position)
-                    onItemClick(getItem(position))
+                    val item = getItem(position) ?: return@setOnClickListener
+                    onItemClick(item)
                 }
             }
             binding.root.setOnFocusChangeListener { view, hasFocus ->
                 val position = bindingAdapterPosition
                 if (hasFocus && position != NO_POSITION) {
                     focusedPosition = position
-                    onItemFocused(position)
+                    onItemFocused?.invoke(position)
                     onItemFocusedWithView?.invoke(view, position)
                 }
             }
@@ -161,32 +134,17 @@ class DynamicVideoAdapter(
             )
         }
 
-        private fun showCardMenu() {
+        override fun showCardMenu() {
             cancelLongPress()
             val position = bindingAdapterPosition
-            if (position == NO_POSITION || position !in currentList.indices) return
-            val video = getItem(position)
+            if (position == NO_POSITION || position !in items.indices) return
+            val video = getItem(position) ?: return
             VideoCardMenuDialog(
                 context = itemView.context,
                 video = video,
-                onDislikeVideo = { removeDislikedItem(video) },
-                onDislikeUp = { upName -> removeBlockedItems(upName) }
+                onDislikeVideo = { this@DynamicVideoAdapter.removeDislikedItem(video) },
+                onDislikeUp = { upName -> this@DynamicVideoAdapter.removeBlockedItems(upName) }
             ).show()
-        }
-
-        private fun startLongPress() {
-            cancelLongPress()
-            longPressTriggered = false
-            longPressRunnable = Runnable {
-                longPressTriggered = true
-                showCardMenu()
-            }
-            handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
-        }
-
-        private fun cancelLongPress() {
-            longPressRunnable?.let { handler.removeCallbacks(it) }
-            longPressRunnable = null
         }
 
         fun bind(item: VideoModel) {
@@ -251,28 +209,5 @@ class DynamicVideoAdapter(
                 ""
             }
         }
-
-
-    }
-
-    companion object {
-        private val DiffCallback = object : DiffUtil.ItemCallback<VideoModel>() {
-            override fun areItemsTheSame(oldItem: VideoModel, newItem: VideoModel): Boolean {
-                return dynamicVideoKey(oldItem) == dynamicVideoKey(newItem)
-            }
-
-            override fun areContentsTheSame(oldItem: VideoModel, newItem: VideoModel): Boolean {
-                return oldItem == newItem
-            }
-        }
-    }
-}
-
-private fun dynamicVideoKey(video: VideoModel): String {
-    return when {
-        video.bvid.isNotBlank() -> "bvid:${video.bvid}"
-        video.aid > 0 -> "aid:${video.aid}"
-        video.cid > 0 -> "cid:${video.cid}"
-        else -> "title:${video.title}|cover:${video.coverUrl}"
     }
 }

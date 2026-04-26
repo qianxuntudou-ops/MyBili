@@ -482,7 +482,8 @@ class AllSeriesFragment : BaseFragment<FragmentAllSeriesBinding>(), OnBackPresse
         globalFocusListener = object : ViewTreeObserver.OnGlobalFocusChangeListener {
             override fun onGlobalFocusChanged(oldFocus: View?, newFocus: View?) {
                 if (oldFocus == null && newFocus == null) return
-                val inRecycler = newFocus != null && isDescendantOf(newFocus, binding.recyclerView)
+                val rv = try { binding.recyclerView } catch (_: NullPointerException) { return }
+                val inRecycler = newFocus != null && isDescendantOf(newFocus, rv)
                 val inFilter = newFocus != null && isDescendantOf(newFocus, binding.viewFilter)
                 val inTopBar = newFocus != null && isDescendantOf(newFocus, binding.viewTop)
                 val escaped = newFocus != null && !inRecycler && !inFilter && !inTopBar

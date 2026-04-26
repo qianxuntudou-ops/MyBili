@@ -1,21 +1,18 @@
 package com.tutu.myblbl.ui.adapter
 
-import android.os.Handler
-import android.os.Looper
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewConfiguration
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.DiffUtil
 import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.Dimension
 import com.tutu.myblbl.model.video.VideoModel
-import com.tutu.myblbl.core.ui.base.BaseAdapter
+import com.tutu.myblbl.core.ui.base.BaseVideoAdapter
+import com.tutu.myblbl.core.ui.base.BaseVideoViewHolder
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.log.AppLog
@@ -27,38 +24,35 @@ class VideoAdapter(
     private val displayStyle: DisplayStyle = DisplayStyle.DEFAULT,
     private val itemWidthPx: Int? = null,
     private val onItemClick: (VideoModel) -> Unit = {},
-    private val onTopEdgeUp: (() -> Boolean)? = null,
-    private val onBottomEdgeDown: (() -> Boolean)? = null,
-    private val onItemFocused: ((Int) -> Unit)? = null,
-    private val onItemFocusedWithView: ((View, Int) -> Unit)? = null,
-    private val onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null,
-    private val onItemsChanged: (() -> Unit)? = null,
+    onTopEdgeUp: (() -> Boolean)? = null,
+    onBottomEdgeDown: (() -> Boolean)? = null,
+    onItemFocused: ((Int) -> Unit)? = null,
+    onItemFocusedWithView: ((View, Int) -> Unit)? = null,
+    onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null,
+    onItemsChanged: (() -> Unit)? = null,
     private val detectPortraitFromCover: Boolean = true
-) : BaseAdapter<VideoModel, VideoAdapter.VideoViewHolder>() {
+) : BaseVideoAdapter<VideoModel, VideoAdapter.VideoViewHolder>() {
 
     var currentPlayingAid: Long = 0
 
-    companion object {
-        private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<VideoModel>() {
-            override fun areItemsTheSame(oldItem: VideoModel, newItem: VideoModel): Boolean =
-                videoKey(oldItem) == videoKey(newItem)
-
-            override fun areContentsTheSame(oldItem: VideoModel, newItem: VideoModel): Boolean =
-                oldItem == newItem
-        }
-
-        private fun videoKey(video: VideoModel): String {
-            return when {
-                video.bvid.isNotBlank() -> "bvid:${video.bvid}"
-                video.aid > 0 -> "aid:${video.aid}"
-                video.cid > 0 -> "cid:${video.cid}"
-                else -> "title:${video.title}|cover:${video.coverUrl}"
-            }
-        }
+    init {
+        this.onTopEdgeUp = onTopEdgeUp
+        this.onBottomEdgeDown = onBottomEdgeDown
+        this.onItemFocused = onItemFocused
+        this.onItemFocusedWithView = onItemFocusedWithView
+        this.onItemDpad = onItemDpad
+        this.onItemsChanged = onItemsChanged
+        setHasStableIds(true)
     }
 
-    override fun areItemsSame(old: VideoModel, new: VideoModel): Boolean =
-        videoKey(old) == videoKey(new)
+    override fun itemKey(item: VideoModel): String {
+        return when {
+            item.bvid.isNotBlank() -> "bvid:${item.bvid}"
+            item.aid > 0 -> "aid:${item.aid}"
+            item.cid > 0 -> "cid:${item.cid}"
+            else -> "title:${item.title}|cover:${item.coverUrl}"
+        }
+    }
 
     override fun areContentsSame(old: VideoModel, new: VideoModel): Boolean =
         old.title == new.title &&
@@ -78,10 +72,6 @@ class VideoAdapter(
         old.historyBusiness == new.historyBusiness &&
         old.historyViewAt == new.historyViewAt
 
-    init {
-        setHasStableIds(true)
-    }
-
     enum class DisplayStyle {
         DEFAULT,
         HISTORY
@@ -93,17 +83,6 @@ class VideoAdapter(
         onItemClickListener = listener
     }
 
-
-    fun addData(newItems: List<VideoModel>) {
-        val existingKeys = items.mapTo(HashSet(items.size)) { videoKey(it) }
-        val deduplicated = deduplicate(newItems).filterNot { incoming ->
-            existingKeys.contains(videoKey(incoming))
-        }
-        if (deduplicated.isEmpty()) {
-            return
-        }
-        addAll(deduplicated)
-    }
 
     override fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): VideoViewHolder {
         val binding = CellVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -135,65 +114,16 @@ class VideoAdapter(
                 onItemFocused?.invoke(position)
                 onItemFocusedWithView?.invoke(view, position)
             },
-            { video -> removeDislikedItem(video) },
-            { upName -> removeDislikedUpItems(upName) },
+            { video -> removeItems { itemKey(it) == itemKey(video) } },
+            { upName -> removeItems { it.authorName.equals(upName, ignoreCase = true) } },
             onItemDpad,
             detectPortraitFromCover
         )
     }
 
     override fun onBindContentViewHolder(holder: VideoViewHolder, position: Int) {
-        val video = items[position]
+        val video = getItem(position) ?: return
         holder.bind(video, video.aid == currentPlayingAid)
-    }
-
-    override fun getFocusStableKey(item: VideoModel): String = videoKey(item)
-
-    override fun getItemId(position: Int): Long {
-        return if (position < items.size) videoKey(items[position]).hashCode().toLong() else super.getItemId(position)
-    }
-
-    private fun deduplicate(source: List<VideoModel>): List<VideoModel> {
-        if (source.isEmpty()) {
-            return emptyList()
-        }
-        val seenKeys = LinkedHashSet<String>(source.size)
-        return source.filter { seenKeys.add(videoKey(it)) }
-    }
-
-    private fun submitItems(newItems: List<VideoModel>) {
-        submitItemsInBackground(
-            newItems = newItems,
-            areItemsTheSame = { old, new -> DIFF_CALLBACK.areItemsTheSame(old, new) },
-            areContentsTheSame = { old, new -> DIFF_CALLBACK.areContentsTheSame(old, new) }
-        )
-    }
-
-    private fun removeDislikedItem(video: VideoModel) {
-        val key = videoKey(video)
-        val filtered = items.filter { videoKey(it) != key }
-        if (filtered.size == items.size) return
-        submitItemsInBackground(
-            newItems = filtered,
-            areItemsTheSame = { old, new -> DIFF_CALLBACK.areItemsTheSame(old, new) },
-            areContentsTheSame = { old, new -> DIFF_CALLBACK.areContentsTheSame(old, new) },
-            onComplete = {
-                onItemsChanged?.invoke()
-            }
-        )
-    }
-
-    private fun removeDislikedUpItems(upName: String) {
-        val filtered = items.filter { !it.authorName.equals(upName, ignoreCase = true) }
-        if (filtered.size == items.size) return
-        submitItemsInBackground(
-            newItems = filtered,
-            areItemsTheSame = { old, new -> DIFF_CALLBACK.areItemsTheSame(old, new) },
-            areContentsTheSame = { old, new -> DIFF_CALLBACK.areContentsTheSame(old, new) },
-            onComplete = {
-                onItemsChanged?.invoke()
-            }
-        )
     }
 
     class VideoViewHolder(
@@ -208,18 +138,15 @@ class VideoAdapter(
         private val onUpDisliked: ((String) -> Unit)? = null,
         private val onItemDpad: ((View, Int, KeyEvent) -> Boolean)? = null,
         private val detectPortraitFromCover: Boolean = true
-    ) : androidx.recyclerview.widget.RecyclerView.ViewHolder(binding.root) {
+    ) : BaseVideoViewHolder(binding.root) {
 
         private var currentVideo: VideoModel? = null
-        private val handler = Handler(Looper.getMainLooper())
-        private val defaultTextColor: Int = run {
+        private val defaultTextColor: Int by lazy {
             val ta = binding.root.context.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
             val color = ta.getColor(0, 0)
             ta.recycle()
             color
         }
-        private var longPressRunnable: Runnable? = null
-        private var longPressTriggered = false
 
         private val keyListener = View.OnKeyListener { view, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -239,7 +166,7 @@ class VideoAdapter(
             }
         }
 
-        private fun showCardMenu() {
+        override fun showCardMenu() {
             cancelLongPress()
             val video = currentVideo ?: return
             VideoCardMenuDialog(
@@ -252,21 +179,6 @@ class VideoAdapter(
                     onUpDisliked?.invoke(upName)
                 }
             ).show()
-        }
-
-        private fun startLongPress() {
-            cancelLongPress()
-            longPressTriggered = false
-            longPressRunnable = Runnable {
-                longPressTriggered = true
-                showCardMenu()
-            }
-            handler.postDelayed(longPressRunnable!!, ViewConfiguration.getLongPressTimeout().toLong())
-        }
-
-        private fun cancelLongPress() {
-            longPressRunnable?.let { handler.removeCallbacks(it) }
-            longPressRunnable = null
         }
 
         init {
