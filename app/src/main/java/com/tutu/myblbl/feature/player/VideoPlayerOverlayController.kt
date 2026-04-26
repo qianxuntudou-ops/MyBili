@@ -79,7 +79,21 @@ class VideoPlayerOverlayController(
         val catalogSource = episodes.firstOrNull()?.source ?: VideoPlayerViewModel.EpisodeCatalogSource.PAGES
         val currentVideoInfo = resolveCurrentVideoInfo()
 
-        titleView?.text = activity.getString(R.string.choose_episode)
+        val currentPos = selectedEpisodeIndex + 1
+        val totalCount = episodes.size
+        titleView?.text = when (catalogSource) {
+            VideoPlayerViewModel.EpisodeCatalogSource.UGC_SEASON -> {
+                val seasonTitle = latestVideoInfoProvider()?.view?.ugcSeason?.title.orEmpty()
+                "合集${if (seasonTitle.isNotBlank()) "·$seasonTitle" else ""}($currentPos/$totalCount)"
+            }
+            VideoPlayerViewModel.EpisodeCatalogSource.PGC_EPISODES -> {
+                val pgcTitle = latestVideoInfoProvider()?.view?.title.orEmpty()
+                "${if (pgcTitle.isNotBlank()) pgcTitle else activity.getString(R.string.choose_episode)}($currentPos/$totalCount)"
+            }
+            VideoPlayerViewModel.EpisodeCatalogSource.PAGES -> {
+                "选集($currentPos/$totalCount)"
+            }
+        }
         val showMoreInfo = catalogSource == VideoPlayerViewModel.EpisodeCatalogSource.PAGES && currentVideoInfo != null
         moreInfoButton?.isVisible = showMoreInfo
         moreInfoButton?.setOnClickListener(

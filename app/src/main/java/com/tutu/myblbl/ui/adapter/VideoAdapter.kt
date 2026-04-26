@@ -335,6 +335,7 @@ class VideoAdapter(
                 binding.textOverflow.setTextColor(accentColor)
                 binding.textView.text = title
                 binding.textView.ellipsize = TextUtils.TruncateAt.END
+                binding.textView.minLines = 1
                 binding.textView.maxLines = 1
 
                 val split = Runnable {
@@ -361,8 +362,8 @@ class VideoAdapter(
                 }
                 binding.textView.setTextColor(defaultTextColor)
                 binding.textView.text = title
+                binding.textView.minLines = 2
                 binding.textView.maxLines = 2
-                binding.textView.ellipsize = TextUtils.TruncateAt.END
                 binding.textOverflow.visibility = View.GONE
             }
             when (displayStyle) {

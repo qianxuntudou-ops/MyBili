@@ -3,6 +3,7 @@ package com.tutu.myblbl.ui.activity
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import androidx.core.app.ActivityOptionsCompat
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -109,7 +110,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             val resolvedSeasonId = seasonId.takeIf { it > 0L }
                 ?: initialVideo?.playbackSeasonId
                 ?: 0L
-            context.startActivity(Intent(context, PlayerActivity::class.java).apply {
+            val intent = Intent(context, PlayerActivity::class.java).apply {
                 if (context !is Activity) {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -123,7 +124,15 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                 putExtra(EXTRA_START_EPISODE, startEpisodeIndex)
                 putExtra(EXTRA_STARTUP_TRACE_ID, startupTraceId)
                 putExtra(EXTRA_STARTUP_TRACE_START_MS, startupTraceStartElapsedMs)
-            })
+            }
+            val options = ActivityOptionsCompat.makeCustomAnimation(
+                context, R.anim.slide_in_to_right, R.anim.slide_out_to_left
+            )
+            if (context is Activity) {
+                context.startActivity(intent, options.toBundle())
+            } else {
+                context.startActivity(intent)
+            }
         }
 
         fun start(
@@ -387,8 +396,6 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        @Suppress("DEPRECATION")
-        overridePendingTransition(R.anim.slide_in_to_right, R.anim.slide_out_to_left)
         handleIntent(intent)
     }
 
