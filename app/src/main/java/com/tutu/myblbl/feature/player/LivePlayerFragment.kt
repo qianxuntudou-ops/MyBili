@@ -127,6 +127,7 @@ class LivePlayerFragment : Fragment() {
         binding.playerView.showSettingButton(false)
         binding.playerView.showHideLiveSettingButton(false)
         binding.playerView.showHideTimeBar(false)
+        binding.playerView.showHideTimeText(false)
         binding.playerView.showHideRefreshButton(true)
         binding.playerView.setOnVideoSettingChangeListener(object : com.tutu.myblbl.feature.player.view.OnVideoSettingChangeListener {
             override fun onLiveSettings() {
@@ -214,7 +215,7 @@ class LivePlayerFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.liveDuration.collect { duration ->
-                binding.playerView.setSubTitle(duration)
+                binding.playerView.setTitle(if (duration.isNotEmpty()) "直播中 $duration" else "")
             }
         }
     }
