@@ -25,7 +25,10 @@ class CookieManager : CookieJar {
 
     companion object {
         private const val KEY_COOKIES = "cookies"
-        private const val COOKIE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
+        private const val COOKIE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000L
+        private val PROTECTED_COOKIE_NAMES = setOf(
+            "SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5"
+        )
     }
     
     fun init(context: Context, syncWebViewCookies: Boolean = true) {
@@ -240,6 +243,9 @@ class CookieManager : CookieJar {
         if (domain.isBlank()) {
             return
         }
+        if (isProtectedCookieBeingCleared(cookie)) {
+            return
+        }
         val cookies = cookieCache.getOrPut(domain) { mutableListOf() }
         val existingIndex = cookies.indexOfFirst {
             it.name == cookie.name && it.path == cookie.path
@@ -258,6 +264,13 @@ class CookieManager : CookieJar {
         } else {
             cookies.add(cookie)
         }
+    }
+
+    private fun isProtectedCookieBeingCleared(cookie: Cookie): Boolean {
+        if (cookie.name !in PROTECTED_COOKIE_NAMES) return false
+        if (isCookieActive(cookie)) return false
+        val existing = findCookie(cookie.name)
+        return existing != null && isCookieActive(existing)
     }
 
     private fun persistCookieCache() {

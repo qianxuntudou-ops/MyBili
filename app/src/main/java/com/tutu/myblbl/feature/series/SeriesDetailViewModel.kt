@@ -64,7 +64,7 @@ class SeriesDetailViewModel(
                         _seriesDetail.value = detail
                         loadRecommend(currentSeasonId)
                     } else if (sessionGateway.isLoggedIn()) {
-                        sessionGateway.forceCookieRefresh()
+                        sessionGateway.tryRecoverExpiredSession()
                         repository.getSeriesDetail(currentSeasonId, epId).fold(
                             onSuccess = { retryDetail ->
                                 currentSeasonId = retryDetail.seasonId.takeIf { it > 0 } ?: currentSeasonId

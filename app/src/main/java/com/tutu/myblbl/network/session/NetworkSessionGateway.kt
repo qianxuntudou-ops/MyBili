@@ -1,13 +1,11 @@
 package com.tutu.myblbl.network.session
 
 import com.tutu.myblbl.core.common.log.AppLog
-import com.tutu.myblbl.event.AppEventHub
 import com.tutu.myblbl.model.BaseResponse
 import com.tutu.myblbl.model.user.UserDetailInfoModel
 import com.tutu.myblbl.network.NetworkManager
 import com.tutu.myblbl.network.response.Base2Response
 import com.tutu.myblbl.network.response.BaseBaseResponse
-import org.koin.mp.KoinPlatform
 
 interface NetworkSessionGateway {
     fun getCsrfToken(): String
@@ -23,6 +21,8 @@ interface NetworkSessionGateway {
     suspend fun ensureWbiKeys()
 
     suspend fun forceCookieRefresh()
+
+    suspend fun tryRecoverExpiredSession(): Boolean
 
     fun clearUserSession(reason: String)
 
@@ -121,6 +121,10 @@ class NetworkManagerSessionGateway : NetworkSessionGateway {
     override suspend fun ensureWbiKeys() = NetworkManager.ensureWbiKeys()
 
     override suspend fun forceCookieRefresh() = NetworkManager.forceCookieRefresh()
+
+    override suspend fun tryRecoverExpiredSession(): Boolean {
+        return NetworkManager.tryRecoverExpiredSession()
+    }
 
     override fun clearUserSession(reason: String) {
         NetworkManager.clearUserSession(reason = reason)
@@ -222,30 +226,19 @@ class NetworkManagerSessionGateway : NetworkSessionGateway {
 
     override fun classifyActionError(code: Int, message: String?): NetworkSessionGateway.ActionError {
         val msg = message ?: ""
-        // -111 / csrf 不匹配：不清 session
         if (code == -111 || (msg.contains("csrf", ignoreCase = true) && code != -101)) {
             return NetworkSessionGateway.ActionError.CsrfMismatch(msg.ifEmpty { "csrf 校验失败" })
         }
-        // -101：真的过期
         if (code == -101) {
-            NetworkManager.clearUserSession(reason = "session_expired")
-            dispatchSessionChanged()
             return NetworkSessionGateway.ActionError.SessionExpired(msg.ifEmpty { "登录已过期" })
         }
-        // 频率限制（-412）
         if (code in frequencyLimitCodes) {
             return NetworkSessionGateway.ActionError.FrequencyLimit(msg.ifEmpty { "操作过于频繁，请稍后再试" })
         }
-        // 风控
         if (isRiskControl(code, message)) {
             return NetworkSessionGateway.ActionError.RiskControl(msg.ifEmpty { "账号被风控" })
         }
         return NetworkSessionGateway.ActionError.Other(msg.ifEmpty { "操作失败" })
     }
 
-    private fun dispatchSessionChanged() {
-        runCatching { KoinPlatform.getKoin().get<AppEventHub>() }
-            .getOrNull()
-            ?.dispatch(AppEventHub.Event.UserSessionChanged)
-    }
 }

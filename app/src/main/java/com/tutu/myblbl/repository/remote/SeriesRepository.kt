@@ -52,8 +52,7 @@ class SeriesRepository(
             val csrf = sessionGateway.requireCsrfToken()
                 ?: throw IllegalStateException("csrf token is blank")
             var response = apiService.followSeries(seasonId, csrf)
-            if (response.code == -101) {
-                sessionGateway.forceCookieRefresh()
+            if (response.code == -101 && sessionGateway.tryRecoverExpiredSession()) {
                 val newCsrf = sessionGateway.requireCsrfToken()
                 if (!newCsrf.isNullOrBlank()) {
                     response = apiService.followSeries(seasonId, newCsrf)
@@ -81,8 +80,7 @@ class SeriesRepository(
             val csrf = sessionGateway.requireCsrfToken()
                 ?: throw IllegalStateException("csrf token is blank")
             var response = apiService.cancelFollowSeries(seasonId, csrf)
-            if (response.code == -101) {
-                sessionGateway.forceCookieRefresh()
+            if (response.code == -101 && sessionGateway.tryRecoverExpiredSession()) {
                 val newCsrf = sessionGateway.requireCsrfToken()
                 if (!newCsrf.isNullOrBlank()) {
                     response = apiService.cancelFollowSeries(seasonId, newCsrf)

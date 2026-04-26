@@ -175,6 +175,55 @@ object NetworkManager {
         resetSessionLifecycleState(clearCookies = clearCookies, reason = reason)
     }
 
+    private fun softClearUserSession(reason: String) {
+        sessionStore.softClearUserSession()
+        securityCoordinator.resetRuntimeState()
+        AppLog.w(TAG, "softClearUserSession: reason=$reason")
+    }
+
+    suspend fun tryRecoverExpiredSession(): Boolean {
+        if (!internalCookieManager.hasSessionCookie()) {
+            AppLog.w(TAG, "tryRecoverExpiredSession: no SESSDATA, cannot recover")
+            hardClearAndNotify("recovery_no_sessdata")
+            return false
+        }
+        if (getRefreshToken().isNullOrBlank()) {
+            AppLog.w(TAG, "tryRecoverExpiredSession: no refresh_token, cannot recover")
+            hardClearAndNotify("recovery_no_refresh_token")
+            return false
+        }
+        return try {
+            securityCoordinator.forceCookieRefresh()
+            val navResponse = noCookieApiService.getUserDetailInfo()
+            if (navResponse.isSuccess && navResponse.data != null) {
+                sessionStore.updateUserSession(navResponse.data)
+                AppLog.i(TAG, "tryRecoverExpiredSession: session recovered successfully")
+                notifySessionChanged()
+                true
+            } else {
+                AppLog.w(TAG, "tryRecoverExpiredSession: nav check failed after refresh, code=${navResponse.code}")
+                hardClearAndNotify("recovery_nav_failed")
+                false
+            }
+        } catch (e: Exception) {
+            AppLog.e(TAG, "tryRecoverExpiredSession: exception during recovery", e)
+            hardClearAndNotify("recovery_exception")
+            false
+        }
+    }
+
+    private fun hardClearAndNotify(reason: String) {
+        clearUserSession(clearCookies = true, reason = reason)
+        notifySessionChanged()
+    }
+
+    private fun notifySessionChanged() {
+        runCatching {
+            KoinPlatform.getKoin().get<com.tutu.myblbl.event.AppEventHub>()
+        }.getOrNull()
+            ?.dispatch(com.tutu.myblbl.event.AppEventHub.Event.UserSessionChanged)
+    }
+
     private fun resetSessionLifecycleState(clearCookies: Boolean, reason: String) {
         if (clearCookies) {
             internalCookieManager.clearCookies()
@@ -254,10 +303,7 @@ object NetworkManager {
         context: AuthContext = AuthContext.FOREGROUND
     ): UserDetailInfoModel? {
         val info = sessionStore.syncUserSession(response, context) {
-            resetSessionLifecycleState(
-                clearCookies = context.shouldClearSession,
-                reason = "$source code=${response.code}"
-            )
+            softClearUserSession(reason = "$source code=${response.code}")
         }
         if (info != null) {
             return info
@@ -267,10 +313,7 @@ object NetworkManager {
 
     fun handleAuthFailureCode(code: Int, source: String) {
         sessionStore.handleAuthFailureCode(code) {
-            resetSessionLifecycleState(
-                clearCookies = true,
-                reason = "$source code=$code"
-            )
+            softClearUserSession(reason = "$source code=$code")
         }
     }
 
@@ -280,10 +323,7 @@ object NetworkManager {
         context: AuthContext = AuthContext.FOREGROUND
     ): BaseResponse<T> {
         return sessionStore.syncAuthState(response, context) {
-            resetSessionLifecycleState(
-                clearCookies = context.shouldClearSession,
-                reason = "$source code=${response.code}"
-            )
+            softClearUserSession(reason = "$source code=${response.code}")
         }
     }
 
@@ -293,10 +333,7 @@ object NetworkManager {
         context: AuthContext = AuthContext.FOREGROUND
     ): BaseBaseResponse {
         return sessionStore.syncAuthState(response, context) {
-            resetSessionLifecycleState(
-                clearCookies = context.shouldClearSession,
-                reason = "$source code=${response.code}"
-            )
+            softClearUserSession(reason = "$source code=${response.code}")
         }
     }
 
@@ -306,10 +343,7 @@ object NetworkManager {
         context: AuthContext = AuthContext.FOREGROUND
     ): Base2Response<T> {
         return sessionStore.syncAuthState(response, context) {
-            resetSessionLifecycleState(
-                clearCookies = context.shouldClearSession,
-                reason = "$source code=${response.code}"
-            )
+            softClearUserSession(reason = "$source code=${response.code}")
         }
     }
 

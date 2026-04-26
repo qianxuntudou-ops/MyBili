@@ -70,6 +70,14 @@ class NetworkSessionStore(
         setWbiInfo("", "")
     }
 
+    fun softClearUserSession() {
+        userInfo = null
+    }
+
+    fun isSessionActive(): Boolean {
+        return userInfo != null
+    }
+
     fun updateUserSession(info: UserDetailInfoModel?) {
         userInfo = info?.let {
             it.copy(face = normalizeAvatarUrl(it.face))
@@ -95,11 +103,10 @@ class NetworkSessionStore(
             return userInfo
         }
         if (isAuthInvalid(response.code)) {
-            // 即使是 BACKGROUND，也尝试从 -101 响应中提取 WBI keys
             extractWbiKeysFromData(response.data)
             if (context.shouldClearSession) {
                 val wasLoggedIn = userInfo != null
-                clearUserSession()
+                softClearUserSession()
                 if (wasLoggedIn) {
                     onAuthInvalid?.invoke()
                 }
@@ -116,7 +123,7 @@ class NetworkSessionStore(
         if (isAuthInvalid(code)) {
             if (!context.shouldClearSession) return
             val wasLoggedIn = userInfo != null
-            clearUserSession()
+            softClearUserSession()
             if (wasLoggedIn) {
                 onAuthInvalid?.invoke()
             }
