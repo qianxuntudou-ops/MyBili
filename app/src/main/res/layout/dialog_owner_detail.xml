@@ -70,11 +70,21 @@
     </androidx.appcompat.widget.LinearLayoutCompat>
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
-        android:paddingBottom="@dimen/px50"
         android:clipToPadding="false"
         android:layout_width="@dimen/px1400"
         android:layout_height="@dimen/px800"
-        android:layout_marginTop="@dimen/px7"
+        android:paddingBottom="@dimen/px50"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/divider"/>
+    <View
+        android:id="@+id/divider"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/px4"
+        android:layout_marginStart="@dimen/px35"
+        android:layout_marginEnd="@dimen/px35"
+        android:layout_marginTop="@dimen/px20"
+        android:background="#66666666"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/image_avatar"/>

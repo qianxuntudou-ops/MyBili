@@ -54,7 +54,9 @@ class OwnerDetailDialog(
         onItemDpad = { view, keyCode, event ->
             tvFocusController?.handleKey(view, keyCode, event) == true
         }
-    )
+    ).also {
+        it.currentPlayingAid = currentAid
+    }
 
     private var relationAttribute = 0
     private var currentPage = 1
@@ -73,12 +75,14 @@ class OwnerDetailDialog(
     }
 
     private fun initView() {
+        val spacing = context.resources.getDimensionPixelSize(R.dimen.px10)
         binding.recyclerView.layoutManager = WrapContentGridLayoutManager(context, 3)
         binding.recyclerView.adapter = videoAdapter
         binding.recyclerView.itemAnimator = null
+        binding.recyclerView.setPadding(0, -spacing, 0, binding.recyclerView.paddingBottom)
         if (binding.recyclerView.itemDecorationCount == 0) {
             binding.recyclerView.addItemDecoration(
-                GridSpacingItemDecoration(3, context.resources.getDimensionPixelSize(R.dimen.px20), true)
+                GridSpacingItemDecoration(3, spacing, true)
             )
         }
         videoAdapter.setOnItemClickListener { _, item ->
@@ -217,6 +221,12 @@ class OwnerDetailDialog(
                 (currentVideoId.isNotBlank() && video.bvid == currentVideoId)
         }
         if (targetIndex >= 0) {
+            if (videoAdapter.currentPlayingAid <= 0L) {
+                val targetAid = videos[targetIndex].aid
+                if (targetAid > 0L) {
+                    videoAdapter.currentPlayingAid = targetAid
+                }
+            }
             binding.recyclerView.post {
                 binding.recyclerView.scrollToPosition(targetIndex)
                 focusVideoAt(targetIndex)
