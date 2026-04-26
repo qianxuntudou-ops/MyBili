@@ -111,6 +111,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
         )
         binding.recyclerViewVideos.layoutManager = WrapContentGridLayoutManager(requireContext(), 4)
         binding.recyclerViewVideos.adapter = favoriteAdapter
+        binding.recyclerViewVideos.itemAnimator = null
         if (binding.recyclerViewVideos.itemDecorationCount == 0) {
             binding.recyclerViewVideos.addItemDecoration(
                 GridSpacingItemDecoration(4, resources.getDimensionPixelSize(com.tutu.myblbl.R.dimen.px20), true)

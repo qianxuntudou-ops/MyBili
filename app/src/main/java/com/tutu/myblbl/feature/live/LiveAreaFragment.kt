@@ -59,6 +59,7 @@ class LiveAreaFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveTabPag
         )
         binding.recyclerView.layoutManager = WrapContentGridLayoutManager(requireContext(), 8)
         binding.recyclerView.adapter = adapter
+        binding.recyclerView.itemAnimator = null
         binding.recyclerView.setHasFixedSize(true)
     }
 

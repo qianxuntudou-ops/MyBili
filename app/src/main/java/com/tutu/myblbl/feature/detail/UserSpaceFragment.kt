@@ -143,6 +143,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>() {
         }
         binding.recyclerViewVideos.layoutManager = layoutManager
         binding.recyclerViewVideos.adapter = concatAdapter
+        binding.recyclerViewVideos.itemAnimator = null
         if (binding.recyclerViewVideos.itemDecorationCount == 0) {
             binding.recyclerViewVideos.addItemDecoration(
                 GridSpacingItemDecoration(

@@ -71,6 +71,7 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
         val layoutManager = WrapContentGridLayoutManager(requireContext(), 4)
         binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.adapter = adapter
+        binding.recyclerView.itemAnimator = null
         binding.recyclerView.setHasFixedSize(true)
         binding.tvTitle.text = title
         binding.buttonBack.setOnClickListener {

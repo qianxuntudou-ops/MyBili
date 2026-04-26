@@ -75,6 +75,7 @@ class OwnerDetailDialog(
     private fun initView() {
         binding.recyclerView.layoutManager = WrapContentGridLayoutManager(context, 3)
         binding.recyclerView.adapter = videoAdapter
+        binding.recyclerView.itemAnimator = null
         if (binding.recyclerView.itemDecorationCount == 0) {
             binding.recyclerView.addItemDecoration(
                 GridSpacingItemDecoration(3, context.resources.getDimensionPixelSize(R.dimen.px20), true)

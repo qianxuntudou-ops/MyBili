@@ -107,6 +107,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
         )
         binding.recyclerViewLeft.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerViewLeft.adapter = upAdapter
+        binding.recyclerViewLeft.itemAnimator = null
         binding.recyclerViewLeft.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 if (dy > 0) checkLoadMoreFollowing()
@@ -134,6 +135,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
         )
         binding.recyclerViewRight.layoutManager = WrapContentGridLayoutManager(requireContext(), 3)
         binding.recyclerViewRight.adapter = videoAdapter
+        binding.recyclerViewRight.itemAnimator = null
         binding.recyclerViewRight.setOnKeyListener { _, _, _ ->
             false
         }

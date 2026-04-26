@@ -415,6 +415,7 @@ class HomeLaneAdapter(
         init {
             binding.recyclerView.layoutManager = GridLayoutManager(binding.root.context, 6)
             binding.recyclerView.adapter = adapter
+            binding.recyclerView.itemAnimator = null
             binding.recyclerView.setHasFixedSize(true)
             val sectionHeaderKeyListener = View.OnKeyListener { view, keyCode, event ->
                 if (event.action != KeyEvent.ACTION_DOWN) {
@@ -548,6 +549,7 @@ class HomeLaneAdapter(
         init {
             binding.recyclerView.layoutManager = GridLayoutManager(binding.root.context, 6)
             binding.recyclerView.adapter = adapter
+            binding.recyclerView.itemAnimator = null
             binding.recyclerView.setHasFixedSize(true)
             val timelineHeaderKeyListener = View.OnKeyListener { view, keyCode, event ->
                 if (event.action != KeyEvent.ACTION_DOWN) {

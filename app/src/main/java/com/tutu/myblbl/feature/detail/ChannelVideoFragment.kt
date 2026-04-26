@@ -1,26 +1,19 @@
 package com.tutu.myblbl.feature.detail
 
-import android.view.LayoutInflater
-import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
-import com.tutu.myblbl.databinding.FragmentBaseListBinding
+import com.tutu.myblbl.core.common.content.ContentFilter
+import com.tutu.myblbl.core.navigation.VideoRouteNavigator
+import com.tutu.myblbl.core.ui.base.BaseListFragment
+import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
+import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.repository.VideoRepository
 import com.tutu.myblbl.ui.adapter.VideoAdapter
-import com.tutu.myblbl.core.ui.base.BaseFragment
-import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
-import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
-import com.tutu.myblbl.core.common.content.ContentFilter
-import com.tutu.myblbl.core.ui.focus.tv.GridTvFocusStrategy
-import com.tutu.myblbl.core.ui.focus.tv.TvDataChangeReason
-import com.tutu.myblbl.core.ui.focus.tv.TvListFocusController
-import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
-class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
+class ChannelVideoFragment : BaseListFragment<VideoModel>() {
 
     companion object {
         private const val ARG_TITLE = "title"
@@ -39,139 +32,97 @@ class ChannelVideoFragment : BaseFragment<FragmentBaseListBinding>() {
     private var title: String = ""
     private var tagId: Long = 0L
     private var offset: String = ""
-    private var hasMore = true
-    private var isLoading = false
-    private var recyclerView: RecyclerView? = null
-    private var tvFocusController: TvListFocusController? = null
-    private val videoAdapter = VideoAdapter(
-        onItemFocusedWithView = { view, position ->
-            tvFocusController?.onItemFocused(view, position)
-        },
-        onItemDpad = { view, keyCode, event ->
-            tvFocusController?.handleKey(view, keyCode, event) == true
-        },
-        onItemsChanged = {
-            tvFocusController?.onDataChanged(TvDataChangeReason.REMOVE_ITEM)
-        }
-    )
     private val videoRepository: VideoRepository by inject()
+
+    override val autoLoad: Boolean = false
+    override val enableTvListFocusController: Boolean = true
+    override val enableSwipeRefresh: Boolean = false
+
+    override fun getSpanCount(): Int = 4
 
     override fun initArguments() {
         title = arguments?.getString(ARG_TITLE).orEmpty()
         tagId = arguments?.getLong(ARG_TAG_ID) ?: 0L
     }
 
-    override fun getViewBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentBaseListBinding {
-        return FragmentBaseListBinding.inflate(inflater, container!!)
-    }
-
     override fun isTopBarVisible(): Boolean = true
 
-    override fun initView() {
-        setMainTitle(title)
-        videoAdapter.setShowLoadMore(false)
-
-        val spanCount = 4
-        val layoutManager = WrapContentGridLayoutManager(requireContext(), spanCount)
-        val decoration = GridSpacingItemDecoration(spanCount, resources.getDimensionPixelSize(R.dimen.px20), true)
-        recyclerView = binding.recyclerView
-        recyclerView?.layoutManager = layoutManager
-        recyclerView?.adapter = videoAdapter
-        recyclerView?.addItemDecoration(decoration)
-        recyclerView?.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
-                super.onScrolled(rv, dx, dy)
-                val totalItemCount = layoutManager.itemCount
-                val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
-                if (lastVisiblePosition >= totalItemCount - 12) {
-                    loadMore()
-                }
+    override fun createAdapter(): VideoAdapter {
+        return VideoAdapter(
+            onItemClick = ::onVideoClick,
+            onItemFocusedWithView = { view, position ->
+                tvFocusController?.onItemFocused(view, position)
+            },
+            onItemDpad = { view, keyCode, event ->
+                tvFocusController?.handleKey(view, keyCode, event) == true
             }
-        })
-        installTvFocusController()
+        )
+    }
 
-        videoAdapter.setOnItemClickListener { _, item ->
-            VideoRouteNavigator.openVideo(
-                context = requireContext(),
-                video = item,
-                playQueue = com.tutu.myblbl.ui.activity.PlayerActivity.buildPlayQueue(
-                    videoAdapter.getItemsSnapshot(),
-                    item
-                )
-            )
-        }
+    override fun initView() {
+        super.initView()
+        setMainTitle(title)
+        recyclerView?.addItemDecoration(
+            GridSpacingItemDecoration(getSpanCount(), resources.getDimensionPixelSize(R.dimen.px20), true)
+        )
     }
 
     override fun initData() {
-        loadData()
+        showLoading(true)
+        loadData(1)
     }
 
-    private fun loadData() {
+    override fun loadData(page: Int) {
         if (isLoading || tagId <= 0) return
         isLoading = true
-        showLoading(true)
         lifecycleScope.launch {
             videoRepository.getChannelVideos(
                 channelId = tagId,
                 offset = offset,
                 pageSize = 30
-            ).onSuccess { page ->
-                showLoading(false)
+            ).onSuccess { result ->
                 isLoading = false
-                hasMore = page.hasMore
-                offset = page.offset
-                videoAdapter.setShowLoadMore(hasMore)
-                val hasExistingItems = videoAdapter.getItem(0) != null
-                if (page.videos.isEmpty() && !hasExistingItems) {
+                hasMore = result.hasMore
+                offset = result.offset
+                adapter?.setShowLoadMore(hasMore)
+                val hasExistingItems = (adapter?.contentCount() ?: 0) > 0
+                val videos = ContentFilter.filterVideos(requireContext(), result.videos)
+                if (videos.isEmpty() && !hasExistingItems) {
+                    showLoading(false)
                     showEmpty()
                 } else {
+                    showLoading(false)
                     showContent()
-                    val videos = ContentFilter.filterVideos(
-                        requireContext(),
-                        page.videos
-                    )
                     if (!hasExistingItems) {
-                        videoAdapter.setData(videos)
-                        tvFocusController?.onDataChanged(TvDataChangeReason.REPLACE_PRESERVE_ANCHOR)
+                        setAdapterData(videos)
                     } else {
-                        videoAdapter.addData(videos)
-                        tvFocusController?.onDataChanged(TvDataChangeReason.APPEND)
+                        (adapter as? VideoAdapter)?.addData(videos)
                     }
                 }
             }.onFailure {
-                showLoading(false)
                 isLoading = false
-                showError(it.message)
+                showLoading(false)
+                if ((adapter?.contentCount() ?: 0) == 0) {
+                    showError(it.message)
+                }
             }
         }
     }
 
-    private fun loadMore() {
-        if (isLoading || !hasMore) return
-        loadData()
+    override fun onRetryClick() {
+        offset = ""
+        showLoading(true)
+        loadData(1)
     }
 
-    private fun installTvFocusController() {
-        val rv = recyclerView ?: return
-        tvFocusController?.release()
-        tvFocusController = TvListFocusController(
-            recyclerView = rv,
-            adapter = videoAdapter,
-            strategy = GridTvFocusStrategy { 4 },
-            canLoadMore = { hasMore },
-            loadMore = {
-                if (!isLoading && hasMore) {
-                    loadMore()
-                }
-            }
+    private fun onVideoClick(video: VideoModel) {
+        VideoRouteNavigator.openVideo(
+            context = requireContext(),
+            video = video,
+            playQueue = com.tutu.myblbl.ui.activity.PlayerActivity.buildPlayQueue(
+                (adapter as? VideoAdapter)?.getItemsSnapshot().orEmpty(),
+                video
+            )
         )
-    }
-
-    override fun onDestroyView() {
-        tvFocusController?.release()
-        tvFocusController = null
-        videoAdapter.clear()
-        recyclerView = null
-        super.onDestroyView()
     }
 }

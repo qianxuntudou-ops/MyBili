@@ -208,6 +208,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
 
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = contentAdapter
+        binding.recyclerView.itemAnimator = null
         binding.recyclerView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
     }
 

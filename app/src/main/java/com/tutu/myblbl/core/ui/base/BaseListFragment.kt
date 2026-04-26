@@ -64,6 +64,7 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
         recyclerView = binding.recyclerView
         adapter = createAdapter()
         recyclerView?.adapter = adapter
+        recyclerView?.itemAnimator = null
         adapter?.registerAdapterDataObserver(restoreObserver)
         recyclerView?.setRecycledViewPool(sharedVideoPool)
         layoutManager = createLayoutManager()

@@ -174,6 +174,7 @@ class VideoPlayerOverlayController(
         recyclerViewRelated.layoutManager =
             GridLayoutManager(activity, 1, RecyclerView.HORIZONTAL, false)
         recyclerViewRelated.adapter = relatedAdapter
+        recyclerViewRelated.itemAnimator = null
         if (viewRelated.isVisible) {
             focusRelatedItem()
             return

@@ -52,6 +52,7 @@ class LiveRecommendFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveT
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
+        binding.recyclerView.itemAnimator = null
         swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(binding.recyclerView) {
             onExplicitRefresh()
         }
