@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.text.format.DateFormat
 import android.view.LayoutInflater
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -313,10 +314,23 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
                 val activity = activity as? com.tutu.myblbl.ui.activity.MainActivity
                 activity?.applyLiveEntryVisibility()
             }
-            6 -> toggleSetting(commonSettings, 6, KEY_MINOR_PROTECTION) { value ->
-                appSettings.putStringAsync(KEY_MINOR_PROTECTION, value)
-                val activity = activity as? com.tutu.myblbl.ui.activity.MainActivity
-                activity?.applyCategoryEntryVisibility()
+            6 -> {
+                val setting = commonSettings.getOrNull(6) ?: return
+                if (setting.info == "开") {
+                    showMinorProtectionVerifyDialog {
+                        toggleSetting(commonSettings, 6, KEY_MINOR_PROTECTION) { value ->
+                            appSettings.putStringAsync(KEY_MINOR_PROTECTION, value)
+                            val activity = activity as? com.tutu.myblbl.ui.activity.MainActivity
+                            activity?.applyCategoryEntryVisibility()
+                        }
+                    }
+                } else {
+                    toggleSetting(commonSettings, 6, KEY_MINOR_PROTECTION) { value ->
+                        appSettings.putStringAsync(KEY_MINOR_PROTECTION, value)
+                        val activity = activity as? com.tutu.myblbl.ui.activity.MainActivity
+                        activity?.applyCategoryEntryVisibility()
+                    }
+                }
             }
             COMMON_POSITION_RISK_CONTROL -> showRiskControlDialog()
         }
@@ -1247,6 +1261,119 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         root.addView(actionContainer)
         dialog.setContentView(root)
         dialog.setOnShowListener { editText.requestFocus() }
+        dialog.show()
+    }
+
+    private fun showMinorProtectionVerifyDialog(onVerified: () -> Unit) {
+        val konamiCode = listOf(
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT
+        )
+        val inputSequence = mutableListOf<Int>()
+
+        val px40 = resources.getDimensionPixelSize(R.dimen.px40)
+        val px35 = resources.getDimensionPixelSize(R.dimen.px35)
+        val px20 = resources.getDimensionPixelSize(R.dimen.px20)
+        val px18 = resources.getDimensionPixelSize(R.dimen.px18)
+        val px16 = resources.getDimensionPixelSize(R.dimen.px16)
+        val px14 = resources.getDimensionPixelSize(R.dimen.px14)
+        val px10 = resources.getDimensionPixelSize(R.dimen.px10)
+        val textColor = resources.getColor(R.color.textColor, null)
+
+        val dialog = AppCompatDialog(requireContext(), R.style.DialogTheme)
+        dialog.setCanceledOnTouchOutside(true)
+
+        val root = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.dialog_background)
+            isClickable = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setOnClickListener { dialog.dismiss() }
+            setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    when (keyCode) {
+                        KeyEvent.KEYCODE_DPAD_UP,
+                        KeyEvent.KEYCODE_DPAD_DOWN,
+                        KeyEvent.KEYCODE_DPAD_LEFT,
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            inputSequence.add(keyCode)
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            }
+        }
+
+        root.addView(TextView(requireContext()).apply {
+            text = getString(R.string.minor_protection)
+            setTextColor(textColor)
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px40, px35, px40, px20)
+            layoutParams = lp
+        })
+
+        root.addView(View(requireContext()).apply {
+            setBackgroundColor(0x1FFFFFFF)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, resources.getDimensionPixelSize(R.dimen.px2))
+            lp.setMargins(px18, 0, px18, 0)
+            layoutParams = lp
+        })
+
+        root.addView(TextView(requireContext()).apply {
+            text = "输入魂斗罗秘籍才能关闭！"
+            setTextColor(textColor)
+            textSize = 12f
+            setLineSpacing(resources.getDimension(R.dimen.px6), 1f)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px40, px20, px40, 0)
+            layoutParams = lp
+        })
+
+        val actionContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(px18, px20, px18, px18)
+            layoutParams = lp
+        }
+
+        actionContainer.addView(TextView(requireContext()).apply {
+            text = "确定"
+            setTextColor(textColor)
+            textSize = 12f
+            setPadding(px16, px14, px16, px14)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                val last8 = inputSequence.takeLast(8)
+                if (last8 == konamiCode) {
+                    dialog.dismiss()
+                    onVerified()
+                } else {
+                    Toast.makeText(requireContext(), "秘籍不对", Toast.LENGTH_SHORT).show()
+                    inputSequence.clear()
+                }
+            }
+            setBackgroundResource(R.drawable.bg_dialog_button)
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            setMargins(px10, 0, px10, 0)
+        })
+
+        root.addView(actionContainer)
+        dialog.setContentView(root)
+        dialog.setOnShowListener { root.requestFocus() }
         dialog.show()
     }
 
