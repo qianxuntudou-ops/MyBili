@@ -52,6 +52,7 @@ class LiveAreaAdapter(
 
         init {
             binding.textSub.visibility = View.GONE
+            binding.imageView.setBorderEnabled(false)
             binding.root.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {

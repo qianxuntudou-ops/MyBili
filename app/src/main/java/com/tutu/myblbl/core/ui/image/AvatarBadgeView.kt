@@ -23,6 +23,7 @@ class AvatarBadgeView @JvmOverloads constructor(
 
     private var badgeDrawable: Drawable? = null
     private var badgeType: Int = BADGE_NONE
+    private var borderEnabled = true
 
     private val borderWidthPx = 1f
     private val gapPx = 1f
@@ -69,9 +70,17 @@ class AvatarBadgeView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun setBorderEnabled(enabled: Boolean) {
+        if (borderEnabled == enabled) return
+        borderEnabled = enabled
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        drawCircleBorder(canvas)
+        if (borderEnabled) {
+            drawCircleBorder(canvas)
+        }
         badgeDrawable?.let { badge ->
             val ratio = if (badgeType == BADGE_VIP) 0.32f else 0.4f
             val contentWidth = width - paddingLeft - paddingRight
