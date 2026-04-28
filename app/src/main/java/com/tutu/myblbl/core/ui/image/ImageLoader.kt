@@ -39,10 +39,13 @@ object ImageLoader {
     private var cachedImageQualityLevel: Int? = null
     private var imageQualityFlowStarted = false
     private val imageQualityScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    
-    private fun isContextAlive(view: View): Boolean {
-        val context = view.context
-        return !(context is Activity && context.isDestroyed)
+
+    private fun glideRequestManager(imageView: ImageView): com.bumptech.glide.RequestManager {
+        val ctx = imageView.context
+        if (ctx is Activity && ctx.isDestroyed) {
+            return Glide.with(ctx.applicationContext)
+        }
+        return Glide.with(imageView)
     }
 
     fun load(
@@ -51,8 +54,7 @@ object ImageLoader {
         placeholder: Int = 0,
         error: Int = 0
     ) {
-        if (!isContextAlive(imageView)) return
-        Glide.with(imageView)
+        glideRequestManager(imageView)
             .load(buildImageModel(buildOptimizedCommonImageUrl(imageView, url)))
             .placeholder(placeholder)
             .error(error)
@@ -67,8 +69,7 @@ object ImageLoader {
         placeholder: Drawable?,
         error: Drawable?
     ) {
-        if (!isContextAlive(imageView)) return
-        Glide.with(imageView)
+        glideRequestManager(imageView)
             .load(buildImageModel(buildOptimizedCommonImageUrl(imageView, url)))
             .placeholder(placeholder)
             .error(error)
@@ -83,10 +84,9 @@ object ImageLoader {
         placeholder: Int = 0,
         error: Int = 0
     ) {
-        if (!isContextAlive(imageView)) return
         val normalizedUrl = normalizeUrl(url)
         val optimizedUrl = buildOptimizedAvatarUrl(imageView, url)
-        val requestManager = Glide.with(imageView)
+        val requestManager = glideRequestManager(imageView)
 
         val requestBuilder = requestManager
             .load(buildImageModel(optimizedUrl))
@@ -122,8 +122,7 @@ object ImageLoader {
         placeholder: Int = 0,
         error: Int = 0
     ) {
-        if (!isContextAlive(imageView)) return
-        Glide.with(imageView)
+        glideRequestManager(imageView)
             .load(buildImageModel(buildOptimizedCommonImageUrl(imageView, url)))
             .placeholder(placeholder)
             .error(error)
@@ -151,12 +150,8 @@ object ImageLoader {
         error: Int = R.drawable.default_video,
         onPortraitDetected: ((Boolean) -> Unit)? = null
     ) {
-        if (!isContextAlive(imageView)) {
-            AppLog.w(TAG, "loadVideoCover: context not alive, url=$url")
-            return
-        }
         val optimizedUrl = buildOptimizedVideoCoverUrl(imageView, url)
-        val request = Glide.with(imageView)
+        val request = glideRequestManager(imageView)
             .load(buildImageModel(optimizedUrl))
             .placeholder(placeholder)
             .error(error)
@@ -198,9 +193,8 @@ object ImageLoader {
         placeholder: Int = R.drawable.default_video,
         error: Int = R.drawable.default_video
     ) {
-        if (!isContextAlive(imageView)) return
         val radius = imageView.context.resources.getDimensionPixelSize(R.dimen.px15)
-        Glide.with(imageView)
+        glideRequestManager(imageView)
             .load(buildImageModel(buildOptimizedSeriesCoverUrl(imageView, url)))
             .placeholder(placeholder)
             .error(error)
@@ -215,8 +209,7 @@ object ImageLoader {
         onLoadSuccess: () -> Unit = {},
         onLoadFailed: () -> Unit = {}
     ) {
-        if (!isContextAlive(imageView)) return
-        Glide.with(imageView)
+        glideRequestManager(imageView)
             .load(buildImageModel(buildOptimizedCommonImageUrl(imageView, url)))
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .transition(DrawableTransitionOptions.withCrossFade())
@@ -250,16 +243,16 @@ object ImageLoader {
         url: String?,
         callback: (Boolean) -> Unit
     ) {
-        if (!isContextAlive(imageView) || url.isNullOrBlank()) return
+        if (url.isNullOrBlank()) return
         val rawUrl = normalizeUrl(url)
         if (!isBilibiliImageUrl(rawUrl)) return
         val probeUrl = appendImageSuffix(rawUrl, "@120w_120h.webp")
-        Glide.with(imageView)
+        glideRequestManager(imageView)
             .load(buildImageModel(probeUrl))
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .into(object : com.bumptech.glide.request.target.CustomTarget<Drawable>() {
                 override fun onResourceReady(resource: Drawable, transition: com.bumptech.glide.request.transition.Transition<in Drawable>?) {
-                    if (!isContextAlive(imageView)) return
+                    if (!imageView.isAttachedToWindow) return
                     val w = resource.intrinsicWidth
                     val h = resource.intrinsicHeight
                     callback(w > 0 && h > 0 && h > w)
