@@ -5,14 +5,19 @@ import android.view.View
 import android.view.ViewGroup
 import android.os.Bundle
 import androidx.core.os.bundleOf
+import com.tutu.myblbl.R
 import com.tutu.myblbl.databinding.FragmentLiveBaseListBinding
 import com.tutu.myblbl.model.live.LiveAreaCategory
 import com.tutu.myblbl.model.live.LiveAreaCategoryParent
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.base.RecyclerViewFocusRestoreHelper
+import com.tutu.myblbl.core.common.ext.toast
+import com.tutu.myblbl.network.session.NetworkSessionGateway
+import com.tutu.myblbl.feature.settings.SignInFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.focus.SpatialFocusNavigator
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
+import org.koin.android.ext.android.inject
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -32,6 +37,7 @@ class LiveAreaFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveTabPag
     }
 
     private lateinit var adapter: LiveAreaAdapter
+    private val sessionGateway: NetworkSessionGateway by inject()
     private var areaList: List<LiveAreaCategory> = emptyList()
 
     override fun initArguments() {
@@ -98,6 +104,10 @@ class LiveAreaFragment : BaseFragment<FragmentLiveBaseListBinding>(), LiveTabPag
     }
 
     private fun openAreaDetail(area: LiveAreaCategory) {
+        if (!sessionGateway.isLoggedIn()) {
+            context?.toast(getString(R.string.need_sign_in))
+            return
+        }
         val areaId = area.areaV2Id.takeIf { it > 0 } ?: area.id
         val parentAreaId = area.areaV2ParentId.takeIf { it > 0 } ?: area.parentId
         val title = area.title.ifBlank { area.name }

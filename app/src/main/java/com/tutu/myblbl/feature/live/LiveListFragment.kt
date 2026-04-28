@@ -22,12 +22,13 @@ import com.tutu.myblbl.core.common.ext.toast
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
 
     private val viewModel: LiveListViewModel by viewModel()
-    private val sessionGateway: NetworkSessionGateway by org.koin.android.ext.android.inject()
+    private val sessionGateway: NetworkSessionGateway by inject()
     private lateinit var adapter: LiveRoomAdapter
     private var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout? = null
     private var areaId: Long = 0
@@ -37,6 +38,7 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
     private var latestStatus = LiveListViewModel.LiveListStatus.Idle
     private var latestError: String? = null
     private var isFirstPageLoad = true
+    private var needsLogin = false
 
     companion object {
         private const val ARG_AREA_ID = "area_id"
@@ -80,14 +82,25 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
         binding.buttonBack.setOnClickListener {
             navigateBackFromUi()
         }
-        binding.btnRetry.setOnClickListener {
-            reload()
-        }
         setupLoadMore()
         swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(binding.recyclerView) {
             reload()
         }
-        renderState()
+        if (!sessionGateway.isLoggedIn()) {
+            needsLogin = true
+            binding.emptyContainer.visibility = View.VISIBLE
+            binding.recyclerView.visibility = View.GONE
+            binding.progressBar.visibility = View.GONE
+            binding.tvEmpty.text = getString(R.string.need_sign_in)
+            binding.btnRetry.text = "登录"
+            binding.btnRetry.setOnClickListener {
+                openInHostContainer(SignInFragment.newInstance())
+            }
+            binding.btnRetry.visibility = View.VISIBLE
+        } else {
+            binding.btnRetry.setOnClickListener { reload() }
+            renderState()
+        }
     }
     
     private fun setupLoadMore() {
@@ -107,6 +120,7 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
 
     override fun initData() {
         if (!sessionGateway.isLoggedIn()) {
+            needsLogin = true
             binding.emptyContainer.visibility = View.VISIBLE
             binding.recyclerView.visibility = View.GONE
             binding.progressBar.visibility = View.GONE
@@ -184,6 +198,7 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
     }
 
     private fun renderState() {
+        if (needsLogin) return
         val hasData = adapter.itemCount > 0
         val emptyMessage = when {
             latestLoading && !hasData -> ""
