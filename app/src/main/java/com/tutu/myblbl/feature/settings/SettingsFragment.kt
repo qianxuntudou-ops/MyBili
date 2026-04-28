@@ -6,6 +6,7 @@ import android.os.Build
 import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -1289,7 +1290,52 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         val dialog = AppCompatDialog(requireContext(), R.style.DialogTheme)
         dialog.setCanceledOnTouchOutside(true)
 
-        val root = LinearLayout(requireContext()).apply {
+        var twoFingerDownTime = 0L
+
+        val root = object : LinearLayout(requireContext()) {
+            override fun onTouchEvent(event: MotionEvent): Boolean {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_POINTER_DOWN -> {
+                        if (event.pointerCount == 2) {
+                            val w = width
+                            val h = height
+                            val inSecondQuadrant = (0 until 2).all { i ->
+                                val x = event.getX(i)
+                                val y = event.getY(i)
+                                x >= 0 && x < w / 2 && y >= 0 && y < h / 2
+                            }
+                            if (inSecondQuadrant) {
+                                twoFingerDownTime = System.currentTimeMillis()
+                            }
+                        }
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (event.pointerCount == 2 && twoFingerDownTime > 0L) {
+                            val w = width
+                            val h = height
+                            val stillInQuadrant = (0 until 2).all { i ->
+                                val x = event.getX(i)
+                                val y = event.getY(i)
+                                x >= 0 && x < w / 2 && y >= 0 && y < h / 2
+                            }
+                            if (stillInQuadrant && System.currentTimeMillis() - twoFingerDownTime >= 2000L) {
+                                twoFingerDownTime = 0L
+                                dialog.dismiss()
+                                onVerified()
+                                return true
+                            }
+                            if (!stillInQuadrant) {
+                                twoFingerDownTime = 0L
+                            }
+                        }
+                    }
+                    MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        twoFingerDownTime = 0L
+                    }
+                }
+                return super.onTouchEvent(event)
+            }
+        }.apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundResource(R.drawable.dialog_background)
             isClickable = true
