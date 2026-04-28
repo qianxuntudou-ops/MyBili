@@ -24,6 +24,7 @@ import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.databinding.FragmentLivePlayerBinding
 import com.tutu.myblbl.core.ui.navigation.navigateBackFromUi
 import com.tutu.myblbl.core.ui.system.ViewUtils
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.koin.android.ext.android.inject
@@ -35,6 +36,7 @@ class LivePlayerFragment : Fragment() {
     companion object {
         private const val TAG = "LivePlayerFragment"
         const val ARG_ROOM_ID = "room_id"
+        private const val MAX_RETRY_COUNT = 3
 
         fun newInstance(roomId: Long): LivePlayerFragment {
             return LivePlayerFragment().apply {
@@ -53,12 +55,37 @@ class LivePlayerFragment : Fragment() {
 
     private var player: ExoPlayer? = null
     private var roomId: Long = 0L
+    private var retryCount = 0
+    private var isRetrying = false
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             AppLog.e(TAG, "live player error: ${error.message}", error)
-            binding.textError.text = error.message ?: "直播播放失败"
-            binding.textError.visibility = View.VISIBLE
+            if (isRetrying) return
+            if (retryCount < MAX_RETRY_COUNT) {
+                retryCount++
+                isRetrying = true
+                AppLog.d(TAG, "auto retry ($retryCount/$MAX_RETRY_COUNT) for error type=${error.errorCodeName}")
+                binding.textError.visibility = View.GONE
+                binding.progressBar.visibility = View.VISIBLE
+                val delayMs = retryCount * 1000L
+                viewLifecycleOwner.lifecycleScope.launch {
+                    delay(delayMs)
+                    if (_binding == null) return@launch
+                    val needRebuild = when (error.errorCode) {
+                        PlaybackException.ERROR_CODE_DECODING_FAILED,
+                        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+                        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> true
+                        else -> false
+                    }
+                    if (needRebuild) rebuildPlayer()
+                    viewModel.retryLiveStream(roomId)
+                    isRetrying = false
+                }
+            } else {
+                binding.textError.text = "${error.message}\n已重试 $MAX_RETRY_COUNT 次，请手动刷新"
+                binding.textError.visibility = View.VISIBLE
+            }
             syncPlaybackEnvironment()
         }
 
@@ -67,6 +94,8 @@ class LivePlayerFragment : Fragment() {
             when (playbackState) {
                 Player.STATE_BUFFERING -> binding.playerView.pauseDanmaku()
                 Player.STATE_READY -> {
+                    retryCount = 0
+                    isRetrying = false
                     if (player?.playWhenReady == true) binding.playerView.resumeDanmaku()
                 }
                 Player.STATE_ENDED -> binding.playerView.stopDanmaku()
@@ -77,6 +106,7 @@ class LivePlayerFragment : Fragment() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             syncPlaybackEnvironment()
             if (isPlaying) {
+                retryCount = 0
                 binding.playerView.resumeDanmaku()
             } else if (player?.playbackState != Player.STATE_BUFFERING) {
                 binding.playerView.pauseDanmaku()
@@ -202,6 +232,15 @@ class LivePlayerFragment : Fragment() {
         binding.playerView.startLiveDanmaku()
 
         syncPlaybackEnvironment()
+    }
+
+    private fun rebuildPlayer() {
+        player?.removeListener(playerListener)
+        binding.playerView.stopDanmaku()
+        PlayerAudioNormalizer.release(player)
+        player?.release()
+        player = null
+        setupPlayer()
     }
 
     private fun syncPlaybackEnvironment() {

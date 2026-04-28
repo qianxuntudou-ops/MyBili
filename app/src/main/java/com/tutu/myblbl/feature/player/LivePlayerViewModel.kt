@@ -213,6 +213,25 @@ class LivePlayerViewModel(
         }
     }
 
+    fun retryLiveStream(roomId: Long) {
+        val qn = _selectedQuality.value?.qn
+        viewModelScope.launch {
+            _error.value = null
+            _isLoading.value = true
+            repository.getLivePlayInfo(roomId, qn ?: 0).fold(
+                onSuccess = { data ->
+                    data.durl?.firstOrNull()?.let { durl ->
+                        _playUrl.value = durl.url
+                    }
+                },
+                onFailure = { e ->
+                    _error.value = e.message ?: "重试失败"
+                }
+            )
+            _isLoading.value = false
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         danmakuManager.release()
