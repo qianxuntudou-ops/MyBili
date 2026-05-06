@@ -141,7 +141,7 @@ class FavoriteFolderAdapter(
                 R.string.favorite_folder_count_format,
                 item.mediaCount
             )
-            ImageLoader.loadVideoCover(
+            ImageLoader.loadSeriesCover(
                 imageView = binding.imageCover,
                 url = item.displayImageUrl
             )
