@@ -13,8 +13,6 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.allowHardware
 import coil3.request.crossfade
-import coil3.util.DebugLogger
-import com.tutu.myblbl.BuildConfig
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.network.NetworkManager
 import okio.Path.Companion.toOkioPath
@@ -84,11 +82,6 @@ object MyBLBLCoilInitializer {
             }
             .crossfade(200)
             .allowHardware(true)
-            .apply {
-                if (BuildConfig.DEBUG) {
-                    logger(DebugLogger())
-                }
-            }
             .build()
     }
 }
