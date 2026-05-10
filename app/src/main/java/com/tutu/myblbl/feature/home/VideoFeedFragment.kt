@@ -209,21 +209,20 @@ abstract class VideoFeedFragment : BaseListFragment<VideoModel>(), HomeTabPage, 
                     TvDataChangeReason.REPLACE_PRESERVE_ANCHOR
                 }
                 notifyTvListDataChanged(reason)
+                if (wasPendingScrollToTop && !isPendingReturnRestore()) {
+                    scrollToTop()
+                    tvFocusController?.requestFocusPosition(0)
+                }
             }
         )
         if (videos.isNotEmpty()) {
             showContent()
             showLoading(false)
             dispatchContentReadyIfNeeded()
-            if (pendingScrollToTopAfterRefresh && !isPendingReturnRestore()) {
-                scrollToTop()
-                tvFocusController?.requestFocusPosition(0)
-            }
-            pendingScrollToTopAfterRefresh = false
         } else {
-            pendingScrollToTopAfterRefresh = false
             showEmpty()
         }
+        pendingScrollToTopAfterRefresh = false
         feedViewModel.consumeListChange()
     }
 
