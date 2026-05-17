@@ -16,6 +16,7 @@ import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.core.ui.base.BaseVideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseVideoViewHolder
 import com.tutu.myblbl.core.ui.image.ImageLoader
+import com.tutu.myblbl.core.ui.image.CoverLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
@@ -164,27 +165,40 @@ class DynamicVideoAdapter(
             val ownerName = item.authorName
             val publishText = formatPublishTime(item)
 
-            val coverUrl: String
+            val coverUrl = item.effectiveCoverUrl
             if (item.bangumi != null) {
                 binding.textView.text = item.bangumi.longTitle
-                coverUrl = item.bangumi.cover
             } else {
                 binding.textView.text = item.title
-                coverUrl = item.coverUrl
             }
-            ImageLoader.loadVideoCover(
-                imageView = binding.imageView,
-                url = coverUrl,
-                onPortraitDetected = if (!item.isPortrait && ownerName.isNotBlank()) { isPortrait ->
-                    if (bindingAdapterPosition != NO_POSITION
-                        && currentItem === item && isPortrait
-                    ) {
-                        binding.imageAvatar.visibility = View.GONE
-                        binding.textBadge.text = "竖屏"
-                        binding.textBadge.visibility = View.VISIBLE
-                    }
-                } else null
-            )
+
+            val optimizedUrl = ImageLoader.buildVideoCoverUrl(coverUrl)
+            val cachedBitmap = CoverLoader.get(optimizedUrl)
+            if (cachedBitmap != null && !cachedBitmap.isRecycled) {
+                binding.imageView.setImageBitmap(cachedBitmap)
+                if (!item.isPortrait && ownerName.isNotBlank()
+                    && cachedBitmap.height > 0 && cachedBitmap.width > 0
+                    && cachedBitmap.height > cachedBitmap.width
+                ) {
+                    binding.imageAvatar.visibility = View.GONE
+                    binding.textBadge.text = "竖屏"
+                    binding.textBadge.visibility = View.VISIBLE
+                }
+            } else {
+                ImageLoader.loadVideoCover(
+                    imageView = binding.imageView,
+                    url = coverUrl,
+                    onPortraitDetected = if (!item.isPortrait && ownerName.isNotBlank()) { isPortrait ->
+                        if (bindingAdapterPosition != NO_POSITION
+                            && currentItem === item && isPortrait
+                        ) {
+                            binding.imageAvatar.visibility = View.GONE
+                            binding.textBadge.text = "竖屏"
+                            binding.textBadge.visibility = View.VISIBLE
+                        }
+                    } else null
+                )
+            }
 
             if (ownerName.isNotBlank()) {
                 binding.textViewOwner.text = if (publishText.isNotBlank()) {
