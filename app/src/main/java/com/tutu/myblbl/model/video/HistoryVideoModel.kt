@@ -116,6 +116,7 @@ data class HistoryVideoModel(
             historyViewAt = viewAt,
             historyBadge = badge,
             historyBusiness = historyInfo?.business.orEmpty(),
+            historyDevice = historyInfo?.dt ?: 0,
             isUpowerExclusive = isUpowerExclusive,
             isChargingArc = isChargingArc,
             elecArcType = elecArcType,

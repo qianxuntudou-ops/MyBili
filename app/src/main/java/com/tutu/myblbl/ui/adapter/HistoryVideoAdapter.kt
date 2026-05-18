@@ -196,6 +196,7 @@ class HistoryVideoAdapter(
             binding.imageAvatar.visibility = View.GONE
             binding.textBadge.visibility = View.GONE
             binding.textHistoryViewTime.visibility = View.VISIBLE
+            binding.iconHistoryDevice.visibility = View.GONE
             binding.iconPlayCount.visibility = View.GONE
             binding.textPlayCount.visibility = View.GONE
             binding.iconDanmaku.visibility = View.GONE
@@ -233,6 +234,7 @@ class HistoryVideoAdapter(
             binding.textViewOwner.text = ownerName
             binding.textHistoryViewTime.text = TimeUtils.formatHistoryViewTime(item.viewAt)
             binding.textHistoryViewTime.visibility = View.VISIBLE
+            applyHistoryDeviceIcon(item.history?.dt ?: 0)
             binding.textChargeBadge.visibility = if (item.isChargingExclusive) View.VISIBLE else View.GONE
             binding.textInteractionBadge.visibility = if (item.isSteinsGate) View.VISIBLE else View.GONE
 
@@ -240,6 +242,18 @@ class HistoryVideoAdapter(
                 imageView = binding.imageView,
                 url = item.cover.ifBlank { item.covers?.firstOrNull().orEmpty() }
             )
+        }
+
+        private fun applyHistoryDeviceIcon(dt: Int) {
+            val deviceIcon = HistoryDeviceIcon.resolve(dt)
+            if (deviceIcon == null) {
+                binding.iconHistoryDevice.visibility = View.GONE
+                binding.iconHistoryDevice.contentDescription = null
+            } else {
+                binding.iconHistoryDevice.setImageResource(deviceIcon.drawableRes)
+                binding.iconHistoryDevice.contentDescription = deviceIcon.contentDescription
+                binding.iconHistoryDevice.visibility = View.VISIBLE
+            }
         }
     }
 }

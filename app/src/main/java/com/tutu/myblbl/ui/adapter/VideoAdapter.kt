@@ -78,6 +78,7 @@ class VideoAdapter(
         old.bangumi == new.bangumi &&
         old.historyBadge == new.historyBadge &&
         old.historyBusiness == new.historyBusiness &&
+        old.historyDevice == new.historyDevice &&
         old.historyViewAt == new.historyViewAt &&
         old.isSteinsGate == new.isSteinsGate
 
@@ -321,6 +322,7 @@ class VideoAdapter(
             binding.iconDanmaku.visibility = View.VISIBLE
             binding.textDanmakuCount.visibility = View.VISIBLE
             binding.textHistoryViewTime.visibility = View.GONE
+            binding.iconHistoryDevice.visibility = View.GONE
 
             val ownerName = video.authorName
             val publishLabel = formatPublishTime(video)
@@ -400,8 +402,21 @@ class VideoAdapter(
             binding.textViewOwner.text = ownerName
             binding.textHistoryViewTime.text = formatHistoryTime(video.historyViewAt)
             binding.textHistoryViewTime.visibility = View.VISIBLE
+            applyHistoryDeviceIcon(video.historyDevice)
             binding.textChargeBadge.visibility = if (video.isChargingExclusive) View.VISIBLE else View.GONE
             binding.textInteractionBadge.visibility = if (video.isSteinsGate) View.VISIBLE else View.GONE
+        }
+
+        private fun applyHistoryDeviceIcon(dt: Int) {
+            val deviceIcon = HistoryDeviceIcon.resolve(dt)
+            if (deviceIcon == null) {
+                binding.iconHistoryDevice.visibility = View.GONE
+                binding.iconHistoryDevice.contentDescription = null
+            } else {
+                binding.iconHistoryDevice.setImageResource(deviceIcon.drawableRes)
+                binding.iconHistoryDevice.contentDescription = deviceIcon.contentDescription
+                binding.iconHistoryDevice.visibility = View.VISIBLE
+            }
         }
 
         private fun applyBadge(video: VideoModel) {
