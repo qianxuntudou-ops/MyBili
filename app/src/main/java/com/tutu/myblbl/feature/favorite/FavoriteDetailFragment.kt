@@ -220,7 +220,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
                         showEmpty(getString(R.string.favorite_folder_content_empty))
                     } else {
                         showListContent()
-                        val filtered = medias.filter { !ContentFilter.isVideoBlocked(requireContext(), it.tagName, it.title, authorName = it.authorName) }
+                        val filtered = medias.filter { !ContentFilter.isVideoBlocked(requireContext(), it.tagName, it.title, authorName = it.displayAuthorName) }
                         if (currentPage == 1) {
                             favoriteAdapter.setData(filtered)
                             tvFocusController?.onDataChanged(TvDataChangeReason.REPLACE_PRESERVE_ANCHOR)

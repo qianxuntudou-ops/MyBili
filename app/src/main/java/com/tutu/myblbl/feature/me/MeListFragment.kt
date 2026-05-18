@@ -319,7 +319,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
                 context = requireContext(),
                 typeName = it.tagName,
                 title = it.title,
-                authorName = it.authorName,
+                authorName = it.displayAuthorName,
                 aid = it.history?.oid ?: 0L,
                 bvid = it.bvid,
                 coverUrl = it.cover
@@ -658,7 +658,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
                                 context = requireContext(),
                                 typeName = it.tagName,
                                 title = it.title,
-                                authorName = it.authorName,
+                                authorName = it.displayAuthorName,
                                 aid = it.history?.oid ?: 0L,
                                 bvid = it.bvid,
                                 coverUrl = it.cover

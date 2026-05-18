@@ -11,19 +11,77 @@
     android:paddingTop="@dimen/px20"
     android:paddingBottom="@dimen/px15">
 
-    <androidx.appcompat.widget.AppCompatImageView
-        android:id="@+id/imageCover"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/coverStack"
         android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="@dimen/px15"
         android:layout_marginTop="@dimen/px10"
         android:layout_marginEnd="@dimen/px15"
-        android:scaleType="centerCrop"
-        app:layout_constraintDimensionRatio="h,16:9"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:src="@mipmap/ic_launcher" />
+        app:layout_constraintTop_toTopOf="parent">
+
+        <View
+            android:id="@+id/viewStackBack"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginStart="@dimen/px50"
+            android:layout_marginEnd="@dimen/px50"
+            android:background="@drawable/bg_favorite_folder_stack_back"
+            app:layout_constraintDimensionRatio="h,16:9"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <View
+            android:id="@+id/viewStackMiddle"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginStart="@dimen/px25"
+            android:layout_marginTop="@dimen/px12"
+            android:layout_marginEnd="@dimen/px25"
+            android:background="@drawable/bg_favorite_folder_stack_middle"
+            app:layout_constraintDimensionRatio="h,16:9"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/imageCover"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="@dimen/px24"
+            android:scaleType="centerCrop"
+            app:layout_constraintDimensionRatio="h,16:9"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:src="@mipmap/ic_launcher" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/px8"
+            android:layout_marginBottom="@dimen/px8"
+            android:background="@drawable/bg_favorite_folder_count_badge"
+            android:drawableStart="@drawable/ic_favorite_folder_count"
+            android:drawablePadding="@dimen/px6"
+            android:gravity="center"
+            android:maxLines="1"
+            android:minWidth="@dimen/px44"
+            android:paddingStart="@dimen/px6"
+            android:paddingTop="@dimen/px3"
+            android:paddingEnd="@dimen/px6"
+            android:paddingBottom="@dimen/px3"
+            android:textColor="#FFFFFF"
+            android:textSize="@dimen/px20"
+            app:layout_constraintBottom_toBottomOf="@+id/imageCover"
+            app:layout_constraintEnd_toEndOf="@+id/imageCover"
+            tools:text="2" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tvTitle"
@@ -35,20 +93,9 @@
         android:textColor="?android:attr/textColorPrimary"
         android:textSize="@dimen/px30"
         android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="@+id/imageCover"
-        app:layout_constraintStart_toStartOf="@+id/imageCover"
-        app:layout_constraintTop_toBottomOf="@+id/imageCover"
+        app:layout_constraintEnd_toEndOf="@+id/coverStack"
+        app:layout_constraintStart_toStartOf="@+id/coverStack"
+        app:layout_constraintTop_toBottomOf="@+id/coverStack"
         tools:text="收藏夹标题" />
-
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvCount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/px5"
-        android:textColor="?android:attr/textColorSecondary"
-        android:textSize="@dimen/px22"
-        app:layout_constraintStart_toStartOf="@+id/tvTitle"
-        app:layout_constraintTop_toBottomOf="@+id/tvTitle"
-        tools:text="20个视频" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

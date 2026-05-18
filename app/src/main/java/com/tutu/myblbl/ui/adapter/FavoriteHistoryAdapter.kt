@@ -108,7 +108,7 @@ class FavoriteHistoryAdapter(
     override fun getItemId(position: Int): Long = favoriteHistoryItemKey(getItem(position)).hashCode().toLong()
 
     private fun removeBlockedItems(blockedName: String) {
-        val filtered = currentList.filter { !it.authorName.equals(blockedName, ignoreCase = true) }
+        val filtered = currentList.filter { !it.displayAuthorName.equals(blockedName, ignoreCase = true) }
         if (filtered.size == currentList.size) return
         submitList(filtered) {
             onItemsChanged?.invoke()
@@ -245,8 +245,10 @@ class FavoriteHistoryAdapter(
             binding.textView.isSelected = isFocused
             binding.textView.text = item.title.ifBlank { item.showTitle }
             binding.progressBar.visibility = View.GONE
-            binding.imageAvatar.visibility = View.GONE
-            if (item.isPortrait) {
+            val authorName = item.displayAuthorName
+            val hasAuthorName = authorName.isNotBlank()
+            binding.imageAvatar.visibility = if (hasAuthorName) View.VISIBLE else View.GONE
+            if (!hasAuthorName && item.isPortrait) {
                 binding.textBadge.text = "竖屏"
                 binding.textBadge.visibility = View.VISIBLE
             } else {
@@ -256,10 +258,7 @@ class FavoriteHistoryAdapter(
             binding.textDanmakuCount.visibility = View.GONE
             binding.textDuration.visibility = View.GONE
 
-            binding.textViewOwner.text = binding.root.context.getString(
-                com.tutu.myblbl.R.string.favorite_added_at,
-                TimeUtils.formatTime(item.favTime)
-            )
+            binding.textViewOwner.text = formatFavoriteOwnerLine(item)
 
             val stat = item.cntInfo
             if (stat != null) {
@@ -278,10 +277,29 @@ class FavoriteHistoryAdapter(
             binding.textChargeBadge.visibility = if (item.isChargingExclusive) View.VISIBLE else View.GONE
             binding.textInteractionBadge.visibility = if (item.isSteinsGate) View.VISIBLE else View.GONE
 
+            val durationValue = item.duration.coerceAtLeast(0L)
+            if (durationValue > 0L) {
+                binding.textDuration.text = NumberUtils.formatDuration(durationValue)
+                binding.textDuration.visibility = View.VISIBLE
+            } else {
+                binding.textDuration.text = ""
+                binding.textDuration.visibility = View.GONE
+            }
+
             ImageLoader.loadVideoCover(
                 imageView = binding.imageView,
                 url = item.cover
             )
+        }
+
+        private fun formatFavoriteOwnerLine(item: HistoryVideoModel): String {
+            val favoriteTime = TimeUtils.formatRelativeTime(item.favTime)
+                .takeIf { it.isNotBlank() }
+                ?.let { "收藏于$it" }
+                .orEmpty()
+            return listOf(item.displayAuthorName, favoriteTime)
+                .filter { it.isNotBlank() }
+                .joinToString(" · ")
         }
     }
 

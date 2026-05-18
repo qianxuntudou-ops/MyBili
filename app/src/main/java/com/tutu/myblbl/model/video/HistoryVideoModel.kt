@@ -27,6 +27,8 @@ data class HistoryVideoModel(
     val authorFace: String = "",
     @SerializedName("author_mid")
     val authorMid: String = "",
+    @SerializedName("upper")
+    val upper: Owner? = null,
     @SerializedName("view_at")
     val viewAt: Long = 0,
     @SerializedName("progress")
@@ -85,6 +87,12 @@ data class HistoryVideoModel(
                 || elecArcType == 1 || elecArcBadge == "充电专属"
     val isPortrait: Boolean
         get() = dimension?.isPortrait == true
+    val displayAuthorName: String
+        get() = authorName.ifBlank { upper?.name.orEmpty() }
+    val displayAuthorFace: String
+        get() = authorFace.ifBlank { upper?.face.orEmpty() }
+    val displayAuthorMid: Long
+        get() = authorMid.toLongOrNull() ?: upper?.mid ?: 0L
     fun toVideoModel(): VideoModel {
         val historyInfo = history
         val aid = historyInfo?.oid ?: kid
@@ -100,9 +108,9 @@ data class HistoryVideoModel(
             epid = historyInfo?.epid ?: 0L,
             redirectUrl = uri,
             owner = Owner(
-                mid = authorMid.toLongOrNull() ?: 0L,
-                name = authorName,
-                face = authorFace
+                mid = displayAuthorMid,
+                name = displayAuthorName,
+                face = displayAuthorFace
             ),
             historyProgress = progress,
             historyViewAt = viewAt,

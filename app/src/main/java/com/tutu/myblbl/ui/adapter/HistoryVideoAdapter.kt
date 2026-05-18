@@ -123,7 +123,7 @@ class HistoryVideoAdapter(
                 context = itemView.context,
                 video = video,
                 onDislikeVideo = { removeItems { itemKey(it) == itemKey(item) } },
-                onDislikeUp = { upName -> removeItems { it.authorName.equals(upName, ignoreCase = true) } }
+                onDislikeUp = { upName -> removeItems { it.displayAuthorName.equals(upName, ignoreCase = true) } }
             ).show()
         }
 

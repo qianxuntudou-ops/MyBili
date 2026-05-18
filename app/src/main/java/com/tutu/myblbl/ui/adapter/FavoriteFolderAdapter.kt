@@ -137,13 +137,12 @@ class FavoriteFolderAdapter(
             binding.root.isSelected = isFocused
             binding.tvTitle.isSelected = isFocused
             binding.tvTitle.text = item.title
-            binding.tvCount.text = binding.root.context.getString(
-                R.string.favorite_folder_count_format,
-                item.mediaCount
-            )
+            binding.tvCount.text = item.mediaCount.toString()
             ImageLoader.loadSeriesCover(
                 imageView = binding.imageCover,
-                url = item.displayImageUrl
+                url = item.displayImageUrl,
+                placeholder = R.drawable.favorite_folder_cover_placeholder,
+                error = R.drawable.favorite_folder_cover_placeholder
             )
         }
     }
