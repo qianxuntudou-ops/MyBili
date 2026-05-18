@@ -1,11 +1,13 @@
 package com.tutu.myblbl.ui.adapter
 
 import android.annotation.SuppressLint
+import android.graphics.Outline
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
@@ -135,10 +137,12 @@ class HistoryVideoAdapter(
                     outline.setRoundRect(0, 0, view.width, view.height, coverRadiusPx)
                 }
             }
-            val progressLp = binding.progressBar.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
-            progressLp.marginStart = coverRadiusPx.toInt()
-            progressLp.marginEnd = coverRadiusPx.toInt()
-            binding.progressBar.layoutParams = progressLp
+            binding.progressBar.clipToOutline = true
+            binding.progressBar.outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, view.height / 2f)
+                }
+            }
             binding.root.setOnClickListener {
                 if (longPressTriggered) {
                     longPressTriggered = false
@@ -191,6 +195,7 @@ class HistoryVideoAdapter(
             )
             binding.imageAvatar.visibility = View.GONE
             binding.textBadge.visibility = View.GONE
+            binding.textHistoryViewTime.visibility = View.VISIBLE
             binding.iconPlayCount.visibility = View.GONE
             binding.textPlayCount.visibility = View.GONE
             binding.iconDanmaku.visibility = View.GONE
@@ -203,13 +208,9 @@ class HistoryVideoAdapter(
             binding.root.isSelected = isFocused
             binding.textView.isSelected = isFocused
             binding.textView.text = item.title.ifBlank { item.showTitle }
-            binding.imageAvatar.visibility = View.GONE
-            if (item.isPortrait) {
-                binding.textBadge.text = "竖屏"
-                binding.textBadge.visibility = View.VISIBLE
-            } else {
-                binding.textBadge.visibility = View.GONE
-            }
+            val ownerName = item.displayAuthorName
+            binding.imageAvatar.visibility = if (ownerName.isNotBlank()) View.VISIBLE else View.GONE
+            binding.textBadge.visibility = View.GONE
             binding.iconPlayCount.visibility = View.GONE
             binding.textPlayCount.visibility = View.GONE
             binding.iconDanmaku.visibility = View.GONE
@@ -221,13 +222,17 @@ class HistoryVideoAdapter(
             binding.progressBar.max = durationValue.toInt()
             binding.progressBar.progress = progressValue.toInt()
 
-            binding.textDuration.text = when {
+            val durationText = when {
                 item.history?.business == "live" && item.badge.isNotBlank() -> item.badge
                 durationValue > 0L -> "${NumberUtils.formatDuration(progressValue)}/${NumberUtils.formatDuration(durationValue)}"
                 item.tagName.isNotBlank() -> item.tagName
                 else -> ""
             }
-            binding.textViewOwner.text = TimeUtils.formatHistoryViewTime(item.viewAt)
+            binding.textDuration.text = durationText
+            binding.textDuration.visibility = if (durationText.isNotBlank()) View.VISIBLE else View.GONE
+            binding.textViewOwner.text = ownerName
+            binding.textHistoryViewTime.text = TimeUtils.formatHistoryViewTime(item.viewAt)
+            binding.textHistoryViewTime.visibility = View.VISIBLE
             binding.textChargeBadge.visibility = if (item.isChargingExclusive) View.VISIBLE else View.GONE
             binding.textInteractionBadge.visibility = if (item.isSteinsGate) View.VISIBLE else View.GONE
 

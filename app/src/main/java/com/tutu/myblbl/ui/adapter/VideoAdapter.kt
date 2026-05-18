@@ -198,6 +198,12 @@ class VideoAdapter(
                     outline.setRoundRect(0, 0, view.width, view.height, coverRadiusPx)
                 }
             }
+            binding.progressBar.clipToOutline = true
+            binding.progressBar.outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, view.height / 2f)
+                }
+            }
             binding.root.setOnClickListener {
                 if (longPressTriggered) {
                     longPressTriggered = false
@@ -314,6 +320,7 @@ class VideoAdapter(
             binding.textPlayCount.visibility = View.VISIBLE
             binding.iconDanmaku.visibility = View.VISIBLE
             binding.textDanmakuCount.visibility = View.VISIBLE
+            binding.textHistoryViewTime.visibility = View.GONE
 
             val ownerName = video.authorName
             val publishLabel = formatPublishTime(video)
@@ -357,6 +364,7 @@ class VideoAdapter(
 
             binding.textPlayCount.text = NumberUtils.formatCount(video.viewCount)
             binding.textDanmakuCount.text = NumberUtils.formatCount(video.danmakuCount)
+            binding.textDuration.visibility = if (binding.textDuration.text.isNullOrBlank()) View.GONE else View.VISIBLE
             binding.textChargeBadge.visibility = if (video.isChargingExclusive) View.VISIBLE else View.GONE
             binding.textInteractionBadge.visibility = if (video.isSteinsGate) View.VISIBLE else View.GONE
         }
@@ -366,7 +374,8 @@ class VideoAdapter(
             binding.textPlayCount.visibility = View.GONE
             binding.iconDanmaku.visibility = View.GONE
             binding.textDanmakuCount.visibility = View.GONE
-            binding.imageAvatar.visibility = View.GONE
+            val ownerName = video.authorName
+            binding.imageAvatar.visibility = if (ownerName.isNotBlank()) View.VISIBLE else View.GONE
             binding.textBadge.visibility = View.GONE
 
             val duration = video.durationValue
@@ -379,14 +388,18 @@ class VideoAdapter(
                 binding.progressBar.visibility = View.GONE
             }
 
-            binding.textDuration.text = if (video.historyBusiness == "live" && video.historyBadge.isNotBlank()) {
+            val durationText = if (video.historyBusiness == "live" && video.historyBadge.isNotBlank()) {
                 video.historyBadge
             } else if (duration > 0) {
                 "${NumberUtils.formatDuration(progress)}/${NumberUtils.formatDuration(duration)}"
             } else {
                 video.historyBadge
             }
-            binding.textViewOwner.text = formatHistoryTime(video.historyViewAt)
+            binding.textDuration.text = durationText
+            binding.textDuration.visibility = if (durationText.isNotBlank()) View.VISIBLE else View.GONE
+            binding.textViewOwner.text = ownerName
+            binding.textHistoryViewTime.text = formatHistoryTime(video.historyViewAt)
+            binding.textHistoryViewTime.visibility = View.VISIBLE
             binding.textChargeBadge.visibility = if (video.isChargingExclusive) View.VISIBLE else View.GONE
             binding.textInteractionBadge.visibility = if (video.isSteinsGate) View.VISIBLE else View.GONE
         }

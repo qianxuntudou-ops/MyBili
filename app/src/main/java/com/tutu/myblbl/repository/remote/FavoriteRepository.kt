@@ -4,13 +4,13 @@ import com.tutu.myblbl.model.BaseResponse
 import com.tutu.myblbl.model.common.CollectionResultModel
 import com.tutu.myblbl.model.favorite.CheckFavoriteModel
 import com.tutu.myblbl.model.favorite.FavoriteFolderDetailWrapper
-import com.tutu.myblbl.model.favorite.FavoriteFolderModel
 import com.tutu.myblbl.model.favorite.FavoriteFoldersWrapper
 import com.tutu.myblbl.model.favorite.FolderDetailModel
 import com.tutu.myblbl.network.api.ApiService
 import com.tutu.myblbl.network.security.NetworkSecurityGateway
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 
+@Suppress("SpellCheckingInspection")
 class FavoriteRepository(
     private val apiService: ApiService,
     private val sessionGateway: NetworkSessionGateway,
@@ -23,6 +23,7 @@ class FavoriteRepository(
         const val WEB_ACTION_STATISTICS = "{\"appId\":100,\"platform\":5}"
     }
 
+    @Suppress("unused")
     suspend fun checkFavorite(aid: Long?): Result<BaseResponse<CheckFavoriteModel>> =
         runCatching {
             sessionGateway.executeWithRiskControlRetry(

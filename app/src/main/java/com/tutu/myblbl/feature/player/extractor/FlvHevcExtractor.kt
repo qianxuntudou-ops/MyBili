@@ -18,7 +18,7 @@ import androidx.media3.extractor.HevcConfig
  * FLV extractor that supports both AVC (H.264) and HEVC (H.265) video codecs.
  *
  * Standard ExoPlayer [androidx.media3.extractor.flv.FlvExtractor] only supports AVC (codec ID 7)
- * and throws [UnsupportedFormatException] for HEVC (codec ID 12). This extractor handles both
+ * and throws an unsupported format exception for HEVC (codec ID 12). This extractor handles both
  * by parsing the respective decoder configuration records (AVCDecoderConfigurationRecord and
  * HEVCDecoderConfigurationRecord) and outputting the correct MIME type.
  */
@@ -32,7 +32,7 @@ class FlvHevcExtractor : Extractor {
         private const val CODEC_HEVC = 12
 
         private const val PACKET_SEQ_START = 0
-        private const val PACKET_NALU = 1
+        private const val PACKET_NAL_UNIT = 1
 
         private const val SOUND_FORMAT_AAC = 10
         private const val AAC_PACKET_SEQ_START = 0
@@ -153,7 +153,7 @@ class FlvHevcExtractor : Extractor {
         // FLV tag timestamp is DTS; PTS = DTS + CTS. Ignoring this when B-frames
         // are present causes the player to render frames in decode order, producing
         // visible forward/backward stuttering.
-        val ctsOffset = if (headerSize >= 5 && packetType == PACKET_NALU) {
+        val ctsOffset = if (headerSize >= 5 && packetType == PACKET_NAL_UNIT) {
             var cts = ((hdr.data[2].toInt() and 0xFF) shl 16) or
                 ((hdr.data[3].toInt() and 0xFF) shl 8) or
                 (hdr.data[4].toInt() and 0xFF)
@@ -187,7 +187,7 @@ class FlvHevcExtractor : Extractor {
                 }
             }
 
-            PACKET_NALU -> {
+            PACKET_NAL_UNIT -> {
                 maybeEndTracks()
                 val track = videoTrack()
                 val rawBuf = ByteArray(payloadSize)

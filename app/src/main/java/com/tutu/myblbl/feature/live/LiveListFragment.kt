@@ -137,8 +137,8 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
     }
     
     private fun setupLoadMore() {
-        binding.recyclerView.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
+        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
                 val layoutManager = binding.recyclerView.layoutManager as? WrapContentGridLayoutManager ?: return
                 val totalItemCount = layoutManager.itemCount

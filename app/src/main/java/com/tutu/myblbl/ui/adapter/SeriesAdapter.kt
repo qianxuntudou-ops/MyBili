@@ -103,7 +103,7 @@ class SeriesAdapter(
     class SeriesViewHolder(
         private val binding: CellSeriesBinding,
         private val onItemClick: (SeriesModel) -> Unit,
-        private val enableSidebarExit: Boolean,
+        enableSidebarExit: Boolean,
         private val onTopEdgeUp: (() -> Boolean)?,
         private val onLeftEdge: (() -> Boolean)?,
         private val onRightEdge: (() -> Boolean)?,

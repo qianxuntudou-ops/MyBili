@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Build
 import android.text.format.DateFormat
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.KeyEvent
 import android.view.View
@@ -50,6 +51,7 @@ import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import java.util.Locale
 
+@Suppress("SpellCheckingInspection")
 class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
     companion object {
@@ -72,7 +74,6 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         private const val KEY_DEFAULT_START_PAGE = "default_start_page"
         private const val KEY_IMAGE_QUALITY = "image_quality"
         private const val KEY_THEME = "theme"
-        private const val KEY_FULLSCREEN_APP = "fullscreen_app"
         private const val KEY_LIVE_ENTRY = "live_entry"
         private const val KEY_MINOR_PROTECTION = "minor_protection"
         private const val KEY_DEFAULT_VIDEO_QUALITY = "default_video_quality"
@@ -80,18 +81,15 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         private const val KEY_DEFAULT_PLAY_SPEED = "default_play_speed"
         private const val KEY_AFTER_PLAY = "after_play"
         private const val KEY_PLAY_FINISH_EXIT_PLAYER = "play_finish_exit_player"
-        private const val KEY_SHOW_RE_FF = "show_re_ff"
         private const val KEY_VIDEO_CODEC = "video_codec"
         private const val KEY_SHOW_SUBTITLE_DEFAULT = "show_subtitle_default"
         private const val KEY_SUBTITLE_TEXT_SIZE = "subtitle_text_size"
         private const val KEY_SHOW_DEBUG = "show_debug"
         private const val KEY_SHOW_VIDEO_DETAIL = "show_video_detail"
         private const val KEY_SHOW_BOTTOM_PROGRESS_BAR = "show_bottom_progress_bar"
-        private const val KEY_SIMPLE_KEY_PRESS = "simple_key_press"
         private const val KEY_GIVE_COIN_NUMBER = "give_coin_number"
         private const val KEY_SHOW_NEXT_PREVIOUS = "show_next_previous"
         private const val KEY_SHOW_DM_SWITCH = "show_dm_switch"
-        private const val KEY_FF_SEEK_SECOND = "ff_seek_second"
         private const val KEY_DM_SWITCH = "dm_enable"
         private const val KEY_DM_ALPHA = "dm_alpha"
         private const val KEY_DM_TEXT_SIZE = "dm_text_size"
@@ -223,14 +221,14 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             SettingModel(getString(R.string.dm_smart_shield), "关")
         )
 
-        deviceSettings.add(SettingModel("应用版本", BuildConfig.VERSION_NAME))
-        deviceSettings.add(SettingModel("检查更新", "点击检查"))
-        deviceSettings.add(SettingModel("设备型号", Build.MODEL))
-        deviceSettings.add(SettingModel("系统版本", "Android ${Build.VERSION.RELEASE}"))
-        deviceSettings.add(SettingModel("SDK版本", Build.VERSION.SDK_INT.toString()))
-        deviceSettings.add(SettingModel("CPU架构", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"))
-        deviceSettings.add(SettingModel("屏幕分辨率", "${resources.displayMetrics.widthPixels}x${resources.displayMetrics.heightPixels}"))
-        deviceSettings.add(SettingModel("硬解支持", ""))
+        deviceSettings.add(DEVICE_POSITION_VERSION, SettingModel("应用版本", BuildConfig.VERSION_NAME))
+        deviceSettings.add(DEVICE_POSITION_CHECK_UPDATE, SettingModel("检查更新", "点击检查"))
+        deviceSettings.add(DEVICE_POSITION_DEVICE_MODEL, SettingModel("设备型号", Build.MODEL))
+        deviceSettings.add(DEVICE_POSITION_SYSTEM_VERSION, SettingModel("系统版本", "Android ${Build.VERSION.RELEASE}"))
+        deviceSettings.add(DEVICE_POSITION_SDK_VERSION, SettingModel("SDK版本", Build.VERSION.SDK_INT.toString()))
+        deviceSettings.add(DEVICE_POSITION_CPU_ABI, SettingModel("CPU架构", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"))
+        deviceSettings.add(DEVICE_POSITION_SCREEN, SettingModel("屏幕分辨率", "${resources.displayMetrics.widthPixels}x${resources.displayMetrics.heightPixels}"))
+        deviceSettings.add(DEVICE_POSITION_CODEC, SettingModel("硬解支持", ""))
 
         commonSettings.add(SettingModel("日志记录", if (AppLog.isEnabled) "开" else "关"))
         commonSettings.add(SettingModel("调试日志", ""))
@@ -324,7 +322,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             4 -> showCommonChoiceDialog(position, KEY_THEME, resources.getStringArray(R.array.themes).drop(1).toTypedArray())
             5 -> toggleSetting(commonSettings, 5, KEY_LIVE_ENTRY) { value ->
                 appSettings.putStringAsync(KEY_LIVE_ENTRY, value)
-                val activity = activity as? com.tutu.myblbl.ui.activity.MainActivity
+                val activity = activity as? MainActivity
                 activity?.applyLiveEntryVisibility()
             }
             6 -> {
@@ -333,14 +331,14 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
                     showMinorProtectionVerifyDialog {
                         toggleSetting(commonSettings, 6, KEY_MINOR_PROTECTION) { value ->
                             appSettings.putStringAsync(KEY_MINOR_PROTECTION, value)
-                            val activity = activity as? com.tutu.myblbl.ui.activity.MainActivity
+                            val activity = activity as? MainActivity
                             activity?.applyCategoryEntryVisibility()
                         }
                     }
                 } else {
                     toggleSetting(commonSettings, 6, KEY_MINOR_PROTECTION) { value ->
                         appSettings.putStringAsync(KEY_MINOR_PROTECTION, value)
-                        val activity = activity as? com.tutu.myblbl.ui.activity.MainActivity
+                        val activity = activity as? MainActivity
                         activity?.applyCategoryEntryVisibility()
                     }
                 }
@@ -528,7 +526,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
         val actionContainer = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.END
+            gravity = Gravity.END
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             lp.setMargins(px18, px20, px18, px18)
             layoutParams = lp
@@ -628,7 +626,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             }
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             lp.setMargins(px18, px20, px18, px18)
-            lp.gravity = android.view.Gravity.END
+            lp.gravity = Gravity.END
             layoutParams = lp
         }
         root.addView(cancelButton)
@@ -682,7 +680,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             context.externalCacheDir?.let { deleteDir(it) }
             commonSettings[0].info = formatFileSize(getCurrentCacheSize())
             adapter.notifyItemChanged(0)
-            android.widget.Toast.makeText(requireContext(), "缓存已清除", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "缓存已清除", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             AppLog.e("SettingsFragment", "clearCache failed", e)
         }
@@ -838,19 +836,23 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         showChoiceDialog(commonSettings[position].title, commonSettings[position].info, options) { value ->
             updateSetting(commonSettings, position, value)
             appSettings.putStringAsync(key, value)
-            if (key == KEY_DEFAULT_START_PAGE) {
-                appSettings.putIntAsync("defaultStartPage", HOME_START_PAGE_OPTIONS.indexOf(value).coerceAtLeast(0))
-            } else if (key == KEY_IMAGE_QUALITY) {
-                val qualityLevel = when (value) {
-                    "低尺寸" -> 0
-                    "高尺寸" -> 2
-                    else -> 1
+            when (key) {
+                KEY_DEFAULT_START_PAGE -> {
+                    appSettings.putIntAsync("defaultStartPage", HOME_START_PAGE_OPTIONS.indexOf(value).coerceAtLeast(0))
                 }
-                appSettings.putIntAsync("imageQualityLevel", qualityLevel)
-                ImageLoader.invalidateImageQualityCache()
-            } else if (key == KEY_THEME) {
-                appSettings.putIntAsync("theme", value.toLegacyTheme())
-                activity?.recreate()
+                KEY_IMAGE_QUALITY -> {
+                    val qualityLevel = when (value) {
+                        "低尺寸" -> 0
+                        "高尺寸" -> 2
+                        else -> 1
+                    }
+                    appSettings.putIntAsync("imageQualityLevel", qualityLevel)
+                    ImageLoader.invalidateImageQualityCache()
+                }
+                KEY_THEME -> {
+                    appSettings.putIntAsync("theme", value.toLegacyTheme())
+                    activity?.recreate()
+                }
             }
         }
     }
@@ -904,7 +906,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         dialog.setCanceledOnTouchOutside(true)
         dialog.findViewById<View>(R.id.dialog_root)?.setOnClickListener { dialog.dismiss() }
 
-        val titleView = dialog.findViewById<android.widget.TextView>(R.id.top_title)
+        val titleView = dialog.findViewById<TextView>(R.id.top_title)
         val recyclerView = dialog.findViewById<RecyclerView>(R.id.recyclerView)
         titleView?.text = title
 
@@ -1034,8 +1036,6 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             shouldRequestInitialCategoryFocus = false
         }
     }
-
-    private fun toggleOptions(): Array<String> = arrayOf("开", "关")
 
     private fun toggleSetting(
         target: MutableList<SettingModel>,
@@ -1193,7 +1193,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
         val actionContainer = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.END
+            gravity = Gravity.END
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             lp.setMargins(px18, px20, px18, px18)
             layoutParams = lp
@@ -1234,7 +1234,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         root.addView(actionContainer)
         dialog.setContentView(root)
         dialog.show()
-        (actionContainer.getChildAt(0) as? android.view.View)?.requestFocus()
+        actionContainer.getChildAt(0)?.requestFocus()
     }
 
     private fun showGaiaVgateVoucherDialog() {
@@ -1294,7 +1294,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
         val actionContainer = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.END
+            gravity = Gravity.END
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             lp.setMargins(px18, px20, px18, px18)
             layoutParams = lp
@@ -1342,7 +1342,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         }
 
         editText.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN && event.action == android.view.KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN) {
                 actionContainer.getChildAt(0)?.requestFocus()
                 true
             } else {
@@ -1375,7 +1375,6 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         val px18 = resources.getDimensionPixelSize(R.dimen.px18)
         val px16 = resources.getDimensionPixelSize(R.dimen.px16)
         val px14 = resources.getDimensionPixelSize(R.dimen.px14)
-        val px10 = resources.getDimensionPixelSize(R.dimen.px10)
         val textColor = resources.getColor(R.color.textColor, null)
 
         val dialog = AppCompatDialog(requireContext(), R.style.DialogTheme)
@@ -1386,7 +1385,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             setTextColor(textColor)
             textSize = 16f
             setTypeface(null, android.graphics.Typeface.BOLD)
-            gravity = android.view.Gravity.CENTER
+            gravity = Gravity.CENTER
             setPadding(px16, px14, px16, px14)
         }
 
