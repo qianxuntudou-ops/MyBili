@@ -48,20 +48,26 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
 
     open fun applyTheme() {
         val themeIndex = appSettings.getCachedInt("theme", 1)
-        setTheme(themeIndex.toThemeResId())
+        setTheme(themeIndexToResId(themeIndex))
     }
 
-    private fun Int.toThemeResId(): Int {
-        return when (this) {
-            0 -> R.style.DarkTheme
-            1 -> R.style.DarkTheme
-            2 -> R.style.WhiteTheme
-            3 -> R.style.ClassicsTheme
-            4 -> R.style.PinkTheme
-            5 -> R.style.BlueTheme
-            6 -> R.style.PurpleTheme
-            7 -> R.style.RedTheme
-            else -> R.style.DarkTheme
+    companion object {
+        /**
+         * 主题 index → Theme resId 映射。Application 阶段的预 inflate 也用它，避免
+         * 用错 theme 导致 ?attr/xxx 解析不到。
+         */
+        fun themeIndexToResId(themeIndex: Int): Int {
+            return when (themeIndex) {
+                0 -> R.style.DarkTheme
+                1 -> R.style.DarkTheme
+                2 -> R.style.WhiteTheme
+                3 -> R.style.ClassicsTheme
+                4 -> R.style.PinkTheme
+                5 -> R.style.BlueTheme
+                6 -> R.style.PurpleTheme
+                7 -> R.style.RedTheme
+                else -> R.style.DarkTheme
+            }
         }
     }
 

@@ -143,13 +143,19 @@
         app:layout_constraintEnd_toEndOf="@+id/imageView"
         app:layout_constraintStart_toStartOf="@+id/imageView"
         app:layout_constraintTop_toBottomOf="@+id/imageView">
+        <!--
+          ~ 不再在 XML 里 srcCompat="@drawable/playing"：playing.gif 33KB，AppCompatImageView
+          ~ 在 inflate 阶段会立刻 decode 一次（即使 visibility=gone），首屏 12 个 cell 同时
+          ~ 触发 12 次 GIF decode 在主线程上是巨大浪费。
+          ~ VideoViewHolder.bind 里已经按需 ImageLoader.loadDrawableRes(iconPlaying, R.drawable.playing)
+          ~ 或 ImageLoader.clear(iconPlaying)，src 完全可以延迟到 bind 时设置。
+          -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/icon_playing"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
-            android:visibility="gone"
-            app:srcCompat="@drawable/playing"/>
+            android:visibility="gone"/>
         <androidx.appcompat.widget.AppCompatTextView
             android:textSize="@dimen/px31"
             android:textStyle="bold"

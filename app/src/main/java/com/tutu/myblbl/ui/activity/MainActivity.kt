@@ -98,7 +98,18 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     private var restoredFromSavedState = false
     private var restoredTabIndex = -1
 
-    override fun getViewBinding(): ActivityMainBinding = ActivityMainBinding.inflate(layoutInflater)
+    override fun getViewBinding(): ActivityMainBinding {
+        // 优先用 Application 阶段 AsyncLayoutInflater 预 inflate 好的 view，
+        // 省去主线程 setContentView 之前那一段 80~150ms 的 inflate 时间（含 view_tab_bar 嵌套 inflate）。
+        // 预 inflate 失败 / Activity recreate / 预 inflate 没赶上时自动 fallback 到主线程 inflate。
+        val preInflated = MyBLBLApplication.instance.consumePreInflatedActivityMain()
+        return if (preInflated != null) {
+            AppLog.i(STARTUP_TAG, "STARTUP activity_main using pre-inflated view")
+            ActivityMainBinding.bind(preInflated)
+        } else {
+            ActivityMainBinding.inflate(layoutInflater)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppLog.i(STARTUP_TAG, "STARTUP T1b MainActivity.onCreate start")
