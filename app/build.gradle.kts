@@ -226,6 +226,8 @@ dependencies {
     implementation("androidx.viewpager2:viewpager2:1.1.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
+    // 在 Application 阶段后台异步 inflate activity_main，避免主线程 setContentView 走慢 inflate 路径。
+    implementation("androidx.asynclayoutinflater:asynclayoutinflater:1.0.0")
     implementation("androidx.datastore:datastore-preferences:1.1.4")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
