@@ -22,6 +22,7 @@ class RecommendViewModel(
         private const val TAG = "RecommendVM"
         private const val FIRST_PAGE_SIZE = 12
         private const val NEXT_PAGE_SIZE = 24
+        private const val FIRST_PAGE_PRELOAD_GRACE_MS = 180L
     }
 
     private val appContext = context.applicationContext
@@ -73,9 +74,12 @@ class RecommendViewModel(
         fromRefresh: Boolean = false
     ) {
         if (page == 1 && replace && fromInitial) {
-            val awaitStart = SystemClock.elapsedRealtime()
-            val preloaded = repository.awaitFirstPage(timeoutMs = 2000L)
-            AppLog.i(TAG, "STARTUP T6 preload ${if (preloaded != null) "hit" else "miss"} await=${SystemClock.elapsedRealtime() - awaitStart}ms items=${preloaded?.items?.size ?: 0}")
+            val peekStart = SystemClock.elapsedRealtime()
+            var preloaded = repository.peekFirstPage()
+            if (preloaded == null) {
+                preloaded = repository.awaitFirstPage(timeoutMs = FIRST_PAGE_PRELOAD_GRACE_MS)
+            }
+            AppLog.i(TAG, "STARTUP T6 preload ${if (preloaded != null) "hit" else "miss"} grace=${FIRST_PAGE_PRELOAD_GRACE_MS}ms elapsed=${SystemClock.elapsedRealtime() - peekStart}ms items=${preloaded?.items?.size ?: 0}")
             if (preloaded != null) {
                 seenBvids.clear()
                 val filterStart = SystemClock.elapsedRealtime()
@@ -95,6 +99,7 @@ class RecommendViewModel(
                 }
                 return
             }
+            AppLog.i(TAG, "STARTUP T6b preload miss -> start direct first-page request")
         }
 
         val current = _uiState.value

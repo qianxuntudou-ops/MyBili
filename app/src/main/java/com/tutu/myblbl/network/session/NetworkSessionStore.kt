@@ -1,11 +1,13 @@
 package com.tutu.myblbl.network.session
 
 import android.content.SharedPreferences
+import com.google.gson.Gson
 import com.tutu.myblbl.model.BaseResponse
 import com.tutu.myblbl.model.user.UserDetailInfoModel
 import com.tutu.myblbl.network.WbiGenerator
 import com.tutu.myblbl.network.response.Base2Response
 import com.tutu.myblbl.network.response.BaseBaseResponse
+import com.tutu.myblbl.core.common.log.AppLog
 
 class NetworkSessionStore(
     private val authInvalidCode: Int
@@ -15,8 +17,11 @@ class NetworkSessionStore(
         private const val WBI_KEYS_STALE_MS = 24 * 60 * 60 * 1000L
         private const val PREFS_KEY_WBI_IMG = "wbi_img_key"
         private const val PREFS_KEY_WBI_SUB = "wbi_sub_key"
+        private const val PREFS_KEY_USER_INFO = "user_info_json"
+        private const val TAG = "NetworkSessionStore"
     }
 
+    private val gson = Gson()
     private var wbiImageKey: String = ""
     private var wbiSubKey: String = ""
     private var wbiKeysUpdatedAt: Long = 0L
@@ -25,7 +30,23 @@ class NetworkSessionStore(
 
     fun initPersistence(prefs: SharedPreferences) {
         sharedPrefs = prefs
+        restorePersistedUserInfo()
         restorePersistedWbiKeys()
+    }
+
+    private fun restorePersistedUserInfo() {
+        val raw = sharedPrefs?.getString(PREFS_KEY_USER_INFO, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        runCatching {
+            gson.fromJson(raw, UserDetailInfoModel::class.java)
+        }.onSuccess { restored ->
+            userInfo = restored?.let { it.copy(face = normalizeAvatarUrl(it.face)) }
+            AppLog.i(TAG, "restorePersistedUserInfo hit mid=${userInfo?.mid ?: 0} hasFace=${!userInfo?.face.isNullOrBlank()}")
+        }.onFailure {
+            AppLog.w(TAG, "restorePersistedUserInfo failed; clearing", it)
+            sharedPrefs?.edit()?.remove(PREFS_KEY_USER_INFO)?.apply()
+        }
     }
 
     private fun restorePersistedWbiKeys() {
@@ -67,11 +88,13 @@ class NetworkSessionStore(
     fun clearUserSession() {
         userInfo = null
         wbiKeysUpdatedAt = 0L
+        sharedPrefs?.edit()?.remove(PREFS_KEY_USER_INFO)?.apply()
         setWbiInfo("", "")
     }
 
     fun softClearUserSession() {
         userInfo = null
+        sharedPrefs?.edit()?.remove(PREFS_KEY_USER_INFO)?.apply()
     }
 
     fun isSessionActive(): Boolean {
@@ -83,10 +106,14 @@ class NetworkSessionStore(
             it.copy(face = normalizeAvatarUrl(it.face))
         }
         if (userInfo == null) {
+            sharedPrefs?.edit()?.remove(PREFS_KEY_USER_INFO)?.apply()
             setWbiInfo("", "")
             return
         }
         val normalizedUser = requireNotNull(userInfo)
+        sharedPrefs?.edit()
+            ?.putString(PREFS_KEY_USER_INFO, gson.toJson(normalizedUser))
+            ?.apply()
         val imgKey = normalizedUser.wbiImg?.imgUrl?.let(WbiGenerator::extractKeyFromUrl).orEmpty()
         val subKey = normalizedUser.wbiImg?.subUrl?.let(WbiGenerator::extractKeyFromUrl).orEmpty()
         setWbiInfo(imgKey, subKey)

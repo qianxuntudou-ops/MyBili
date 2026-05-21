@@ -17,6 +17,7 @@ import com.tutu.myblbl.core.ui.base.BaseVideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseVideoViewHolder
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
+import com.tutu.myblbl.core.common.log.VideoCardPerfLogger
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
@@ -65,11 +66,13 @@ class DynamicVideoAdapter(
     }
 
     override fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = CellVideoBinding.inflate(
-            LayoutInflater.from(parent.context),
-            parent,
-            false
-        )
+        val binding = VideoCardPerfLogger.measureInflate("DynamicVideoAdapter") {
+            CellVideoBinding.inflate(
+                LayoutInflater.from(parent.context),
+                parent,
+                false
+            )
+        }
         return ViewHolder(binding)
     }
 

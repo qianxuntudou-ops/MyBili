@@ -14,6 +14,7 @@ import com.tutu.myblbl.databinding.FragmentLiveListBinding
 import com.tutu.myblbl.model.live.LiveRoomItem
 import com.tutu.myblbl.ui.activity.LivePlayerActivity
 import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseListFragment
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.feature.settings.SignInFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
@@ -87,6 +88,7 @@ class LiveListFragment : BaseFragment<FragmentLiveListBinding>(), LiveTabPage {
         binding.recyclerView.adapter = adapter
         binding.recyclerView.itemAnimator = null
         binding.recyclerView.setHasFixedSize(true)
+        binding.recyclerView.setRecycledViewPool(BaseListFragment.sharedVideoPool)
 
         tvFocusController = TvListFocusController(
             recyclerView = binding.recyclerView,

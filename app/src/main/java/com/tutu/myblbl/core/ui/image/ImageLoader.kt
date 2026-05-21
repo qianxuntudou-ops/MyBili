@@ -22,9 +22,11 @@ import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.network.NetworkManager
 import pl.droidsonroids.gif.GifDrawable
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -57,11 +59,25 @@ object ImageLoader {
     // 独立的 OkHttpClient，不走业务 interceptor
     private val imageOkHttpClient: OkHttpClient by lazy { buildImageOkHttpClient() }
 
-    // Prefetch 专用去重
-    private val prefetchInFlight = mutableMapOf<String, Job>()
+    // 前台 bind 与后台 prefetch 共用同 URL 请求，避免首屏重复下载/解码同一张封面。
+    private val imageDataScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val imageDataInFlight = mutableMapOf<String, Deferred<ImageData>>()
 
     private val preheatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val preheated = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private data class ImageData(
+        val bytes: ByteArray,
+        val bitmap: Bitmap?,
+        val isGif: Boolean,
+        val fetchMs: Long,
+        val decodeMs: Long
+    )
+
+    private data class ImageDataRequest(
+        val deferred: Deferred<ImageData>,
+        val reused: Boolean
+    )
 
     // ---------- 公开 API ----------
 
@@ -97,12 +113,8 @@ object ImageLoader {
         placeholder: Int = 0,
         error: Int = 0
     ) {
-        val optimizedUrl = buildOptimizedAvatarUrl(url)
         val normalizedUrl = normalizeUrl(url)
-        loadInto(imageView, optimizedUrl, placeholder, error,
-            circleCrop = true,
-            fallbackUrl = if (optimizedUrl != normalizedUrl) normalizedUrl else null
-        )
+        loadInto(imageView, normalizedUrl, placeholder, error, circleCrop = true)
     }
 
     fun loadDrawableRes(
@@ -359,6 +371,7 @@ object ImageLoader {
         // 内存缓存命中
         val cached = cache.get(url)
         if (cached != null) {
+            AppLog.i(TAG, "cover memory hit url=${url.takeLast(50)}")
             imageView.setImageBitmap(applyTransform(cached, circleCrop, cornerRadius))
             onSuccess?.invoke(cached)
             return
@@ -371,29 +384,30 @@ object ImageLoader {
         val startMs = SystemClock.elapsedRealtime()
         val job = scope.launch {
             try {
-                val bytes = withContext(Dispatchers.IO) { fetchBytes(url) }
-                val elapsed = SystemClock.elapsedRealtime() - startMs
-                if (isGifBytes(bytes)) {
+                val request = loadImageData(url)
+                val data = request.deferred.await()
+                val bytes = data.bytes
+                val fetchMs = data.fetchMs
+                if (data.isGif) {
                     if ((imageView.getTag(R.id.tag_image_loader_url) as? String) == url) {
                         val gifDrawable = withContext(Dispatchers.IO) {
                             GifDrawable(bytes).also { it.start() }
                         }
                         imageView.setImageDrawable(gifDrawable)
                     }
-                    AppLog.i(TAG, "gif loaded: elapsed=${elapsed}ms url=${url.takeLast(50)}")
+                    AppLog.i(TAG, "gif loaded: elapsed=${SystemClock.elapsedRealtime() - startMs}ms fetch=${fetchMs}ms bytes=${bytes.size} url=${url.takeLast(50)}")
                 } else {
-                    val bmp = withContext(Dispatchers.Default) {
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    }
+                    val bmp = data.bitmap
+                    val decodeMs = data.decodeMs
                     if (bmp != null) {
                         cache.put(url, bmp)
                         if ((imageView.getTag(R.id.tag_image_loader_url) as? String) == url) {
                             imageView.setImageBitmap(applyTransform(bmp, circleCrop, cornerRadius))
                         }
-                        AppLog.i(TAG, "cover loaded: elapsed=${elapsed}ms url=${url.takeLast(50)}")
+                        AppLog.i(TAG, "cover loaded: elapsed=${SystemClock.elapsedRealtime() - startMs}ms fetch=${fetchMs}ms decode=${decodeMs}ms shared=${request.reused} bytes=${bytes.size} url=${url.takeLast(50)}")
                         onSuccess?.invoke(bmp)
                     } else {
-                        AppLog.w(TAG, "cover decode null: elapsed=${elapsed}ms url=${url.takeLast(50)}")
+                        AppLog.w(TAG, "cover decode null: elapsed=${SystemClock.elapsedRealtime() - startMs}ms fetch=${fetchMs}ms decode=${decodeMs}ms url=${url.takeLast(50)}")
                         handleLoadError(imageView, url, errorRes, fallbackUrl, circleCrop, cornerRadius, onSuccess, onError)
                     }
                 }
@@ -447,8 +461,9 @@ object ImageLoader {
 
         val job = scope.launch {
             try {
-                val bytes = withContext(Dispatchers.IO) { fetchBytes(url) }
-                if (isGifBytes(bytes)) {
+                val data = loadImageData(url).deferred.await()
+                val bytes = data.bytes
+                if (data.isGif) {
                     if ((imageView.getTag(R.id.tag_image_loader_url) as? String) == url) {
                         val gifDrawable = withContext(Dispatchers.IO) {
                             GifDrawable(bytes).also { it.start() }
@@ -456,9 +471,7 @@ object ImageLoader {
                         imageView.setImageDrawable(gifDrawable)
                     }
                 } else {
-                    val bmp = withContext(Dispatchers.Default) {
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    }
+                    val bmp = data.bitmap
                     if (bmp != null) {
                         cache.put(url, bmp)
                         if ((imageView.getTag(R.id.tag_image_loader_url) as? String) == url) {
@@ -512,20 +525,59 @@ object ImageLoader {
     private fun prefetch(url: String) {
         if (url.isBlank()) return
         if (cache.get(url) != null) return
-        synchronized(prefetchInFlight) {
-            if (prefetchInFlight[url]?.isActive == true) return
-            val job = scope.launch {
-                try {
-                    val bytes = withContext(Dispatchers.IO) { fetchBytes(url) }
-                    val bmp = withContext(Dispatchers.Default) {
+        scope.launch {
+            try {
+                val request = loadImageData(url)
+                val data = request.deferred.await()
+                val bmp = data.bitmap
+                if (bmp != null) {
+                    cache.put(url, bmp)
+                    AppLog.i(
+                        TAG,
+                        "prefetch cover cached url=${url.takeLast(50)} shared=${request.reused} bytes=${data.bytes.size}"
+                    )
+                }
+            } catch (t: Throwable) {
+                AppLog.w(TAG, "prefetch failed url=${url.takeLast(50)}", t)
+            }
+        }
+    }
+
+    private fun loadImageData(url: String): ImageDataRequest {
+        synchronized(imageDataInFlight) {
+            imageDataInFlight[url]?.takeIf { it.isActive }?.let {
+                return ImageDataRequest(it, reused = true)
+            }
+            val deferred = imageDataScope.async {
+                val fetchStartMs = SystemClock.elapsedRealtime()
+                val bytes = fetchBytes(url)
+                val fetchMs = SystemClock.elapsedRealtime() - fetchStartMs
+                val isGif = isGifBytes(bytes)
+                val decodeStartMs = SystemClock.elapsedRealtime()
+                val bitmap = if (isGif) {
+                    null
+                } else {
+                    withContext(Dispatchers.Default) {
                         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                     }
-                    if (bmp != null) cache.put(url, bmp)
-                } catch (t: Throwable) {
-                    AppLog.w(TAG, "prefetch failed url=${url.takeLast(50)}", t)
+                }
+                ImageData(
+                    bytes = bytes,
+                    bitmap = bitmap,
+                    isGif = isGif,
+                    fetchMs = fetchMs,
+                    decodeMs = SystemClock.elapsedRealtime() - decodeStartMs
+                )
+            }
+            deferred.invokeOnCompletion {
+                synchronized(imageDataInFlight) {
+                    if (imageDataInFlight[url] === deferred) {
+                        imageDataInFlight.remove(url)
+                    }
                 }
             }
-            prefetchInFlight[url] = job
+            imageDataInFlight[url] = deferred
+            return ImageDataRequest(deferred, reused = false)
         }
     }
 
@@ -603,6 +655,9 @@ object ImageLoader {
             url.startsWith("https://") -> url
             url.startsWith("http://") -> "https://${url.removePrefix("http://")}"
             url.startsWith("//") -> "https:$url"
+            url.startsWith("/bfs/") -> "https://i0.hdslb.com$url"
+            url.startsWith("/face/") -> "https://i0.hdslb.com/bfs$url"
+            url.startsWith("face/") -> "https://i0.hdslb.com/bfs/$url"
             url.startsWith("bfs/") -> "https://i0.hdslb.com/$url"
             else -> url
         }
@@ -626,17 +681,6 @@ object ImageLoader {
             0 -> "@240w_240h_1c.webp"
             2 -> "@960w_960h_1c.webp"
             else -> "@480w_480h_1c.webp"
-        }
-        return appendImageSuffix(normalized, suffix)
-    }
-
-    private fun buildOptimizedAvatarUrl(url: String?): String {
-        val normalized = normalizeUrl(url)
-        if (!isBilibiliImageUrl(normalized)) return normalized
-        val suffix = when (resolveImageQualityLevel()) {
-            0 -> "@120w_120h_1c.webp"
-            2 -> "@360w_360h_1c.webp"
-            else -> "@240w_240h_1c.webp"
         }
         return appendImageSuffix(normalized, suffix)
     }

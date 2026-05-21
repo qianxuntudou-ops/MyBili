@@ -19,6 +19,7 @@ import com.tutu.myblbl.model.user.FollowingModel
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseListFragment
 import android.os.SystemClock
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.ui.fragment.main.MainTabFocusTarget
@@ -36,7 +37,9 @@ import com.tutu.myblbl.core.ui.focus.tv.TvListFocusController
 import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -137,6 +140,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
         binding.recyclerViewRight.layoutManager = WrapContentGridLayoutManager(requireContext(), 3)
         binding.recyclerViewRight.adapter = videoAdapter
         binding.recyclerViewRight.itemAnimator = null
+        binding.recyclerViewRight.setRecycledViewPool(BaseListFragment.sharedVideoPool)
         binding.recyclerViewRight.setOnKeyListener { _, _, _ ->
             false
         }
@@ -267,8 +271,11 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.videos.collectLatest { rawVideos ->
                     val filterStartMs = SystemClock.elapsedRealtime()
-                    val videos = ContentFilter.filterVideos(requireContext(), rawVideos)
-                    AppLog.i(TAG, "DYN D6 filterVideos end elapsed=${SystemClock.elapsedRealtime() - filterStartMs}ms raw=${rawVideos.size} filtered=${videos.size}")
+                    val appContext = requireContext().applicationContext
+                    val (videos, filterThread) = withContext(Dispatchers.Default) {
+                        ContentFilter.filterVideos(appContext, rawVideos) to Thread.currentThread().name
+                    }
+                    AppLog.i(TAG, "DYN D6 filterVideos end elapsed=${SystemClock.elapsedRealtime() - filterStartMs}ms raw=${rawVideos.size} filtered=${videos.size} filterThread=$filterThread")
 
                     val page = viewModel.loadedPage.value
                     swipeRefreshLayout?.isRefreshing = false

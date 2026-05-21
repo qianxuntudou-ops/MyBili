@@ -213,8 +213,12 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     private val appEventHub: AppEventHub by inject()
     private val videoRepository: com.tutu.myblbl.repository.VideoRepository by inject()
 
-    override fun getViewBinding(): FragmentVideoPlayerBinding =
-        FragmentVideoPlayerBinding.inflate(layoutInflater)
+    override fun getViewBinding(): FragmentVideoPlayerBinding {
+        val startMs = SystemClock.elapsedRealtime()
+        return FragmentVideoPlayerBinding.inflate(layoutInflater).also {
+            AppLog.i(TAG, "PLAYER_STARTUP binding inflate elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
+        }
+    }
 
     private val viewModel: VideoPlayerViewModel by viewModel()
 
@@ -435,12 +439,18 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
         if (!initialized) {
             initialized = true
+            val initStartMs = SystemClock.elapsedRealtime()
             initViews()
+            val settingsStartMs = SystemClock.elapsedRealtime()
             playerSettings = PlayerSettingsStore.load(this)
+            AppLog.i(TAG, "PLAYER_STARTUP PlayerSettingsStore.load elapsed=${SystemClock.elapsedRealtime() - settingsStartMs}ms")
             setupAdapters()
             setupOverlayController()
+            val setupPlayerStartMs = SystemClock.elapsedRealtime()
             setupPlayer()
+            AppLog.i(TAG, "PLAYER_STARTUP setupPlayer elapsed=${SystemClock.elapsedRealtime() - setupPlayerStartMs}ms")
             setupObservers()
+            AppLog.i(TAG, "PLAYER_STARTUP first init block elapsed=${SystemClock.elapsedRealtime() - initStartMs}ms")
             binding.root.post {
                 setupBackHandler()
             }

@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.FrameMetrics
 import android.view.GestureDetector
@@ -36,6 +37,7 @@ import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import androidx.media3.ui.AspectRatioFrameLayout
 import com.kuaishou.akdanmaku.ui.DanmakuView
 import com.tutu.myblbl.R
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.model.dm.DmMaskRepository
 import com.tutu.myblbl.model.dm.DmModel
@@ -309,7 +311,10 @@ class MyPlayerView @JvmOverloads constructor(
     }
 
     init {
+        val initStartMs = SystemClock.elapsedRealtime()
+        val layoutStartMs = SystemClock.elapsedRealtime()
         LayoutInflater.from(context).inflate(R.layout.my_exo_styled_player_view, this)
+        AppLog.i("PlayerViewPerf", "my_exo_styled_player_view inflate elapsed=${SystemClock.elapsedRealtime() - layoutStartMs}ms")
         descendantFocusability = FOCUS_AFTER_DESCENDANTS
 
         contentFrame = findViewById(R.id.exo_content_frame)
@@ -323,20 +328,29 @@ class MyPlayerView @JvmOverloads constructor(
         dmkMaskHost = findViewById(R.id.dmk_mask_host)
         pauseIndicatorView = findViewById(R.id.image_pause_indicator)
 
+        val surfaceStartMs = SystemClock.elapsedRealtime()
         setupSurfaceView()
+        AppLog.i("PlayerViewPerf", "setupSurfaceView elapsed=${SystemClock.elapsedRealtime() - surfaceStartMs}ms")
 
         bufferingView?.visibility = GONE
         errorMessageView?.visibility = GONE
 
+        val controllerStartMs = SystemClock.elapsedRealtime()
         setupController()
+        AppLog.i("PlayerViewPerf", "setupController elapsed=${SystemClock.elapsedRealtime() - controllerStartMs}ms")
+        val settingStartMs = SystemClock.elapsedRealtime()
         setupSettingView()
+        AppLog.i("PlayerViewPerf", "setupSettingView elapsed=${SystemClock.elapsedRealtime() - settingStartMs}ms")
+        val overlayStartMs = SystemClock.elapsedRealtime()
         setupYouTubeOverlay()
+        AppLog.i("PlayerViewPerf", "setupYouTubeOverlay elapsed=${SystemClock.elapsedRealtime() - overlayStartMs}ms")
 
         isClickable = true
         isFocusable = true
         descendantFocusability = FOCUS_AFTER_DESCENDANTS
 
         isDoubleTapEnabled = true
+        AppLog.i("PlayerViewPerf", "MyPlayerView init elapsed=${SystemClock.elapsedRealtime() - initStartMs}ms")
     }
 
     private fun setupSurfaceView() {

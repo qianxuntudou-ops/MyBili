@@ -23,10 +23,12 @@ class RecommendFeedRepository(
         private const val CACHE_KEY = "recommendCacheList"
         private const val MAX_CACHED_RECOMMEND_ITEMS = 24
         private const val PRELOAD_PAGE_SIZE = 12
-        private const val COVER_PREFETCH_COUNT = 8
+        private const val COVER_PREFETCH_COUNT = 12
     }
 
     private val firstPageDeferred = CompletableDeferred<NetworkPage>()
+    @Volatile
+    private var preloadedFirstPage: NetworkPage? = null
 
     suspend fun preloadFirstPage() {
         val startMs = SystemClock.elapsedRealtime()
@@ -36,9 +38,10 @@ class RecommendFeedRepository(
         val page = result.getOrNull()
         if (page != null) {
             AppLog.i(TAG, "STARTUP T3 preload api done items=${page.items.size} hasMore=${page.hasMore}")
+            preloadedFirstPage = page
+            firstPageDeferred.complete(page)
             writeCache(page.items)
             prefetchCovers(page.items)
-            firstPageDeferred.complete(page)
         } else {
             firstPageDeferred.completeExceptionally(
                 result.exceptionOrNull() ?: IllegalStateException("preload failed")
@@ -47,15 +50,25 @@ class RecommendFeedRepository(
         AppLog.i(TAG, "STARTUP T3b preload end elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
     }
 
+    fun peekFirstPage(): NetworkPage? {
+        val page = preloadedFirstPage
+        AppLog.i(TAG, "STARTUP peekFirstPage ${if (page != null) "hit" else "miss"} items=${page?.items?.size ?: 0}")
+        return page
+    }
+
     suspend fun awaitFirstPage(timeoutMs: Long): NetworkPage? {
         return try {
             withTimeout(timeoutMs) { firstPageDeferred.await() }
         } catch (e: TimeoutCancellationException) {
-            AppLog.w(TAG, "STARTUP awaitFirstPage timeout after ${timeoutMs}ms")
-            null
+            preloadedFirstPage.also { page ->
+                AppLog.w(
+                    TAG,
+                    "STARTUP awaitFirstPage timeout after ${timeoutMs}ms fallback=${if (page != null) "hit" else "miss"}"
+                )
+            }
         } catch (e: Exception) {
             AppLog.w(TAG, "STARTUP awaitFirstPage failed: ${e.message}")
-            null
+            preloadedFirstPage
         }
     }
 

@@ -20,6 +20,7 @@ import com.tutu.myblbl.databinding.CellVideoBinding
 import com.tutu.myblbl.model.video.HistoryVideoModel
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
+import com.tutu.myblbl.core.common.log.VideoCardPerfLogger
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
 import com.tutu.myblbl.core.ui.focus.tv.TvFocusableAdapter
@@ -77,7 +78,9 @@ class FavoriteHistoryAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = CellVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val binding = VideoCardPerfLogger.measureInflate("FavoriteHistoryAdapter") {
+            CellVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        }
         return ViewHolder(
             binding = binding,
             onItemClick = onItemClick,

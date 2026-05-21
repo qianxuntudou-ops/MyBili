@@ -600,9 +600,27 @@ object ContentFilter {
     }
 
     fun filterLiveRooms(context: Context, rooms: List<LiveRoomItem>): List<LiveRoomItem> {
-        return rooms.filter { room ->
-            !isLiveRoomBlocked(context, room.areaV2Name.ifEmpty { room.areaName }, room.parentAreaName, room.uname, room.title)
+        val t0 = SystemClock.elapsedRealtime()
+        val blockedUpNames = getBlockedUpNames(context)
+        val minorProtectionEnabled = isMinorProtectionEnabled(context)
+        val result = rooms.filter { room ->
+            val anchorName = room.uname.trim()
+            if (anchorName.isNotEmpty()) {
+                if (BLOCKED_UP_NAMES.any { it.equals(anchorName, ignoreCase = true) }) return@filter false
+                if (blockedUpNames.any { it.equals(anchorName, ignoreCase = true) }) return@filter false
+            }
+            if (!minorProtectionEnabled) return@filter true
+            val areaLower = room.areaV2Name.ifEmpty { room.areaName }.trim().lowercase()
+            if (areaLower.isNotEmpty() && areaLower in LIVE_BLOCKED_AREAS_LOWER) return@filter false
+            val parentAreaLower = room.parentAreaName.trim().lowercase()
+            if (parentAreaLower.isNotEmpty() && parentAreaLower in LIVE_BLOCKED_PARENT_AREAS_LOWER) return@filter false
+            !shouldBlockTitle(room.title.lowercase())
         }
+        val elapsed = SystemClock.elapsedRealtime() - t0
+        if (elapsed > 5) {
+            AppLog.i("ContentFilter", "filterLiveRooms ${rooms.size}→${result.size} elapsed=${elapsed}ms")
+        }
+        return result
     }
 
     fun isSearchKeywordBlocked(context: Context, keyword: String): Boolean {

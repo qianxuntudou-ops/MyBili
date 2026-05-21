@@ -19,6 +19,7 @@ import com.tutu.myblbl.core.ui.base.BaseVideoViewHolder
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
 import com.tutu.myblbl.core.common.log.AppLog
+import com.tutu.myblbl.core.common.log.VideoCardPerfLogger
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
@@ -100,7 +101,9 @@ class VideoAdapter(
 
 
     override fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): VideoViewHolder {
-        val binding = CellVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val binding = VideoCardPerfLogger.measureInflate("VideoAdapter") {
+            CellVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        }
         itemWidthPx?.let { width ->
             val layoutParams = binding.root.layoutParams
                 ?: androidx.recyclerview.widget.RecyclerView.LayoutParams(

@@ -1,6 +1,8 @@
 package com.tutu.myblbl.network.cookie
 
 import android.content.Context
+import android.os.SystemClock
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Cookie
@@ -25,6 +27,7 @@ class CookieManager : CookieJar {
     private var lastCookieCleanupTime = 0L
 
     companion object {
+        private const val TAG = "CookieManager"
         private const val KEY_COOKIES = "cookies"
         private const val COOKIE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000L
         private val PROTECTED_COOKIE_NAMES = setOf(
@@ -40,12 +43,14 @@ class CookieManager : CookieJar {
     }
 
     private fun loadCookiesFromPrefs() {
+        val startMs = SystemClock.elapsedRealtime()
         cookieCache.clear()
         val cookieStrings = appSettings.getCachedStringSet(KEY_COOKIES)
         cookieStrings.forEach { cookieString ->
             parseCookie(cookieString)?.let(::upsertCookie)
         }
         persistCookieCache()
+        AppLog.i(TAG, "loadCookiesFromPrefs elapsed=${SystemClock.elapsedRealtime() - startMs}ms raw=${cookieStrings.size} domains=${cookieCache.size}")
     }
 
     fun saveCookies(cookieStrings: List<String>) {

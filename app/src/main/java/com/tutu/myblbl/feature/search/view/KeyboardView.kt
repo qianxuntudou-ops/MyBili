@@ -2,6 +2,7 @@ package com.tutu.myblbl.feature.search.view
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -13,6 +14,7 @@ import androidx.appcompat.widget.AppCompatTextView
 import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.core.content.ContextCompat
 import com.tutu.myblbl.R
+import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import org.koin.mp.KoinPlatform
 
@@ -76,9 +78,11 @@ class KeyboardView @JvmOverloads constructor(
     private var activeCandidates: T9CandidateSet? = null
 
     init {
+        val startMs = SystemClock.elapsedRealtime()
         orientation = VERTICAL
         clipChildren = false
         buildKeyboard()
+        AppLog.i(TAG, "KeyboardView init elapsed=${SystemClock.elapsedRealtime() - startMs}ms mode=${if (isT9Keyboard) "T9" else "QWE"}")
     }
 
     fun setKeySelectListener(listener: KeySelectListener?) {
@@ -143,6 +147,7 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun buildKeyboard() {
+        val startMs = SystemClock.elapsedRealtime()
         removeAllViews()
 
         val headerView = LayoutInflater.from(context).inflate(R.layout.layout_keyboard_header, this, false)
@@ -163,6 +168,7 @@ class KeyboardView @JvmOverloads constructor(
 
         bindHeaderAndFooterButtons()
         renderKeyboard()
+        AppLog.i(TAG, "buildKeyboard elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
     }
 
     private fun bindHeaderAndFooterButtons() {
@@ -208,6 +214,7 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun renderKeyboard() {
+        val startMs = SystemClock.elapsedRealtime()
         collapseActiveOverlay()
         keyboardContainer?.removeAllViews()
         if (isT9Keyboard) {
@@ -216,6 +223,7 @@ class KeyboardView @JvmOverloads constructor(
             renderQweKeyboard()
         }
         updateKeyboardToggleState()
+        AppLog.i(TAG, "renderKeyboard mode=${if (isT9Keyboard) "T9" else "QWE"} elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
     }
 
     private fun createRowLP(): LayoutParams {
@@ -419,6 +427,7 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     companion object {
+        private const val TAG = "KeyboardView"
         private const val KEY_IS_T9_KEYBOARD = "isT9Keyboard"
     }
 }

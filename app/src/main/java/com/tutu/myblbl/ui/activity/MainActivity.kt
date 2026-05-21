@@ -3,6 +3,7 @@ package com.tutu.myblbl.ui.activity
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.activity.OnBackPressedCallback
@@ -46,6 +47,7 @@ import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.core.startup.AppStartupScheduler
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import java.lang.ref.WeakReference
@@ -62,11 +64,10 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         private const val SETTINGS_OVERLAY_EXIT_ANIM_MS = 275L
         private const val SEARCH_TAB_INDEX = 5
         private const val STARTUP_TAG = "AppStartup"
-        // 正常路径下 RecommendListFragment.applyReplacedVideosNow 会发出 HomeContentReady
-        // 让 splash 自然消失（实测 T+1.7s 左右）；timeout 只是兜底，防止网络全挂时永远黑屏。
-        // 之前 300ms 太短，splash 会在内容贴上 RecyclerView 之前就消失，用户先看到一段空白
-        // 再看到卡片，体感反而比 splash 多挂 500ms 更糟。设到 2.5s 覆盖 99% 正常启动情况。
-        private const val SPLASH_TIMEOUT_MS = 2500L
+        // Splash 只负责覆盖系统拉起到 Activity 壳可绘制前的短窗口。
+        // 推荐内容是否 ready 单独打点，不再把网络/首屏卡片 inflate 的波动转化成黑屏时间。
+        private const val SPLASH_TIMEOUT_MS = 1200L
+        private const val SESSION_PREWARM_DELAY_MS = 20_000L
     }
 
     // tab 顺序固定（与 fragmentFactories 一一对应）：
@@ -92,7 +93,10 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     private var lastBackStackEntryCount = 0
     private var pendingFocusRestoreDelayMs = 0L
     private var startupTasksScheduled = false
-    private var splashDismissed = false
+    private var startupShellRevealed = false
+    private var homeContentReadyLogged = false
+    private var startupAvatarRefreshScheduled = false
+    private var avatarRefreshJob: Job? = null
     private val activityCreateStartMs = SystemClock.elapsedRealtime()
     private var lastKnownLoggedIn = sessionGateway.isLoggedIn()
     private var restoredFromSavedState = false
@@ -100,17 +104,8 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
 
     override fun getViewBinding(): ActivityMainBinding {
         val t0 = SystemClock.elapsedRealtime()
-        // 优先用 Application 阶段 AsyncLayoutInflater 预 inflate 好的 view，
-        // 省去主线程 setContentView 之前那一段 80~150ms 的 inflate 时间（含 view_tab_bar 嵌套 inflate）。
-        // 预 inflate 失败 / Activity recreate / 预 inflate 没赶上时自动 fallback 到主线程 inflate。
-        val preInflated = MyBLBLApplication.instance.consumePreInflatedActivityMain()
-        val binding = if (preInflated != null) {
-            AppLog.i(STARTUP_TAG, "STARTUP activity_main using pre-inflated view")
-            ActivityMainBinding.bind(preInflated)
-        } else {
-            AppLog.i(STARTUP_TAG, "STARTUP activity_main fallback to inflate")
-            ActivityMainBinding.inflate(layoutInflater)
-        }
+        AppLog.i(STARTUP_TAG, "STARTUP activity_main inflate start")
+        val binding = ActivityMainBinding.inflate(layoutInflater)
         AppLog.i(STARTUP_TAG, "STARTUP getViewBinding elapsed=${SystemClock.elapsedRealtime() - t0}ms")
         return binding
     }
@@ -146,7 +141,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 mainNavigationViewModel.events.collect { event ->
                     if (event == MainNavigationViewModel.Event.HomeContentReady) {
-                        dismissSplash()
+                        onHomeContentReady()
                     }
                 }
             }
@@ -200,8 +195,23 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         updateNavigationVisibility()
         scheduleDeferredStartupTasks()
         scheduleSplashTimeout()
+        binding.root.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                if (binding.root.viewTreeObserver.isAlive) {
+                    binding.root.viewTreeObserver.removeOnPreDrawListener(this)
+                }
+                AppLog.i(
+                    STARTUP_TAG,
+                    "STARTUP T3a firstPreDraw elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms"
+                )
+                revealStartupShell("first_pre_draw")
+                scheduleFastStartupAvatarRefresh()
+                return true
+            }
+        })
         binding.root.post {
             AppLog.i(STARTUP_TAG, "MainActivity first root post elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms")
+            revealStartupShell("first_root_post")
             showUsageTipIfNeeded()
         }
         AppLog.i(STARTUP_TAG, "MainActivity.initData end elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
@@ -371,25 +381,43 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         showUserInfoDialog()
     }
 
-    private fun dismissSplash() {
-        if (splashDismissed) return
-        splashDismissed = true
-        AppLog.i(STARTUP_TAG, "STARTUP T4 dismissSplash elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms")
+    private fun revealStartupShell(reason: String) {
+        if (startupShellRevealed) return
+        startupShellRevealed = true
+        AppLog.i(
+            STARTUP_TAG,
+            "STARTUP T3 revealShell reason=$reason elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms"
+        )
         window.setBackgroundDrawableResource(R.color.systemBackgroundColor)
+    }
+
+    private fun onHomeContentReady() {
+        if (!homeContentReadyLogged) {
+            homeContentReadyLogged = true
+            AppLog.i(
+                STARTUP_TAG,
+                "STARTUP T4 homeContentReady elapsed=${SystemClock.elapsedRealtime() - activityCreateStartMs}ms"
+            )
+        }
+        revealStartupShell("home_content_ready")
     }
 
     private fun scheduleSplashTimeout() {
         lifecycleScope.launch {
             delay(SPLASH_TIMEOUT_MS)
-            if (!splashDismissed) {
-                AppLog.i(STARTUP_TAG, "Splash timeout fallback")
-                dismissSplash()
+            if (!startupShellRevealed) {
+                AppLog.i(STARTUP_TAG, "Splash shell reveal timeout fallback")
+                revealStartupShell("timeout")
             }
         }
     }
 
-    private fun refreshAvatar(allowNetworkFetch: Boolean = true) {
+    private fun refreshAvatar(
+        allowNetworkFetch: Boolean = true,
+        forceNetworkFetch: Boolean = false
+    ) {
         if (!sessionGateway.isLoggedIn()) {
+            avatarRefreshJob?.cancel()
             binding.myTabView.setAvatarUrl(null)
             binding.myTabView.setAvatarBadge(officialVerifyType = -1)
             return
@@ -399,16 +427,33 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         if (!cachedInfo?.face.isNullOrBlank()) {
             binding.myTabView.setAvatarUrl(cachedInfo?.face)
             setTabBarBadge(cachedInfo)
-            return
+            if (!forceNetworkFetch) return
         }
 
         if (!allowNetworkFetch) return
 
-        lifecycleScope.launch {
+        if (avatarRefreshJob?.isActive == true) return
+        avatarRefreshJob = lifecycleScope.launch {
+            val startMs = SystemClock.elapsedRealtime()
+            AppLog.i(STARTUP_TAG, "STARTUP avatarRefresh start force=$forceNetworkFetch")
             val refreshed = userRepository.refreshCurrentUserInfo().getOrNull()
-            binding.myTabView.setAvatarUrl(refreshed?.face)
-            setTabBarBadge(refreshed)
+            if (sessionGateway.isLoggedIn()) {
+                binding.myTabView.setAvatarUrl(refreshed?.face)
+                setTabBarBadge(refreshed)
+            }
+            AppLog.i(
+                STARTUP_TAG,
+                "STARTUP avatarRefresh end elapsed=${SystemClock.elapsedRealtime() - startMs}ms hasFace=${!refreshed?.face.isNullOrBlank()}"
+            )
         }
+    }
+
+    private fun scheduleFastStartupAvatarRefresh() {
+        if (startupAvatarRefreshScheduled) return
+        startupAvatarRefreshScheduled = true
+        binding.root.postDelayed({
+            refreshAvatar(allowNetworkFetch = true, forceNetworkFetch = true)
+        }, 300L)
     }
 
     private fun setTabBarBadge(info: UserDetailInfoModel?) {
@@ -432,13 +477,13 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         }
         startupTasksScheduled = true
         AppStartupScheduler()
-            .addTask("refreshAvatar", AppStartupScheduler.Phase.DELAYED, delayMs = 2000L) {
+            .addTask("refreshAvatar", AppStartupScheduler.Phase.DELAYED, delayMs = 1200L) {
                 refreshAvatar(allowNetworkFetch = true)
             }
             .addTask("playerPrewarm", AppStartupScheduler.Phase.DELAYED, delayMs = 10000L) {
                 PlayerInstancePool.prewarm(this@MainActivity)
             }
-            .addTask("sessionPrewarm", AppStartupScheduler.Phase.DELAYED, delayMs = 5000L) {
+            .addTask("sessionPrewarm", AppStartupScheduler.Phase.DELAYED, delayMs = SESSION_PREWARM_DELAY_MS) {
                 MyBLBLApplication.instance.scheduleDeferredSessionPrewarm(delayMillis = 0L)
             }
             .addTask("wbiKeys", AppStartupScheduler.Phase.IDLE) {

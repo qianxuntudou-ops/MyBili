@@ -23,6 +23,7 @@ import com.tutu.myblbl.model.search.SearchItemModel
 import com.tutu.myblbl.model.search.SearchType
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.core.common.format.NumberUtils
+import com.tutu.myblbl.core.common.log.VideoCardPerfLogger
 import com.tutu.myblbl.core.common.time.TimeUtils
 import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
 import com.tutu.myblbl.core.ui.focus.tv.TvFocusableAdapter
@@ -118,7 +119,9 @@ class SearchItemAdapter(
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
             VIEW_TYPE_VIDEO -> VideoViewHolder(
-                CellVideoBinding.inflate(inflater, parent, false)
+                VideoCardPerfLogger.measureInflate("SearchItemAdapter") {
+                    CellVideoBinding.inflate(inflater, parent, false)
+                }
             )
 
             VIEW_TYPE_LIVE -> LiveViewHolder(

@@ -12,9 +12,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import android.os.SystemClock
+import com.tutu.myblbl.MyBLBLApplication
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.ui.image.ImageLoader
-import com.tutu.myblbl.MyBLBLApplication
 
 class DynamicViewModel(
     private val userRepository: UserRepository
@@ -468,7 +468,7 @@ class DynamicViewModel(
         preloadJob?.cancel()
         followingLoadJob?.cancel()
         videoCache.evictAll()
-        ImageLoader.clearMemory(MyBLBLApplication.instance)
+        AppLog.i(TAG, "onCleared: keep global ImageLoader memory cache, only clear dynamic page cache")
         _followingList.value = emptyList()
         _videos.value = emptyList()
         currentVideoItems = emptyList()

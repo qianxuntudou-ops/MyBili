@@ -23,6 +23,7 @@ import com.tutu.myblbl.ui.adapter.UserSpaceHeaderAdapter
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseAdapter
 import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.BaseListFragment
 import com.tutu.myblbl.feature.user.FollowUserListFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
@@ -142,6 +143,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
         binding.recyclerViewVideos.layoutManager = layoutManager
         binding.recyclerViewVideos.adapter = concatAdapter
         binding.recyclerViewVideos.itemAnimator = null
+        binding.recyclerViewVideos.setRecycledViewPool(BaseListFragment.sharedVideoPool)
         if (binding.recyclerViewVideos.itemDecorationCount == 0) {
             binding.recyclerViewVideos.addItemDecoration(
                 GridSpacingItemDecoration(

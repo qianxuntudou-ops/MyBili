@@ -14,6 +14,7 @@ import com.tutu.myblbl.databinding.PageSearchResultBinding
 import com.tutu.myblbl.model.search.SearchCategoryItem
 import com.tutu.myblbl.model.search.SearchItemModel
 import com.tutu.myblbl.model.search.SearchType
+import com.tutu.myblbl.core.ui.base.BaseListFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.ui.focus.TabContentFocusHelper
@@ -181,6 +182,7 @@ class SearchResultPagerAdapter(
                 binding.recyclerViewResult.layoutManager =
                     WrapContentGridLayoutManager(binding.root.context, spanCount)
                 binding.recyclerViewResult.adapter = currentAdapter
+                binding.recyclerViewResult.setRecycledViewPool(BaseListFragment.sharedVideoPool)
                 while (binding.recyclerViewResult.itemDecorationCount > 0) {
                     binding.recyclerViewResult.removeItemDecorationAt(0)
                 }

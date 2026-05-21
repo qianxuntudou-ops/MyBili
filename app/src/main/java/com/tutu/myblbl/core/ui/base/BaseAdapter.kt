@@ -231,6 +231,6 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
 
     companion object {
         const val LOAD_MORE_TYPE = -1000
-        private const val PREFETCH_COVER_COUNT = 8
+        private const val PREFETCH_COVER_COUNT = 12
     }
 }

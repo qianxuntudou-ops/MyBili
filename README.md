@@ -17,9 +17,9 @@
 - **语言**: Kotlin 2.1.0
 - **架构**: MVVM + Koin 3.5.3 依赖注入
 - **异步**: Kotlin Coroutines 1.10.2 + Flow + LiveData
-- **网络**: Retrofit 2.9.0 + OkHttp 4.12.0 + Gson
+- **网络**: Retrofit 2.9.0 + OkHttp 4.12.0 + Gson（热路径使用 BiliClient 轻量网络层，零反射 JSON 解析）
 - **播放器**: Media3 1.9.3 (ExoPlayer)
-- **图片加载**: Coil 3.0.4 (与 OkHttp 共享 HTTP/2 连接池)
+- **图片加载**: 自实现轻量 ImageLoader（复用 OkHttp DNS/协议配置，独立图片连接池）
 - **弹幕**: 快手 AkDanmaku 引擎 
 - **数据存储**: DataStore Preferences 1.1.4
 - **UI**: AndroidX (Fragment 1.8.6, Lifecycle 2.8.7, RecyclerView 1.4.0)

@@ -2,20 +2,15 @@ package com.tutu.myblbl
 
 import android.app.Application
 import android.os.SystemClock
-import android.view.View
-import androidx.asynclayoutinflater.view.AsyncLayoutInflater
-import androidx.appcompat.view.ContextThemeWrapper
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
 import com.tutu.myblbl.core.lifecycle.AppBackgroundMonitor
-import com.tutu.myblbl.core.ui.base.BaseActivity
 import com.tutu.myblbl.core.ui.image.ImageLoader
 import com.tutu.myblbl.di.appModules
 import com.tutu.myblbl.feature.home.RecommendFeedRepository
 import com.tutu.myblbl.feature.player.PlayerInstancePool
 import com.tutu.myblbl.network.NetworkManager
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,12 +26,6 @@ class MyBLBLApplication : Application() {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val startupPrewarmScheduled = AtomicBoolean(false)
-
-    // 预 inflate 出来的 activity_main root view（含 view_tab_bar 嵌套 inflate）。
-    // 使用 AtomicReference 是因为生产/消费跨线程（AsyncLayoutInflater worker thread → MainActivity onCreate main thread）。
-    // 消费 (getAndSet null) 后即使 Activity recreate 也会走原始 inflate 路径，避免错用旧的 detached view。
-    private val preInflatedActivityMain = AtomicReference<View?>(null)
-    private val preInflateScheduled = AtomicBoolean(false)
     
     companion object {
         private const val TAG = "AppStartup"
@@ -52,12 +41,6 @@ class MyBLBLApplication : Application() {
         instance = this
         AppLog.init(this)
 
-        // 预 inflate 前移到所有重初始化之前：
-        // AsyncLayoutInflater 在 worker thread 跑，不阻塞主线程；
-        // 前移后 worker 有整个 app.onCreate（~190ms）+ 系统 Activity 启动（~56ms）的时间来完成 inflate。
-        // 之前放在 initNetwork 之后，worker 只有 ~56ms，每次都来不及。
-        schedulePreInflateActivityMain()
-
         // Koin 必须先初始化（后续所有组件依赖 DI）
         trace("initKoin", startMs) { initKoin() }
         // Settings 必须在 Network 之前：CookieManager.loadCookiesFromPrefs 依赖 AppSettingsDataStore cache
@@ -69,25 +52,6 @@ class MyBLBLApplication : Application() {
         AppLog.i(TAG, "STARTUP T1 app.onCreate end elapsed=${SystemClock.elapsedRealtime() - startMs}ms")
     }
 
-    private fun schedulePreInflateActivityMain() {
-        if (!preInflateScheduled.compareAndSet(false, true)) return
-        // 读取主题：此时 Koin 可能还未初始化，直接读 SharedPreferences
-        val themeIndex = runCatching {
-            getSharedPreferences("app_settings", MODE_PRIVATE).getInt("theme", 1)
-        }.getOrDefault(1)
-        // 用 ContextThemeWrapper 确保子 view 的 ?attr/xxx 能解析到与 MainActivity.applyTheme 一致的 theme。
-        val themedContext = ContextThemeWrapper(this, BaseActivity.themeIndexToResId(themeIndex))
-        AsyncLayoutInflater(themedContext).inflate(R.layout.activity_main, null) { view, _, _ ->
-            preInflatedActivityMain.set(view)
-            AppLog.i(TAG, "STARTUP activity_main pre-inflated")
-        }
-    }
-
-    /**
-     * MainActivity.getViewBinding 调用一次：拿到预 inflate 的 view 后置空（避免 recreate 复用 stale view）。
-     */
-    fun consumePreInflatedActivityMain(): View? = preInflatedActivityMain.getAndSet(null)
-
     private inline fun trace(name: String, appStartMs: Long, block: () -> Unit) {
         val stepStartMs = SystemClock.elapsedRealtime()
         block()
@@ -98,7 +62,7 @@ class MyBLBLApplication : Application() {
     }
 
     private fun initSettings() {
-        KoinPlatform.getKoin().get<AppSettingsDataStore>().initCache()
+        KoinPlatform.getKoin().get<AppSettingsDataStore>().initCacheBlocking("application_init")
     }
     
     private fun initKoin() {
@@ -138,9 +102,16 @@ class MyBLBLApplication : Application() {
             if (delayMillis > 0) {
                 delay(delayMillis)
             }
+            val startMs = SystemClock.elapsedRealtime()
             if (NetworkManager.isLoggedIn()) {
-                NetworkManager.prewarmWebSession()
+                AppLog.i(TAG, "STARTUP sessionPrewarm start")
+                val success = NetworkManager.prewarmWebSession()
+                AppLog.i(
+                    TAG,
+                    "STARTUP sessionPrewarm end success=$success elapsed=${SystemClock.elapsedRealtime() - startMs}ms"
+                )
             } else {
+                AppLog.i(TAG, "STARTUP sessionPrewarm skip loggedOut")
                 startupPrewarmScheduled.set(false)
             }
         }
