@@ -101,7 +101,7 @@ open class SimpleRenderer : DanmakuRenderer {
     strokePaint.typeface = textPaint.typeface
     strokePaint.color = resolveStandardStrokeColor(textPaint.color)
     strokePaint.style = Paint.Style.STROKE
-    strokePaint.strokeWidth = (textPaint.textSize * 0.12f).coerceIn(2.0f, 4.0f)
+    strokePaint.strokeWidth = (textPaint.textSize * 0.09f).coerceIn(1.5f, 3.0f)
     strokePaint.strokeJoin = Paint.Join.ROUND
     strokePaint.strokeCap = Paint.Cap.ROUND
   }
