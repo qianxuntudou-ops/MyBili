@@ -1170,7 +1170,7 @@ class MyPlayerView @JvmOverloads constructor(
             timebarSeekStartMs = android.os.SystemClock.uptimeMillis()
         }
 
-        val step = 10_000L * if (timebarSeekForward) 1 else -1
+        val step = 60_000L * if (timebarSeekForward) 1 else -1
         timebarSeekTargetMs = (timebarSeekTargetMs + step).coerceIn(0L, duration)
 
         controller?.beginSeekPreview(timebarSeekTargetMs)

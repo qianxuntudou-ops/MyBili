@@ -136,6 +136,10 @@ internal class PlayerControlFocusCoordinator(
                     requestPlayPauseFocus()
                     return true
                 }
+                if (focused === timeBar) {
+                    buttonPlay.performClick()
+                    return true
+                }
             }
         }
         return false
