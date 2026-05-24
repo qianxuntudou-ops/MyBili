@@ -319,6 +319,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
     }
 
     private fun onVideoClick(video: VideoModel) {
+        if (!isAdded) return
         pendingRestoreFocus = true
         tvFocusController?.captureCurrentAnchor()
         VideoRouteNavigator.openVideo(
@@ -332,6 +333,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
     }
 
     private fun onHistoryVideoClick(video: HistoryVideoModel) {
+        if (!isAdded) return
         val mapped = video.toVideoModel()
         if (mapped.aid != 0L || mapped.bvid.isNotEmpty()) {
             lastFocusedHistoryPosition = historyAdapter?.focusedItemPosition() ?: RecyclerView.NO_POSITION
@@ -626,15 +628,13 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
         }
         when (type) {
             TYPE_HISTORY, TYPE_LATER -> {
-                if (!hasContentItems()) {
-                    if (!cacheRestoreCompleted) {
-                        pendingLoadAfterCacheRestore = true
-                        PagePerfLogger.markNow(pageTag(), "wait_cache_restore_before_network")
-                        return
-                    }
-                    currentPage = 1
-                    loadData()
+                if (!cacheRestoreCompleted) {
+                    pendingLoadAfterCacheRestore = true
+                    PagePerfLogger.markNow(pageTag(), "wait_cache_restore_before_network")
+                    return
                 }
+                currentPage = 1
+                loadData()
             }
             else -> {
                 if (!hasContentItems() || viewModel.shouldRefresh(CACHE_TTL_MS)) {

@@ -181,10 +181,11 @@ class FavoriteFragment : BaseFragment<FragmentFavoriteBinding>(), MeTabPage {
         binding.progressBar.visibility = View.VISIBLE
         isLoadingFolders = true
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val mid = userRepository.resolveCurrentUserMid().getOrNull()
             if (mid == null || mid <= 0L) {
                 isLoadingFolders = false
+                if (!isAdded || view == null) return@launch
                 binding.progressBar.visibility = View.GONE
                 binding.tvEmpty.visibility = View.VISIBLE
                 binding.tvEmpty.text = getString(R.string.need_sign_in)
@@ -195,6 +196,7 @@ class FavoriteFragment : BaseFragment<FragmentFavoriteBinding>(), MeTabPage {
 
             val result = favoriteRepository.getFavoriteFolders(mid)
             isLoadingFolders = false
+            if (!isAdded || view == null) return@launch
             binding.progressBar.visibility = View.GONE
             swipeRefreshLayout?.isRefreshing = false
 
@@ -282,9 +284,7 @@ class FavoriteFragment : BaseFragment<FragmentFavoriteBinding>(), MeTabPage {
         if (!isAdded || view == null) {
             return
         }
-        if (adapter.itemCount == 0) {
-            loadFavoriteFolders()
-        }
+        loadFavoriteFolders()
     }
 
     override fun onTabReselected() {
