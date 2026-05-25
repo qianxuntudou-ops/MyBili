@@ -1,6 +1,5 @@
 package com.tutu.myblbl.core.ui.render
 
-import android.os.SystemClock
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.core.common.log.AppLog
@@ -30,6 +29,7 @@ object FirstScreenRenderer {
         onAppendRest: ((Int) -> Unit)? = null
     ) {
         val renderToken = Any()
+        cancelPendingAppend(recyclerView, page, "new_render")
         recyclerView.setTag(R.id.tag_first_screen_render_token, renderToken)
         if (items.isEmpty()) {
             setItems(emptyList()) {}
@@ -88,6 +88,11 @@ object FirstScreenRenderer {
         }
     }
 
+    fun cancel(recyclerView: RecyclerView, page: String, reason: String) {
+        cancelPendingAppend(recyclerView, page, reason)
+        recyclerView.setTag(R.id.tag_first_screen_render_token, null)
+    }
+
     fun logFirstFrame(
         recyclerView: RecyclerView,
         page: String,
@@ -139,14 +144,24 @@ object FirstScreenRenderer {
     ) {
         val remaining = allItems.drop(firstCount)
         if (remaining.isEmpty()) return
-        recyclerView.postDelayed({
+        lateinit var runnable: Runnable
+        runnable = Runnable {
+            if (recyclerView.getTag(R.id.tag_first_screen_append_runnable) !== runnable) {
+                PagePerfLogger.markNow(
+                    page,
+                    "first_screen_append_skip_stale",
+                    "reason=replaced items=${allItems.size} appended=${remaining.size}"
+                )
+                return@Runnable
+            }
+            recyclerView.setTag(R.id.tag_first_screen_append_runnable, null)
             if (recyclerView.getTag(R.id.tag_first_screen_render_token) !== renderToken) {
                 PagePerfLogger.markNow(
                     page,
                     "first_screen_append_skip_stale",
-                    "items=${allItems.size} appended=${remaining.size}"
+                    "reason=token items=${allItems.size} appended=${remaining.size}"
                 )
-                return@postDelayed
+                return@Runnable
             }
             val appendStartMs = PagePerfLogger.now()
             appendItems?.invoke(remaining)
@@ -157,7 +172,20 @@ object FirstScreenRenderer {
                 "items=${allItems.size} appended=${remaining.size}"
             )
             onAppendRest?.invoke(remaining.size)
-        }, APPEND_AFTER_FIRST_FRAME_DELAY_MS)
+        }
+        recyclerView.setTag(R.id.tag_first_screen_append_runnable, runnable)
+        recyclerView.postDelayed(runnable, APPEND_AFTER_FIRST_FRAME_DELAY_MS)
+    }
+
+    private fun cancelPendingAppend(
+        recyclerView: RecyclerView,
+        page: String,
+        reason: String
+    ) {
+        val pending = recyclerView.getTag(R.id.tag_first_screen_append_runnable) as? Runnable ?: return
+        recyclerView.removeCallbacks(pending)
+        recyclerView.setTag(R.id.tag_first_screen_append_runnable, null)
+        PagePerfLogger.markNow(page, "first_screen_append_cancel", "reason=$reason")
     }
 
     private fun firstBatchSize(

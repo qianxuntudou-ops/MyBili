@@ -377,7 +377,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
         )
         val rawSignature = historyListSignature(videos)
         if (rawSignature == lastRenderedHistorySignature && (historyAdapter?.contentCount() ?: 0) > 0) {
-            PagePerfLogger.markNow(pageTag(), "skip_duplicate_payload", "raw=${videos.size}")
+            skipDuplicatePayload(videos.size)
             return
         }
         swipeRefreshLayout?.isRefreshing = false
@@ -478,7 +478,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
         val rawSignature = videoListSignature(videos)
         if (rawSignature == lastRenderedLaterSignature && (videoAdapter?.contentCount() ?: 0) > 0) {
             AppLog.d("MeDebug", "[later] bindLaterData: SKIPPED (duplicate signature)")
-            PagePerfLogger.markNow(pageTag(), "skip_duplicate_payload", "raw=${videos.size}")
+            skipDuplicatePayload(videos.size)
             return
         }
         swipeRefreshLayout?.isRefreshing = false
@@ -558,6 +558,32 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
         val first = videos.first()
         val last = videos.last()
         return "${videos.size}:${first.bvid.ifBlank { first.aid.toString() }}:${first.title.hashCode()}:${last.bvid.ifBlank { last.aid.toString() }}:${last.title.hashCode()}"
+    }
+
+    private fun skipDuplicatePayload(rawSize: Int) {
+        swipeRefreshLayout?.isRefreshing = false
+        PagePerfLogger.markNow(pageTag(), "skip_duplicate_payload", "raw=$rawSize")
+        when (type) {
+            TYPE_HISTORY -> {
+                if (pendingHistoryScrollToTop) {
+                    pendingHistoryScrollToTop = false
+                    scrollHistoryListToTopAfterRefresh()
+                } else if (pendingHistoryReturnRestore) {
+                    restoreContentFocus()
+                }
+            }
+            TYPE_LATER -> {
+                if (pendingLaterScrollToTop) {
+                    pendingLaterScrollToTop = false
+                    scrollListToTop(immediate = true)
+                    binding.recyclerView.post {
+                        scrollListToTop(immediate = true)
+                    }
+                }
+            }
+        }
+        currentOpenStartMs = 0L
+        updateContentState(isEmpty = false)
     }
 
     private fun installTvFocusControllerIfNeeded() {
@@ -900,6 +926,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
                     }
                 }.getOrElse { emptyList() }
                 if (cachedVideos.isNotEmpty() && isAdded && view != null) {
+                    val rawSignature = historyListSignature(cachedVideos)
                     val filtered = withContext(Dispatchers.Default) {
                         cachedVideos.filter {
                             !ContentFilter.isVideoBlocked(
@@ -913,6 +940,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
                             )
                         }
                     }
+                    lastRenderedHistorySignature = rawSignature
                     historyAdapter?.let { adapter ->
                         FirstScreenRenderer.render(
                             recyclerView = binding.recyclerView,
@@ -929,6 +957,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
                             },
                             onFirstBatchCommitted = {
                                 tvFocusController?.onDataChanged(TvDataChangeReason.REPLACE_PRESERVE_ANCHOR)
+                                currentOpenStartMs = 0L
                             },
                             onAppendRest = {
                                 tvFocusController?.onDataChanged(TvDataChangeReason.APPEND)
@@ -953,9 +982,11 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
                     }
                 }.getOrElse { emptyList() }
                 if (cachedVideos.isNotEmpty() && isAdded && view != null) {
+                    val rawSignature = videoListSignature(cachedVideos)
                     val filtered = withContext(Dispatchers.Default) {
                         ContentFilter.filterVideos(ctx, cachedVideos)
                     }
+                    lastRenderedLaterSignature = rawSignature
                     videoAdapter?.let { adapter ->
                         FirstScreenRenderer.render(
                             recyclerView = binding.recyclerView,
@@ -972,6 +1003,7 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
                             },
                             onFirstBatchCommitted = {
                                 tvFocusController?.onDataChanged(TvDataChangeReason.REPLACE_PRESERVE_ANCHOR)
+                                currentOpenStartMs = 0L
                             },
                             onAppendRest = {
                                 tvFocusController?.onDataChanged(TvDataChangeReason.APPEND)

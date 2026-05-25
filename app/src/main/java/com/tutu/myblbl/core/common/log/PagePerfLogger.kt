@@ -42,19 +42,19 @@ object PagePerfLogger {
             onLogged?.invoke()
         }
 
-        recyclerView.post {
+        fun installPreDrawListener() {
             if (!recyclerView.isAttachedToWindow) {
                 if (fired.compareAndSet(false, true)) {
                     finish("not_attached")
                 }
-                return@post
+                return
             }
             val observer = recyclerView.viewTreeObserver
             if (!observer.isAlive) {
                 if (fired.compareAndSet(false, true)) {
                     finish("no_observer")
                 }
-                return@post
+                return
             }
             val listener = object : ViewTreeObserver.OnPreDrawListener {
                 override fun onPreDraw(): Boolean {
@@ -72,6 +72,12 @@ object PagePerfLogger {
                     finish("timeout")
                 }
             }, DRAW_TIMEOUT_MS)
+        }
+
+        if (recyclerView.isAttachedToWindow) {
+            installPreDrawListener()
+        } else {
+            recyclerView.post { installPreDrawListener() }
         }
     }
 
