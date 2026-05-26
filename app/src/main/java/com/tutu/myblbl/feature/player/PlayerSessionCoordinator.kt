@@ -135,82 +135,62 @@ class PlayerSessionCoordinator {
         playNextEpisode: () -> Unit,
         playVideo: (VideoModel) -> Unit
     ): ContinuationPlan {
-        if (afterPlayMode == AfterPlayMode.NOTHING) {
+        fun finishPlan(): ContinuationPlan {
             return if (exitPlayerWhenPlaybackFinished) {
                 ContinuationPlan.ExitPlayer
             } else {
                 ContinuationPlan.ShowController
             }
         }
-        if (afterPlayMode == AfterPlayMode.RECOMMEND) {
-            val related = nextRelatedVideo()
-            if (related != null) {
-                return ContinuationPlan.PlayVideo(
-                    title = related.title,
-                    coverUrl = related.coverUrl,
-                    preloadTarget = related.toPreloadTarget(PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN),
-                    perform = { playVideo(related) }
-                )
+
+        return when (afterPlayMode) {
+            AfterPlayMode.NOTHING -> finishPlan()
+            AfterPlayMode.RECOMMEND -> {
+                val related = nextRelatedVideo()
+                if (related != null) {
+                    ContinuationPlan.PlayVideo(
+                        title = related.title,
+                        coverUrl = related.coverUrl,
+                        preloadTarget = related.toPreloadTarget(PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN),
+                        perform = { playVideo(related) }
+                    )
+                } else {
+                    finishPlan()
+                }
             }
-            return if (exitPlayerWhenPlaybackFinished) {
-                ContinuationPlan.ExitPlayer
-            } else {
-                ContinuationPlan.ShowController
+            AfterPlayMode.PLAY_QUEUE -> {
+                trimQueueAgainstCurrent(getCurrentVideo())
+                val queuedVideo = launchQueue.pollFirst()
+                if (queuedVideo != null) {
+                    ContinuationPlan.PlayVideo(
+                        title = queuedVideo.title,
+                        coverUrl = queuedVideo.coverUrl,
+                        preloadTarget = queuedVideo.toPreloadTarget(PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN),
+                        perform = { playVideo(queuedVideo) }
+                    )
+                } else {
+                    finishPlan()
+                }
             }
-        }
-        if (afterPlayMode == AfterPlayMode.PLAY_QUEUE) {
-            val queuedVideo = launchQueue.pollFirst()
-            if (queuedVideo != null) {
-                return ContinuationPlan.PlayVideo(
-                    title = queuedVideo.title,
-                    coverUrl = queuedVideo.coverUrl,
-                    preloadTarget = queuedVideo.toPreloadTarget(PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN),
-                    perform = { playVideo(queuedVideo) }
-                )
+            AfterPlayMode.NEXT_EPISODE -> {
+                // 严格按“播放合集中的下一个”执行；没有下一集时不再兜底播队列或推荐。
+                if (hasNextEpisode && nextEpisode != null) {
+                    ContinuationPlan.PlayNextEpisode(
+                        title = nextEpisode.title,
+                        coverUrl = nextEpisode.cover,
+                        preloadTarget = PlaybackPreloadTarget(
+                            aid = nextEpisode.aid.takeIf { it > 0L },
+                            bvid = nextEpisode.bvid.takeIf { it.isNotBlank() },
+                            cid = nextEpisode.cid,
+                            epId = nextEpisode.epId.takeIf { it > 0L },
+                            source = PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN
+                        ),
+                        perform = playNextEpisode
+                    )
+                } else {
+                    finishPlan()
+                }
             }
-            return if (exitPlayerWhenPlaybackFinished) {
-                ContinuationPlan.ExitPlayer
-            } else {
-                ContinuationPlan.ShowController
-            }
-        }
-        // NEXT_EPISODE: 优先播合集下一集，然后播队列，最后播推荐
-        if (hasNextEpisode && nextEpisode != null) {
-            return ContinuationPlan.PlayNextEpisode(
-                title = nextEpisode.title,
-                coverUrl = nextEpisode.cover,
-                preloadTarget = PlaybackPreloadTarget(
-                    aid = nextEpisode.aid.takeIf { it > 0L },
-                    bvid = nextEpisode.bvid.takeIf { it.isNotBlank() },
-                    cid = nextEpisode.cid,
-                    epId = nextEpisode.epId.takeIf { it > 0L },
-                    source = PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN
-                ),
-                perform = playNextEpisode
-            )
-        }
-        val queuedVideo = launchQueue.pollFirst()
-        if (queuedVideo != null) {
-            return ContinuationPlan.PlayVideo(
-                title = queuedVideo.title,
-                coverUrl = queuedVideo.coverUrl,
-                preloadTarget = queuedVideo.toPreloadTarget(PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN),
-                perform = { playVideo(queuedVideo) }
-            )
-        }
-        val related = nextRelatedVideo()
-        if (related != null) {
-            return ContinuationPlan.PlayVideo(
-                title = related.title,
-                coverUrl = related.coverUrl,
-                preloadTarget = related.toPreloadTarget(PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN),
-                perform = { playVideo(related) }
-            )
-        }
-        return if (exitPlayerWhenPlaybackFinished) {
-            ContinuationPlan.ExitPlayer
-        } else {
-            ContinuationPlan.ShowController
         }
     }
 
