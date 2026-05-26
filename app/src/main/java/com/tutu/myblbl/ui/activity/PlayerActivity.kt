@@ -1636,7 +1636,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                 exitPlayerWhenPlaybackFinished = playerSettings.exitPlayerWhenPlaybackFinished,
                 hasNextEpisode = hasNextEpisode,
                 nextEpisode = nextEpisode,
-                playNextEpisode = { viewModel.playNext() },
+                playNextEpisode = { viewModel.playNext(preferLastPlayTime = false) },
                 playVideo = {
                     sessionCoordinator.updateCurrentVideo(it)
                     viewModel.playRelatedVideo(it, preferLastPlayTime = false)

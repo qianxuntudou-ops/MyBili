@@ -748,12 +748,16 @@ class VideoPlayerViewModel(
             _videoCodecs.value = emptyList()
             _selectedVideoCodec.value = null
             try {
+                val effectivePreferLastPlayTime = preferLastPlayTime ?: currentSettings.resumePlayback
                 if (isPgcPlayback()) {
-                    loadPgcVideoInfo(loadGeneration)
+                    loadPgcVideoInfo(
+                        preferLastPlayTime = effectivePreferLastPlayTime,
+                        loadGeneration = loadGeneration
+                    )
                     return@launch
                 }
                 loadUgcVideoInfo(
-                    preferLastPlayTime = preferLastPlayTime ?: currentSettings.resumePlayback,
+                    preferLastPlayTime = effectivePreferLastPlayTime,
                     loadGeneration = loadGeneration
                 )
             } catch (e: Exception) {
@@ -778,11 +782,11 @@ class VideoPlayerViewModel(
         return previousIndex in _episodes.value.orEmpty().indices
     }
 
-    fun playNext() {
+    fun playNext(preferLastPlayTime: Boolean = true) {
         val episodes = _episodes.value.orEmpty()
         val targetIndex = (_selectedEpisodeIndex.value ?: 0) + 1
         if (targetIndex in episodes.indices) {
-            playEpisode(targetIndex)
+            playEpisode(targetIndex, preferLastPlayTime = preferLastPlayTime)
         }
     }
 
@@ -797,7 +801,7 @@ class VideoPlayerViewModel(
         return _episodes.value.orEmpty().getOrNull(nextIndex)
     }
 
-    fun playEpisode(index: Int) {
+    fun playEpisode(index: Int, preferLastPlayTime: Boolean = true) {
         val episode = _episodes.value.orEmpty().getOrNull(index) ?: return
         reportPlaybackHeartbeat()
         savePlayerSnapshot()
@@ -815,7 +819,8 @@ class VideoPlayerViewModel(
                 bvid = targetBvid,
                 cid = episode.cid,
                 seasonId = targetSeasonId,
-                epId = targetEpId ?: 0L
+                epId = targetEpId ?: 0L,
+                preferLastPlayTime = preferLastPlayTime
             )
             return
         }
@@ -824,7 +829,12 @@ class VideoPlayerViewModel(
             targetBvid != null &&
             targetBvid != currentBvid
         ) {
-            loadVideoInfo(episode.aid, targetBvid, episode.cid)
+            loadVideoInfo(
+                aid = episode.aid,
+                bvid = targetBvid,
+                cid = episode.cid,
+                preferLastPlayTime = preferLastPlayTime
+            )
             return
         }
         _selectedEpisodeIndex.value = index
@@ -1044,12 +1054,14 @@ class VideoPlayerViewModel(
     }
 
     fun preloadPlayback(target: PlaybackPreloadTarget?) {
-        if (!hasReachedFirstFrame) return
         val identity = target?.toPlayRequestIdentity()
         val currentIdentity = currentPlayRequestIdentity()
 
         if (target == null) {
             clearPreloadedPlayback(cancelJob = true)
+            return
+        }
+        if (!hasReachedFirstFrame && target.source != PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN) {
             return
         }
         if (
@@ -1475,7 +1487,10 @@ class VideoPlayerViewModel(
         }
     }
 
-    private suspend fun loadPgcVideoInfo(loadGeneration: Long): Unit = coroutineScope {
+    private suspend fun loadPgcVideoInfo(
+        preferLastPlayTime: Boolean,
+        loadGeneration: Long
+    ): Unit = coroutineScope {
         val seasonId = currentSeasonId
         val epId = currentEpId
         val initialIdentity = currentPlayRequestIdentity()
@@ -1493,7 +1508,7 @@ class VideoPlayerViewModel(
                 async {
                     requestPreparedPlayback(
                         identity = identity,
-                        preferLastPlayTime = currentSettings.resumePlayback,
+                        preferLastPlayTime = preferLastPlayTime,
                         replaceInPlace = false
                     )
                 }
@@ -1510,7 +1525,7 @@ class VideoPlayerViewModel(
             if (shouldFallbackToUgcPlayback(detailResponse)) {
                 currentSeasonId = null
                 currentEpId = null
-                loadUgcVideoInfo(preferLastPlayTime = currentSettings.resumePlayback, loadGeneration = loadGeneration)
+                loadUgcVideoInfo(preferLastPlayTime = preferLastPlayTime, loadGeneration = loadGeneration)
                 return@coroutineScope
             }
             AppLog.e(
@@ -1597,7 +1612,7 @@ class VideoPlayerViewModel(
         if (preparedPlayback != null) {
             applyPreparedPlayback(preparedPlayback)
         } else {
-            loadPlayUrl(preferLastPlayTime = currentSettings.resumePlayback, loadGeneration = loadGeneration)
+            loadPlayUrl(preferLastPlayTime = preferLastPlayTime, loadGeneration = loadGeneration)
         }
     }
 
@@ -1797,7 +1812,10 @@ class VideoPlayerViewModel(
             val pgcSeasonId = parseSeasonIdFromBangumiUrl(redirectUrl)
             currentEpId = pgcEpId
             currentSeasonId = pgcSeasonId.takeIf { it > 0L }
-            loadPgcVideoInfo(loadGeneration)
+            loadPgcVideoInfo(
+                preferLastPlayTime = preferLastPlayTime,
+                loadGeneration = loadGeneration
+            )
             return@coroutineScope
         }
 
