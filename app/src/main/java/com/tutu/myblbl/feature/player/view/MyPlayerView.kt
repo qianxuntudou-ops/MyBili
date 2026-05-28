@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.graphics.Color
+import android.graphics.SurfaceTexture
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -1544,7 +1545,7 @@ class MyPlayerView @JvmOverloads constructor(
     }
 
     fun setMirrorEnabled(enabled: Boolean) {
-        val currentPlayer = player ?: return
+        player ?: return
         val frame = contentFrame ?: return
 
         val currentSurface = videoSurfaceView
@@ -1558,19 +1559,49 @@ class MyPlayerView @JvmOverloads constructor(
         // 关闭镜像且当前是 SurfaceView，无需操作
         if (!enabled) return
 
-        // 首次开启镜像：从 SurfaceView 切换到 TextureView
-        currentPlayer.clearVideoSurfaceView(currentSurface as SurfaceView)
-        frame.removeView(currentSurface)
+        // 首次开启镜像：从 SurfaceView 切换到 TextureView。
+        //
+        // ⚠️ 切换顺序非常敏感，错了会触发 EGL_BAD_MATCH，UI 卡死 1-2 秒（用户看到
+        // 「弹幕全部消失」实为 Choreographer 跳 100+ 帧，弹幕滚动暂停）。
+        //
+        // 错误做法（之前的实现）：
+        //   addView(textureView) → textureView.post {
+        //       clearVideoSurfaceView(old);            // 1. 旧 surface 已 detach
+        //       setVideoTextureView(textureView)       // 2. 但新 SurfaceTexture 还没创建
+        //   }
+        //   textureView.post 只保证 layout 完成，SurfaceTexture 是 GPU 线程异步创建的，
+        //   post 时往往还没就绪。期间 video codec 没有可写 target → EGL_BAD_MATCH，
+        //   OpenGLRenderer 反复重建上下文 → 主线程 Choreographer skip 60-120 帧。
+        //
+        // 正确做法：addView 后通过 SurfaceTextureListener.onSurfaceTextureAvailable
+        // 等到 GPU 线程确认 SurfaceTexture 真正可用，再把 player 切到新 surface。
+        // 旧 SurfaceView 的 detach 由 setVideoTextureView 内部自动处理，无需手动 clear。
+        val surfaceView = currentSurface as SurfaceView
 
         val layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         val textureView = TextureView(context)
         textureView.layoutParams = layoutParams
-        videoSurfaceView = textureView
-        frame.addView(textureView, 0)
-        currentPlayer.setVideoTextureView(textureView)
+        textureView.isOpaque = true
 
-        // 布局完成后再设置 scaleX，避免 TV 设备硬件层尺寸异常
-        textureView.post { textureView.scaleX = -1f }
+        textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(s: SurfaceTexture, w: Int, h: Int) {
+                // 摘掉 listener：player.setVideoTextureView 内部会重设自己的 listener，
+                // 这里先清空避免被重入回调。
+                textureView.surfaceTextureListener = null
+                videoSurfaceView = textureView
+                textureView.scaleX = -1f
+                player?.setVideoTextureView(textureView)
+                frame.removeView(surfaceView)
+            }
+
+            override fun onSurfaceTextureSizeChanged(s: SurfaceTexture, w: Int, h: Int) {}
+
+            override fun onSurfaceTextureDestroyed(s: SurfaceTexture): Boolean = true
+
+            override fun onSurfaceTextureUpdated(s: SurfaceTexture) {}
+        }
+
+        frame.addView(textureView, 0)
     }
 
     fun showHideMirrorButton(show: Boolean) {
