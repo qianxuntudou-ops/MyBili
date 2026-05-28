@@ -614,7 +614,9 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         binding.root.postDelayed({
             if (isFinishing || isDestroyed) return@postDelayed
             val currentFocus = currentFocus
-            if (currentFocus != null) return@postDelayed
+            if (currentFocus != null && currentFocus.isAttachedToWindow && currentFocus.isShown && currentFocus.isFocusable) {
+                return@postDelayed
+            }
             val handledByContent = focusCurrentMainContent(anchorView = null, preferSpatialEntry = false)
             if (!handledByContent) {
                 binding.myTabView.focusCurrentTab()

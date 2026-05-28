@@ -18,6 +18,7 @@ import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
 import com.tutu.myblbl.core.ui.video.VideoCardViews
 import com.tutu.myblbl.core.ui.video.VideoLightCardFactory
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
+import java.util.concurrent.atomic.AtomicInteger
 
 class HistoryVideoAdapter(
     private val onItemClick: (HistoryVideoModel) -> Unit,
@@ -30,6 +31,8 @@ class HistoryVideoAdapter(
     private val onItemDisliked: ((HistoryVideoModel) -> Unit)? = null,
     private val onUpDisliked: ((String) -> Unit)? = null
 ) : BaseVideoAdapter<HistoryVideoModel, HistoryVideoAdapter.ViewHolder>() {
+
+    private val contentViewType = nextViewType.getAndIncrement()
 
     init {
         setHasStableIds(true)
@@ -50,6 +53,8 @@ class HistoryVideoAdapter(
     }
 
     override fun areContentsSame(old: HistoryVideoModel, new: HistoryVideoModel): Boolean = old == new
+
+    override fun getContentItemViewType(position: Int): Int = contentViewType
 
     override fun setData(
         newItems: List<HistoryVideoModel>,
@@ -149,7 +154,7 @@ class HistoryVideoAdapter(
                     val previous = focusedPosition
                     focusedPosition = position
                     if (previous != RecyclerView.NO_POSITION && previous != position) {
-                        notifyItemChanged(previous)
+                        notifyItemChangedWhenIdle(views.root, previous)
                     }
                     applyFocusState(views.root, true)
                     onItemFocusedWithView?.invoke(views.root, position)
@@ -174,7 +179,7 @@ class HistoryVideoAdapter(
                     val previous = focusedPosition
                     focusedPosition = position
                     if (previous != RecyclerView.NO_POSITION && previous != position) {
-                        notifyItemChanged(previous)
+                        notifyItemChangedWhenIdle(view, previous)
                     }
                     applyFocusState(view, true)
                     onItemFocusedWithView?.invoke(view, position)
@@ -247,9 +252,19 @@ class HistoryVideoAdapter(
             )
         }
 
+        private fun notifyItemChangedWhenIdle(anchor: View, position: Int) {
+            anchor.post {
+                if (position != RecyclerView.NO_POSITION && position < itemCount) {
+                    notifyItemChanged(position)
+                }
+            }
+        }
+
     }
 
     private companion object {
+        private val nextViewType = AtomicInteger(0x580100)
+
         fun watchedProgress(rawProgress: Long, duration: Long): Long {
             if (duration <= 0L) return 0L
             return if (rawProgress < 0L) {

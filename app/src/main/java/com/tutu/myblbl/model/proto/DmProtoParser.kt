@@ -4,6 +4,12 @@ import com.google.protobuf.CodedInputStream
 
 object DmProtoParser {
 
+    data class SegmentMeta(
+        val state: Int = 0,
+        val aiFlag: DanmakuAIFlagProto = DanmakuAIFlagProto(),
+        val colorfulSrc: List<DmColorfulProto> = emptyList()
+    )
+
     fun parseSegment(bytes: ByteArray): DmSegMobileReplyProto {
         val input = CodedInputStream.newInstance(bytes)
         val elems = mutableListOf<DanmakuElemProto>()
@@ -30,6 +36,51 @@ object DmProtoParser {
             aiFlag = aiFlag,
             colorfulSrc = colorfulSrc
         )
+    }
+
+    fun parseSegmentMeta(bytes: ByteArray): SegmentMeta {
+        val input = CodedInputStream.newInstance(bytes)
+        var state = 0
+        var aiFlag = DanmakuAIFlagProto()
+        val colorfulSrc = mutableListOf<DmColorfulProto>()
+        while (!input.isAtEnd) {
+            when (val tag = input.readTag()) {
+                0 -> break
+                else -> {
+                    when (tag ushr 3) {
+                        2 -> state = input.readInt32()
+                        3 -> aiFlag = parseAiFlag(input.readByteArray())
+                        5 -> colorfulSrc += parseColorful(input.readByteArray())
+                        else -> input.skipField(tag)
+                    }
+                }
+            }
+        }
+        return SegmentMeta(
+            state = state,
+            aiFlag = aiFlag,
+            colorfulSrc = colorfulSrc
+        )
+    }
+
+    fun forEachSegmentElem(bytes: ByteArray, onElem: (DanmakuElemProto) -> Unit): Int {
+        val input = CodedInputStream.newInstance(bytes)
+        var count = 0
+        while (!input.isAtEnd) {
+            when (val tag = input.readTag()) {
+                0 -> break
+                else -> {
+                    when (tag ushr 3) {
+                        1 -> {
+                            onElem(parseElem(input.readByteArray()))
+                            count++
+                        }
+                        else -> input.skipField(tag)
+                    }
+                }
+            }
+        }
+        return count
     }
 
     fun parseView(bytes: ByteArray): DmWebViewReplyProto {

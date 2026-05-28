@@ -145,7 +145,9 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         if (source == PlaybackSource.NONE) return
         lastPlaybackSource = PlaybackSource.NONE
 
-        binding.recyclerView.postDelayed({
+        val recyclerView = _binding?.recyclerView ?: return
+        recyclerView.postDelayed({
+            if (!canTouchView()) return@postDelayed
             when (source) {
                 PlaybackSource.PLAY_BUTTON -> focusPlayButton()
                 PlaybackSource.UGC_CARD -> {
@@ -158,11 +160,13 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
     }
 
     private fun focusPlayButton() {
+        val binding = _binding ?: return
         val header = binding.recyclerView.findViewHolderForAdapterPosition(0)?.itemView ?: return
         header.findViewById<View>(R.id.button_play)?.requestFocus()
     }
 
     private fun focusUgcCardByAid(aid: Long) {
+        val binding = _binding ?: return
         val ugcRow = contentAdapter.currentList.indexOfFirst {
             it is VideoDetailContentAdapter.Row.UgcSeason
         }
@@ -242,7 +246,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             dumpProgressBars(view, "AFTER_LOAD_START")
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             runCatching {
                 videoRepository.getVideoDetail(currentAid, currentBvid)
             }.onSuccess { response ->
@@ -281,7 +285,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
                 bvid = view.bvid
             ))
             val ctx = requireContext()
-            lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch {
                 runCatching {
                     val video = VideoModel(aid = view.aid, bvid = view.bvid, title = view.title, pic = view.pic)
                     videoRepository.dislikeFeed(video, 1)
@@ -321,7 +325,9 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         } else {
             val rows = buildRows(detail)
             contentAdapter.submitList(rows) {
-                binding.recyclerView.postDelayed({
+                val recyclerView = _binding?.recyclerView ?: return@submitList
+                recyclerView.postDelayed({
+                    if (!canTouchView()) return@postDelayed
                     focusPlayButton()
                 }, 150)
             }
@@ -360,7 +366,9 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             ugcHolder?.bind(seasonTitle, items, oldRow.isReverse, view.aid)
         }
 
-        binding.recyclerView.postDelayed({
+        val recyclerView = _binding?.recyclerView ?: return
+        recyclerView.postDelayed({
+            if (!canTouchView()) return@postDelayed
             focusUgcCardByAid(focusAid)
         }, 150)
     }
@@ -425,7 +433,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return
         val currentBvid = videoView?.bvid ?: videoModel?.bvid
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             runCatching { videoRepository.getArchiveRelation(currentAid, currentBvid) }
                 .onSuccess { response ->
                     if (response.isSuccess) {
@@ -454,7 +462,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
     private fun loadRelationState() {
         val ownerMid = videoView?.owner?.mid ?: return
         val isSelf = sessionGateway.getUserInfo()?.mid == ownerMid
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             // 粉丝数是公开数据，不需要登录
             runCatching {
                 val statResponse = userRepository.getRelationStat(ownerMid)
@@ -492,7 +500,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         val currentAttr = holder.currentRelationAttribute()
         val isFollowing = currentAttr == 2 || currentAttr == 6
         val action = if (isFollowing) 2 else 1
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             userRepository.modifyRelation(ownerMid, action)
                 .onSuccess { response ->
                     if (response.isSuccess) {
@@ -719,7 +727,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         }
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return
         val currentBvid = videoView?.bvid ?: videoModel?.bvid
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             runCatching {
                 videoRepository.like(currentAid, currentBvid, if (isLiked) 2 else 1)
             }.onSuccess { response ->
@@ -748,7 +756,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return
         val currentBvid = videoView?.bvid ?: videoModel?.bvid
         val coinCount = appSettings.getCachedString("give_coin_number")?.toIntOrNull()?.coerceIn(1, 2) ?: 2
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             runCatching {
                 videoRepository.giveCoin(currentAid, currentBvid, multiply = coinCount)
             }.onSuccess { response ->
@@ -771,7 +779,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
             return
         }
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val currentUserMid = sessionGateway.getUserInfo()?.mid?.takeIf { it > 0L }
                 ?: videoView?.owner?.mid ?: videoModel?.owner?.mid ?: 0L
             if (currentUserMid <= 0L) {
@@ -810,7 +818,7 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
         }
         val currentAid = videoView?.aid ?: videoModel?.aid ?: return
         val currentBvid = videoView?.bvid ?: videoModel?.bvid
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             runCatching { videoRepository.tripleAction(currentAid, currentBvid) }
                 .onSuccess { response ->
                     if (response.isSuccess) {
@@ -831,9 +839,14 @@ class VideoDetailFragment : androidx.fragment.app.Fragment() {
     }
 
     private fun updateActionButtonsDirectly() {
+        val binding = _binding ?: return
         val holder = binding.recyclerView.findViewHolderForAdapterPosition(0)
             as? VideoDetailContentAdapter.VideoDetailHeadViewHolder ?: return
         holder.updateActionButtons(isLiked, isCoined, isFavorited)
+    }
+
+    private fun canTouchView(): Boolean {
+        return isAdded && view != null && _binding != null
     }
 
     private fun toast(message: String) {

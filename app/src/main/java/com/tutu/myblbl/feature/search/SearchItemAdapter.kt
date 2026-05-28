@@ -30,6 +30,7 @@ import com.tutu.myblbl.model.video.Owner
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
+import java.util.concurrent.atomic.AtomicInteger
 
 data class SearchResultEntry(
     val pageType: SearchType,
@@ -47,6 +48,7 @@ class SearchItemAdapter(
 
     private val portraitDetectedUrls = mutableSetOf<String>()
     private val items = mutableListOf<SearchItemModel>()
+    private val viewTypeBase = nextViewTypeBase.getAndAdd(VIEW_TYPE_STRIDE)
 
     fun setItems(list: List<SearchItemModel>) {
         if (items.isEmpty() && list.isNotEmpty()) {
@@ -116,27 +118,27 @@ class SearchItemAdapter(
     }
 
     override fun getItemViewType(position: Int): Int = when (searchType) {
-        SearchType.Video -> VIEW_TYPE_VIDEO
-        SearchType.LiveRoom -> VIEW_TYPE_LIVE
+        SearchType.Video -> viewTypeBase + VIEW_TYPE_VIDEO_OFFSET
+        SearchType.LiveRoom -> viewTypeBase + VIEW_TYPE_LIVE_OFFSET
         SearchType.Animation,
-        SearchType.FilmAndTv -> VIEW_TYPE_SERIES
-        SearchType.User -> VIEW_TYPE_USER
+        SearchType.FilmAndTv -> viewTypeBase + VIEW_TYPE_SERIES_OFFSET
+        SearchType.User -> viewTypeBase + VIEW_TYPE_USER_OFFSET
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
-        return when (viewType) {
-            VIEW_TYPE_VIDEO -> VideoViewHolder(
+        return when (viewType - viewTypeBase) {
+            VIEW_TYPE_VIDEO_OFFSET -> VideoViewHolder(
                 VideoCardPerfLogger.measureInflate("SearchItemAdapter.light") {
                     VideoLightCardFactory.create(parent, source = "SearchItemAdapter.light")
                 }
             )
 
-            VIEW_TYPE_LIVE -> LiveViewHolder(
+            VIEW_TYPE_LIVE_OFFSET -> LiveViewHolder(
                 CellLiveRoomBinding.inflate(inflater, parent, false)
             )
 
-            VIEW_TYPE_USER -> UserViewHolder(
+            VIEW_TYPE_USER_OFFSET -> UserViewHolder(
                 CellUserBinding.inflate(inflater, parent, false)
             )
 
@@ -410,9 +412,11 @@ class SearchItemAdapter(
     }
 
     private companion object {
-        const val VIEW_TYPE_VIDEO = 0x530100
-        const val VIEW_TYPE_LIVE = 0x530101
-        const val VIEW_TYPE_SERIES = 0x530102
-        const val VIEW_TYPE_USER = 0x530103
+        const val VIEW_TYPE_VIDEO_OFFSET = 0
+        const val VIEW_TYPE_LIVE_OFFSET = 1
+        const val VIEW_TYPE_SERIES_OFFSET = 2
+        const val VIEW_TYPE_USER_OFFSET = 3
+        const val VIEW_TYPE_STRIDE = 8
+        val nextViewTypeBase = AtomicInteger(0x5C0100)
     }
 }

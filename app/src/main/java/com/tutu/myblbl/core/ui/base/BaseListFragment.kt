@@ -130,6 +130,11 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
                 if (newState != RecyclerView.SCROLL_STATE_IDLE) {
                     return
                 }
+                recyclerView.post {
+                    if (this@BaseListFragment.recyclerView === recyclerView && isAdded && view != null) {
+                        tvFocusController?.ensureValidFocus("scrollIdle")
+                    }
+                }
                 val action = pendingRecyclerIdleAction ?: return
                 pendingRecyclerIdleAction = null
                 recyclerView.post {
@@ -170,7 +175,9 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
 
     override fun onResume() {
         super.onResume()
-        tvFocusController?.restoreCapturedAnchor()
+        if (tvFocusController?.restoreCapturedAnchor() != true) {
+            tvFocusController?.ensureValidFocus("resume")
+        }
     }
 
     private fun setupSwipeRefresh() {
@@ -324,7 +331,9 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
         if (!hidden) {
-            tvFocusController?.restoreCapturedAnchor()
+            if (tvFocusController?.restoreCapturedAnchor() != true) {
+                tvFocusController?.ensureValidFocus("shown")
+            }
         }
     }
 

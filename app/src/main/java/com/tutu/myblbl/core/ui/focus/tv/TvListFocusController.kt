@@ -82,23 +82,7 @@ class TvListFocusController(
             pendingMoveAfterLoadMore = null
             // Don't auto-move focus to new items (preserves existing design).
             // But if focus was lost during a fast-scroll + loadMore cycle, recover it.
-            if (!hasValidFocusedItem()) {
-                val focused = recyclerView.rootView?.findFocus()
-                if (focused == null || isDescendantOf(focused, recyclerView)) {
-                    val anchor = currentAnchor ?: capturedAnchor
-                    if (anchor != null) {
-                        val resolved = resolveAnchorPosition(anchor)
-                        if (resolved != RecyclerView.NO_POSITION) {
-                            focusPosition(resolved, anchor.offsetTop, "appendFocusRecovery")
-                        }
-                    } else {
-                        val firstVisible = firstVisibleFocusablePosition()
-                        if (firstVisible != RecyclerView.NO_POSITION) {
-                            focusPosition(firstVisible, 0, "appendFocusRecovery")
-                        }
-                    }
-                }
-            }
+            ensureValidFocus("appendFocusRecovery")
             return
         }
 
@@ -121,6 +105,46 @@ class TvListFocusController(
         }
     }
 
+    fun ensureValidFocus(reason: String, allowWhenFocusOutside: Boolean = false): Boolean {
+        if (hasValidFocusedItem()) {
+            return true
+        }
+        val focused = recyclerView.rootView?.findFocus()
+        val focusInsideList = focused != null && isDescendantOf(focused, recyclerView)
+        val focusDetachedOrHidden = focused != null && (!focused.isAttachedToWindow || !focused.isShown)
+        if (focused != null && !focusInsideList && !focusDetachedOrHidden && !allowWhenFocusOutside) {
+            AppLog.d(TAG, "ensureValidFocus: skip reason=$reason outsideFocus=${focused.javaClass.simpleName}")
+            return false
+        }
+
+        val anchor = currentAnchor ?: capturedAnchor
+        if (anchor != null) {
+            val resolved = resolveAnchorPosition(anchor)
+            if (resolved != RecyclerView.NO_POSITION) {
+                AppLog.d(TAG, "ensureValidFocus: restore anchor pos=$resolved reason=$reason")
+                return focusPosition(
+                    resolved,
+                    anchor.offsetTop,
+                    reason,
+                    allowOutsideFocus = allowWhenFocusOutside || focusDetachedOrHidden
+                )
+            }
+        }
+
+        val firstVisible = firstVisibleFocusablePosition()
+        if (firstVisible != RecyclerView.NO_POSITION) {
+            AppLog.d(TAG, "ensureValidFocus: restore firstVisible pos=$firstVisible reason=$reason")
+            return focusPosition(
+                firstVisible,
+                0,
+                reason,
+                allowOutsideFocus = allowWhenFocusOutside || focusDetachedOrHidden
+            )
+        }
+        AppLog.w(TAG, "ensureValidFocus: no focus target reason=$reason itemCount=${adapter.focusableItemCount()}")
+        return false
+    }
+
     private fun hasValidFocusedItem(): Boolean {
         val focused = recyclerView.rootView?.findFocus() ?: return false
         val position = resolveAdapterPosition(focused)
@@ -140,12 +164,12 @@ class TvListFocusController(
         if (anchor != null) {
             val resolved = resolveAnchorPosition(anchor)
             if (resolved != RecyclerView.NO_POSITION) {
-                return focusPosition(resolved, anchor.offsetTop, "primaryAnchor")
+                return focusPosition(resolved, anchor.offsetTop, "primaryAnchor", allowOutsideFocus = true)
             }
         }
         val firstVisible = firstVisibleFocusablePosition()
         val target = if (firstVisible != RecyclerView.NO_POSITION) firstVisible else 0
-        return focusPosition(target, 0, "primary")
+        return focusPosition(target, 0, "primary", allowOutsideFocus = true)
     }
 
     fun requestFocusPosition(position: Int): Boolean {
@@ -226,9 +250,14 @@ class TvListFocusController(
         return false
     }
 
-    private fun focusPosition(position: Int, offsetTop: Int, reason: String): Boolean {
+    private fun focusPosition(
+        position: Int,
+        offsetTop: Int,
+        reason: String,
+        allowOutsideFocus: Boolean = false
+    ): Boolean {
         val focused = recyclerView.rootView?.findFocus()
-        if (focused != null && !isDescendantOf(focused, recyclerView) && reason != "move" && reason != "primary") {
+        if (focused != null && !isDescendantOf(focused, recyclerView) && reason != "move" && reason != "primary" && !allowOutsideFocus) {
             AppLog.d(TAG, "focusPosition: BLOCKED reason=$reason — focus is outside RV on ${focused.javaClass.simpleName}")
             return false
         }

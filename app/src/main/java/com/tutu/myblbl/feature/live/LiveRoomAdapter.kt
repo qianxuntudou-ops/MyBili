@@ -20,6 +20,7 @@ import com.tutu.myblbl.model.video.Owner
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
+import java.util.concurrent.atomic.AtomicInteger
 
 class LiveRoomAdapter(
     private val onItemClick: (LiveRoomItem) -> Unit,
@@ -27,6 +28,7 @@ class LiveRoomAdapter(
 ) : RecyclerView.Adapter<LiveRoomAdapter.ViewHolder>(), TvFocusableAdapter {
 
     private val items = ArrayList<LiveRoomItem>()
+    private val contentViewType = nextViewType.getAndIncrement()
 
     val currentList: List<LiveRoomItem>
         get() = items
@@ -61,7 +63,7 @@ class LiveRoomAdapter(
 
     override fun getItemId(position: Int): Long = items.getOrNull(position)?.roomId ?: RecyclerView.NO_ID
 
-    override fun getItemViewType(position: Int): Int = VIEW_TYPE_LIVE_ROOM
+    override fun getItemViewType(position: Int): Int = contentViewType
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val views = VideoCardPerfLogger.measureInflate("LiveRoomAdapter.light") {
@@ -208,6 +210,6 @@ class LiveRoomAdapter(
     }
 
     companion object {
-        private const val VIEW_TYPE_LIVE_ROOM = 0x4C5200
+        private val nextViewType = AtomicInteger(0x5B0100)
     }
 }

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 
 class DmMaskRepository {
 
@@ -16,6 +17,7 @@ class DmMaskRepository {
 
     private val cache = LruCache<Long, DmMaskData>(MAX_CACHE_SIZE)
     private val timelineCache = LruCache<Long, DmMaskTimeline>(MAX_CACHE_SIZE)
+    private val segmentParseLocks = ConcurrentHashMap<String, Any>()
 
     suspend fun downloadAndParse(maskUrl: String, cid: Long, fps: Int): DmMaskData? {
         cache.get(cid)?.let {
@@ -120,23 +122,34 @@ class DmMaskRepository {
         if (segIndex < 0 || segIndex >= segments.size) return
         val segment = segments[segIndex]
         if (segment.cachedFrames != null) return
-        val segDurationMs = if (segIndex + 1 < segments.size) {
-            (segments[segIndex + 1].timeMs - segment.timeMs).coerceAtLeast(1)
-        } else {
-            (300L * 1000L / maskData.fps.coerceAtLeast(1)).coerceAtLeast(1)
+        val lockKey = "$cid:$segIndex"
+        val lock = segmentParseLocks.getOrPut(lockKey) { Any() }
+        try {
+            synchronized(lock) {
+                if (segment.cachedFrames != null) return
+                val segDurationMs = if (segIndex + 1 < segments.size) {
+                    (segments[segIndex + 1].timeMs - segment.timeMs).coerceAtLeast(1)
+                } else {
+                    (300L * 1000L / maskData.fps.coerceAtLeast(1)).coerceAtLeast(1)
+                }
+                val frames = WebmaskParser.parseSegmentFrames(segment, maskData.fps, segDurationMs) ?: emptyList()
+                segment.cachedFrames = frames
+                AppLog.d(TAG, "Segment preloaded: seg=$segIndex, frames=${frames.size}")
+            }
+        } finally {
+            segmentParseLocks.remove(lockKey, lock)
         }
-        val frames = WebmaskParser.parseSegmentFrames(segment, maskData.fps, segDurationMs) ?: emptyList()
-        segment.cachedFrames = frames
-        AppLog.d(TAG, "Segment preloaded: seg=$segIndex, frames=${frames.size}")
     }
 
     fun clear(cid: Long) {
         cache.remove(cid)
         timelineCache.remove(cid)
+        segmentParseLocks.keys.removeAll { it.startsWith("$cid:") }
     }
 
     fun clearAll() {
         cache.evictAll()
         timelineCache.evictAll()
+        segmentParseLocks.clear()
     }
 }

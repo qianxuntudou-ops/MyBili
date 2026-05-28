@@ -19,6 +19,7 @@ import com.tutu.myblbl.model.lane.LaneItemModel
 import com.tutu.myblbl.model.series.timeline.SeriesTimeLineModel
 import com.tutu.myblbl.ui.activity.MainActivity
 import com.tutu.myblbl.core.ui.base.BaseAdapter
+import java.util.concurrent.atomic.AtomicInteger
 
 class HomeLaneAdapter(
     private val onSeriesClick: (LaneItemModel) -> Unit,
@@ -30,6 +31,7 @@ class HomeLaneAdapter(
 ) : BaseAdapter<HomeLaneSection, RecyclerView.ViewHolder>() {
 
     private var outerRecyclerView: RecyclerView? = null
+    private val viewTypeBase = nextViewTypeBase.getAndAdd(VIEW_TYPE_STRIDE)
 
     private val outerDetachListener = object : RecyclerView.OnChildAttachStateChangeListener {
         override fun onChildViewAttachedToWindow(view: View) = Unit
@@ -54,9 +56,10 @@ class HomeLaneAdapter(
 
     companion object {
         private const val TAG = "HomeLaneFocus"
-        private const val VIEW_TYPE_SCROLLABLE = 100
-        private const val VIEW_TYPE_TIMELINE = 101
-        private const val VIEW_TYPE_LOAD_MORE = -1000
+        private const val VIEW_TYPE_SCROLLABLE_OFFSET = 0
+        private const val VIEW_TYPE_TIMELINE_OFFSET = 1
+        private const val VIEW_TYPE_STRIDE = 4
+        private val nextViewTypeBase = AtomicInteger(0x5D0100)
     }
 
     fun addData(newItems: List<HomeLaneSection>): Boolean {
@@ -94,15 +97,15 @@ class HomeLaneAdapter(
             return LOAD_MORE_TYPE
         }
         return if (items[position].timelineDays.isNotEmpty()) {
-            VIEW_TYPE_TIMELINE
+            viewTypeBase + VIEW_TYPE_TIMELINE_OFFSET
         } else {
-            VIEW_TYPE_SCROLLABLE
+            viewTypeBase + VIEW_TYPE_SCROLLABLE_OFFSET
         }
     }
 
     override fun onCreateContentViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return when (viewType) {
-            VIEW_TYPE_TIMELINE -> {
+        return when (viewType - viewTypeBase) {
+            VIEW_TYPE_TIMELINE_OFFSET -> {
                 lateinit var holder: TimelineViewHolder
                 val binding = CellLaneSeriesTimeLineBinding.inflate(
                     LayoutInflater.from(parent.context),

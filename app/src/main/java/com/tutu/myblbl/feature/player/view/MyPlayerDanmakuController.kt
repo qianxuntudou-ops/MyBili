@@ -63,7 +63,7 @@ class MyPlayerDanmakuController(
         private const val LIVE_THROTTLE_MAX_ITEMS = 30
         private const val LIVE_MERGE_BUFFER_MS = 800L
         private const val LIVE_DENSITY_TRACK_MS = 5000L
-        private const val INITIAL_WINDOW_BEHIND_MS = 2_000L
+        private const val INITIAL_WINDOW_BEHIND_MS = 0L
         private const val INITIAL_WINDOW_AHEAD_MS = 12_000L
         private const val INITIAL_WINDOW_MAX_ITEMS = 64
         private const val ACTIVE_WINDOW_BEHIND_MS = 8_000L
@@ -125,7 +125,7 @@ class MyPlayerDanmakuController(
     private var danmakuConfig = DanmakuConfig(dataFilter = listOf(TypeFilter()))
     private var danmakuTimeline: DanmakuTimeline = DanmakuTimeline.EMPTY
     private var danmakuData: List<DanmakuItemData> = emptyList()
-    private var rawDanmakuData: MutableList<DmModel> = mutableListOf()
+    private var rawDanmakuData: List<DmModel> = emptyList()
     private var activeWindowStartMs: Long = Long.MIN_VALUE
     private var activeWindowEndMs: Long = Long.MIN_VALUE
     private var activeWindowCoveredUntilMs: Long = Long.MIN_VALUE
@@ -206,7 +206,7 @@ class MyPlayerDanmakuController(
                     return@withContext
                 }
                 danmakuTimeline = timeline
-                rawDanmakuData = timeline.data.toMutableList()
+                rawDanmakuData = timeline.data
                 rawDanmakuSignature = rawSignature
                 rawDanmakuCount = timeline.count
                 applyPreparedWindowState(preparedWindow, preparedSignature)
@@ -276,7 +276,7 @@ class MyPlayerDanmakuController(
                     return@withContext
                 }
                 danmakuTimeline = timeline
-                rawDanmakuData = timeline.data.toMutableList()
+                rawDanmakuData = timeline.data
                 rawDanmakuSignature = rawSignature
                 rawDanmakuCount = timeline.count
                 applyPreparedWindowState(preparedWindow, signature)

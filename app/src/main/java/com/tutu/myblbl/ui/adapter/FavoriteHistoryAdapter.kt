@@ -22,6 +22,7 @@ import com.tutu.myblbl.core.ui.focus.tv.TvFocusableAdapter
 import com.tutu.myblbl.core.ui.video.VideoCardViews
 import com.tutu.myblbl.core.ui.video.VideoLightCardFactory
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
+import java.util.concurrent.atomic.AtomicInteger
 
 class FavoriteHistoryAdapter(
     private val onItemClick: (HistoryVideoModel) -> Unit,
@@ -33,6 +34,7 @@ class FavoriteHistoryAdapter(
 ) : ListAdapter<HistoryVideoModel, FavoriteHistoryAdapter.ViewHolder>(DiffCallback), TvFocusableAdapter {
 
     private var focusedPosition = RecyclerView.NO_POSITION
+    private val contentViewType = nextViewType.getAndIncrement()
 
     init {
         setHasStableIds(true)
@@ -105,7 +107,7 @@ class FavoriteHistoryAdapter(
         holder.bind(getItem(position), position == focusedPosition)
     }
 
-    override fun getItemViewType(position: Int): Int = VIEW_TYPE_FAVORITE_HISTORY
+    override fun getItemViewType(position: Int): Int = contentViewType
 
     override fun getItemId(position: Int): Long = favoriteHistoryItemKey(getItem(position)).hashCode().toLong()
 
@@ -299,7 +301,7 @@ class FavoriteHistoryAdapter(
     }
 
     companion object {
-        private const val VIEW_TYPE_FAVORITE_HISTORY = 0x464801
+        private val nextViewType = AtomicInteger(0x590100)
 
         private val DiffCallback = object : DiffUtil.ItemCallback<HistoryVideoModel>() {
             override fun areItemsTheSame(oldItem: HistoryVideoModel, newItem: HistoryVideoModel): Boolean {

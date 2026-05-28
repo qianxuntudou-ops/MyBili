@@ -107,7 +107,9 @@ class VideoPlayerViewModel(
         private const val KEY_SOFTWARE_DECODER_SAFE_PLAYBACK = "player_software_decoder_safe_playback"
         private const val KEY_SOFTWARE_DECODER_SAFE_QUALITY_ID = "player_software_decoder_safe_quality_id"
         private const val FIRST_FRAME_DEFERRED_WORK_DELAY_MS = 250L
+        private const val FIRST_FRAME_DANMAKU_LOAD_DELAY_MS = 600L
         private const val FIRST_FRAME_SPONSOR_LOAD_DELAY_MS = 1_500L
+        private const val FIRST_FRAME_DM_MASK_LOAD_DELAY_MS = 2_500L
         private val verboseDanmakuCandidateLog =
             java.lang.Boolean.getBoolean("myblbl.verbose_danmaku_candidate_log")
         @Volatile
@@ -791,11 +793,9 @@ class VideoPlayerViewModel(
             runCatching { playInfoGateway.warmupWbiKeys() }
         }
 
-        // 入口就已知 cid+aid 时，立即启动弹幕元数据预加载（不用等 getVideoDetail）
+        // 入口只预取弹幕 view 元数据；分片解析放到首帧后，避免与解码起播抢 CPU。
         if (cid > 0L && (aid ?: 0L) > 0L) {
             preloadDanmakuView(cid = cid, aid = aid ?: 0L, loadGeneration = loadGeneration)
-            val resumeSegment = ((seekPositionMs.coerceAtLeast(0L) / 360_000L) + 1L).toInt()
-            preloadInitialDanmakuSegment(cid = cid, aid = aid ?: 0L, segmentIndex = resumeSegment)
         }
 
         prepareDeferredSponsorLoad(
@@ -1375,7 +1375,6 @@ class VideoPlayerViewModel(
             )
             identity.aid?.takeIf { it > 0L }?.let { aid ->
                 preloadDanmakuView(cid = identity.cid, aid = aid, loadGeneration = videoLoadGeneration)
-                preloadInitialDanmakuSegment(cid = identity.cid, aid = aid, segmentIndex = 1)
             }
             PlaybackStartupTrace.log(
                 traceId = currentStartupTraceId,
@@ -2527,11 +2526,15 @@ class VideoPlayerViewModel(
         if (loadedDanmakuCid != cid) {
             val danmakuAid = currentAid ?: 0L
             loadedDanmakuCid = cid
-            loadDanmaku(
-                cid = cid,
-                aid = danmakuAid,
-                durationMs = currentPlayInfo?.timeLength ?: 0L
-            )
+            viewModelScope.launch {
+                delay(FIRST_FRAME_DANMAKU_LOAD_DELAY_MS)
+                if (currentCid != cid || loadedDanmakuCid != cid) return@launch
+                loadDanmaku(
+                    cid = cid,
+                    aid = danmakuAid,
+                    durationMs = currentPlayInfo?.timeLength ?: 0L
+                )
+            }
         }
         scheduleDeferredSponsorLoadAfterFirstFrame(cid)
         viewModelScope.launch {
@@ -3307,8 +3310,7 @@ class VideoPlayerViewModel(
                         cid = dmMask.cid,
                         fps = dmMask.fps
                     )
-                    AppLog.d(TAG, "dm_mask callback: onDmMaskReady=$onDmMaskReady, vm=${this.hashCode()}")
-                    onDmMaskReady?.invoke(dmMask.maskUrl, dmMask.cid, dmMask.fps)
+                    scheduleDmMaskReadyCallback(dmMask)
                     Unit
                 } else {
                     AppLog.d(TAG, "dm_mask unavailable for this video")
@@ -3406,51 +3408,6 @@ class VideoPlayerViewModel(
             val eagerInitialSegment = ((seekPositionMs.coerceAtLeast(0L) / 360_000L) + 1L)
                 .toInt()
                 .coerceIn(1, fallbackSegmentCount)
-            val eagerPreloadJob = danmakuSegmentPreloadJob?.takeIf {
-                preloadedDanmakuSegmentCid == cid &&
-                    preloadedDanmakuSegmentAid == aid &&
-                    preloadedDanmakuSegmentIndex == eagerInitialSegment
-            }
-            val eagerSegmentDeferred = async(Dispatchers.IO) {
-                val waitStartMs = SystemClock.elapsedRealtime()
-                eagerPreloadJob?.join()
-                if (eagerPreloadJob != null) {
-                    PlaybackStartupTrace.log(
-                        traceId = currentStartupTraceId,
-                        startElapsedMs = currentStartupTraceStartElapsedMs,
-                        step = "danmaku_segment_preload_waited",
-                        message = "cid=$cid segment=$eagerInitialSegment waitMs=${SystemClock.elapsedRealtime() - waitStartMs}"
-                    )
-                }
-                val preloaded = withContext(Dispatchers.Main.immediate) {
-                    consumePreloadedDanmakuSegment(
-                        cid = cid,
-                        aid = aid,
-                        segmentIndex = eagerInitialSegment
-                    )
-                }
-                if (preloaded != null) {
-                    PlaybackStartupTrace.log(
-                        traceId = currentStartupTraceId,
-                        startElapsedMs = currentStartupTraceStartElapsedMs,
-                        step = "danmaku_segment_preload_hit",
-                        message = "cid=$cid segment=$eagerInitialSegment regular=${preloaded.regularItems.size} special=${preloaded.specialItems.size}"
-                    )
-                    preloaded
-                } else {
-                    PlaybackStartupTrace.log(
-                        traceId = currentStartupTraceId,
-                        startElapsedMs = currentStartupTraceStartElapsedMs,
-                        step = "danmaku_segment_preload_miss",
-                        message = "cid=$cid segment=$eagerInitialSegment"
-                    )
-                    loadDanmakuSegmentPayload(
-                        cid = cid,
-                        aid = aid,
-                        segmentIndices = listOf(eagerInitialSegment)
-                    )
-                }
-            }
             // 1. 获取弹幕 view 元数据（优先：预加载 > 缓存 > 网络）
             var danmakuViewSource = "none"
             val danmakuView = if (preloadedDanmakuViewCid == cid) {
@@ -3521,10 +3478,24 @@ class VideoPlayerViewModel(
             // 3. 当前段先发布；特殊弹幕和下一段后台补，避免首段弹幕被额外请求拖慢。
             danmakuLoadingSegments.add(initialSegment)
             val currentPayload = try {
-                if (initialSegment == eagerInitialSegment) {
-                    eagerSegmentDeferred.await()
+                val preloaded = if (initialSegment == eagerInitialSegment) {
+                    consumePreloadedDanmakuSegment(
+                        cid = cid,
+                        aid = aid,
+                        segmentIndex = eagerInitialSegment
+                    )
                 } else {
-                    eagerSegmentDeferred.cancel()
+                    null
+                }
+                if (preloaded != null) {
+                    PlaybackStartupTrace.log(
+                        traceId = currentStartupTraceId,
+                        startElapsedMs = currentStartupTraceStartElapsedMs,
+                        step = "danmaku_segment_preload_hit",
+                        message = "cid=$cid segment=$initialSegment regular=${preloaded.regularItems.size} special=${preloaded.specialItems.size}"
+                    )
+                    preloaded
+                } else {
                     loadDanmakuSegmentPayload(
                         cid = cid,
                         aid = aid,
@@ -3595,55 +3566,57 @@ class VideoPlayerViewModel(
                 step = "danmaku_segment_bytes_loaded",
                 message = "cid=$cid segment=$segmentIndex bytes=${bytes.size}"
             )
-            val segment = runCatching {
-                DmProtoParser.parseSegment(bytes)
-            }.getOrNull() ?: return@forEach
             val regularStartIndex = regularItems.size
             val specialStartIndex = specialItems.size
             var advancedCount = 0
-            val aiFlagsById = segment.aiFlag.dmFlags.associate { it.dmid to it.flag }
-            val colorfulSrcByType = segment.colorfulSrc
+            val meta = runCatching {
+                DmProtoParser.parseSegmentMeta(bytes)
+            }.getOrNull() ?: return@forEach
+            val aiFlagsById = meta.aiFlag.dmFlags.associate { it.dmid to it.flag }
+            val colorfulSrcByType = meta.colorfulSrc
                 .filter { it.type != 0 && it.src.isNotBlank() }
                 .associate { it.type to it.src }
-            segment.elems.forEach { elem ->
-                if (elem.mode == 7) {
-                    advancedCount += 1
-                    AdvancedDanmakuParser.parse(
-                        id = elem.id.takeIf { it > 0L } ?: elem.progress.toLong(),
-                        progressMs = elem.progress,
-                        color = elem.color,
-                        fontSize = elem.fontSize,
-                        rawContent = elem.content
-                    )?.let(specialItems::add)
-                } else {
-                    val rawColorfulSrc = colorfulSrcByType[elem.colorful].orEmpty()
-                    regularItems += DmModel(
-                        id = elem.id,
-                        color = elem.color,
-                        colorful = elem.colorful,
-                        colorfulSrc = rawColorfulSrc,
-                        colorfulStyle = DmColorfulStyleParser.parse(rawColorfulSrc),
-                        content = elem.content,
-                        mode = elem.mode,
-                        progress = elem.progress,
-                        fontSize = elem.fontSize,
-                        weight = elem.weight,
-                        pool = elem.pool,
-                        attr = elem.attr,
-                        aiFlagScore = aiFlagsById[elem.id] ?: 0,
-                        midHash = elem.midHash,
-                        ctime = elem.ctime,
-                        action = elem.action,
-                        idStr = elem.idStr,
-                        animation = elem.animation
-                    )
+            val elemCount = runCatching {
+                DmProtoParser.forEachSegmentElem(bytes) { elem ->
+                    if (elem.mode == 7) {
+                        advancedCount += 1
+                        AdvancedDanmakuParser.parse(
+                            id = elem.id.takeIf { it > 0L } ?: elem.progress.toLong(),
+                            progressMs = elem.progress,
+                            color = elem.color,
+                            fontSize = elem.fontSize,
+                            rawContent = elem.content
+                        )?.let(specialItems::add)
+                    } else {
+                        val rawColorfulSrc = colorfulSrcByType[elem.colorful].orEmpty()
+                        regularItems += DmModel(
+                            id = elem.id,
+                            color = elem.color,
+                            colorful = elem.colorful,
+                            colorfulSrc = rawColorfulSrc,
+                            colorfulStyle = DmColorfulStyleParser.parse(rawColorfulSrc),
+                            content = elem.content,
+                            mode = elem.mode,
+                            progress = elem.progress,
+                            fontSize = elem.fontSize,
+                            weight = elem.weight,
+                            pool = elem.pool,
+                            attr = elem.attr,
+                            aiFlagScore = aiFlagsById[elem.id] ?: 0,
+                            midHash = elem.midHash,
+                            ctime = elem.ctime,
+                            action = elem.action,
+                            idStr = elem.idStr,
+                            animation = elem.animation
+                        )
+                    }
                 }
-            }
+            }.getOrNull() ?: return@forEach
             PlaybackStartupTrace.log(
                 traceId = currentStartupTraceId,
                 startElapsedMs = currentStartupTraceStartElapsedMs,
                 step = "danmaku_segment_parsed",
-                message = "cid=$cid segment=$segmentIndex elems=${segment.elems.size} regular=${regularItems.size - regularStartIndex} special=${specialItems.size - specialStartIndex} advanced=$advancedCount"
+                message = "cid=$cid segment=$segmentIndex elems=$elemCount regular=${regularItems.size - regularStartIndex} special=${specialItems.size - specialStartIndex} advanced=$advancedCount"
             )
         }
         SpecialDanmakuPayload(
@@ -3836,6 +3809,16 @@ class VideoPlayerViewModel(
             items = items,
             replace = replace
         ))
+    }
+
+    private fun scheduleDmMaskReadyCallback(dmMask: DmMaskInfo) {
+        val callbackGeneration = videoLoadGeneration
+        viewModelScope.launch {
+            delay(FIRST_FRAME_DM_MASK_LOAD_DELAY_MS)
+            if (!isActiveVideoLoad(callbackGeneration) || currentCid != dmMask.cid) return@launch
+            AppLog.d(TAG, "dm_mask callback: onDmMaskReady=$onDmMaskReady, vm=${this@VideoPlayerViewModel.hashCode()}")
+            onDmMaskReady?.invoke(dmMask.maskUrl, dmMask.cid, dmMask.fps)
+        }
     }
 
     private fun clearDanmaku() {

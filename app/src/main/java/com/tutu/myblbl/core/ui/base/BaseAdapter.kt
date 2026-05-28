@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.tutu.myblbl.R
 import com.tutu.myblbl.core.ui.focus.tv.TvFocusableAdapter
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,8 +23,7 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
 
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var pendingSetDataJob: Job? = null
-    private val defaultContentViewType = this::class.java.name.hashCode()
-        .let { if (it == LOAD_MORE_TYPE) CONTENT_VIEW_TYPE_FALLBACK else it }
+    private val defaultContentViewType = nextContentViewType.getAndIncrement()
 
     protected open fun areItemsSame(old: MODEL, new: MODEL): Boolean = old == new
     protected open fun areContentsSame(old: MODEL, new: MODEL): Boolean = old == new
@@ -214,6 +214,6 @@ abstract class BaseAdapter<MODEL, VH : RecyclerView.ViewHolder> : RecyclerView.A
 
     companion object {
         const val LOAD_MORE_TYPE = -1000
-        private const val CONTENT_VIEW_TYPE_FALLBACK = -1001
+        private val nextContentViewType = AtomicInteger(0x7A0000)
     }
 }

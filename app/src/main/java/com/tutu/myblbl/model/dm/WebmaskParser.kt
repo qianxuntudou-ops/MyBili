@@ -87,11 +87,16 @@ object WebmaskParser {
         var diagLogged = false
         var emptyCount = 0
         val totalFrames = parts.size - 1
-        val frameIntervalMs = if (fps > 0 && totalFrames > 0) segDurationMs / totalFrames else 0L
         val frames = mutableListOf<MaskFrame>()
         for (frameIdx in 1 until parts.size) {
             val localIdx = frameIdx - 1
-            val ptsMs = segment.timeMs + localIdx * frameIntervalMs
+            val ptsMs = if (totalFrames > 1 && segDurationMs > 0L) {
+                segment.timeMs + (localIdx.toLong() * segDurationMs) / totalFrames
+            } else if (fps > 0) {
+                segment.timeMs + localIdx.toLong() * 1000L / fps
+            } else {
+                segment.timeMs
+            }
             val b64Data = parts[frameIdx]
             val svgBytes = try {
                 Base64.decode(b64Data, Base64.DEFAULT)

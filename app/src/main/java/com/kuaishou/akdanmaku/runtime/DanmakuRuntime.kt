@@ -578,8 +578,8 @@ internal class DanmakuRuntime(private val context: DanmakuContext) {
   )
 
   companion object {
-    private const val PREPARE_AHEAD_MS = 450L
-    private const val MAX_ENQUEUE_PER_FRAME = 48
+    private const val PREPARE_AHEAD_MS = 300L
+    private const val MAX_ENQUEUE_PER_FRAME = 32
     private const val MAX_MEASURE_PER_FRAME = 12
     private const val MAX_CACHE_REQUESTS_PER_FRAME = 4
     private const val MEASURE_SCHEDULE_BUDGET_MS = 2L

@@ -39,9 +39,9 @@ class DmMaskController(
          * 帧率越高画面运动越剧烈，肉眼越明显。
          *
          * 注意这是**真补偿**，不是当年那套"50ms audio-video + maskDt/2 + coverage/2 ≈ 80ms"的过度 lookahead。
-         * 80ms 让 mask 提前 24px 抢在 video 前面（功能反向失败）；16ms 只补 mask 路径多走的 1 vsync。
+         * 32ms 覆盖 View 绘制链路和蒙版帧量化误差，避免人物移动时遮罩持续落后一小段。
          */
-        private const val MASK_LOOKAHEAD_MS = 16L
+        private const val MASK_LOOKAHEAD_MS = 32L
 
         /** 同步诊断日志节流间隔（每秒最多 1 条）。 */
         private const val DIAG_LOG_INTERVAL_MS = 1000L
@@ -271,7 +271,6 @@ class DmMaskController(
             lastPreloadedSegIndex = segIdx
             return
         }
-        preloadingSegIndex = segIdx
         preloadAhead(segIdx)
         lastPreloadedSegIndex = segIdx
     }
@@ -341,6 +340,8 @@ class DmMaskController(
     private fun preloadAhead(currentSegIdx: Int) {
         val cid = currentCid
         val timeline = currentTimeline ?: return
+        if (preloadingSegIndex == currentSegIdx) return
+        preloadingSegIndex = currentSegIdx
         val totalSegs = timeline.totalSegments()
         // 预解析当前段 ± 2
         val range = (currentSegIdx - 1).coerceAtLeast(0)..(currentSegIdx + 2).coerceAtMost(totalSegs - 1)

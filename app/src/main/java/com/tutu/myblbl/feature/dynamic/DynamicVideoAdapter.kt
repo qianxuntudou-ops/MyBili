@@ -20,6 +20,7 @@ import com.tutu.myblbl.core.ui.video.VideoCardViews
 import com.tutu.myblbl.core.ui.video.VideoLightCardFactory
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
+import java.util.concurrent.atomic.AtomicInteger
 
 class DynamicVideoAdapter(
     private val onItemClick: (VideoModel) -> Unit,
@@ -31,6 +32,7 @@ class DynamicVideoAdapter(
 ) : BaseVideoAdapter<VideoModel, DynamicVideoAdapter.ViewHolder>() {
 
     private val portraitDetectedBvids = mutableSetOf<String>()
+    private val contentViewType = nextViewType.getAndIncrement()
 
     init {
         setShowLoadMore(false)
@@ -70,6 +72,8 @@ class DynamicVideoAdapter(
         }
         return ViewHolder(views)
     }
+
+    override fun getContentItemViewType(position: Int): Int = contentViewType
 
     override fun onBindContentViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position) ?: return
@@ -230,5 +234,9 @@ class DynamicVideoAdapter(
                 ""
             }
         }
+    }
+
+    private companion object {
+        private val nextViewType = AtomicInteger(0x5A0100)
     }
 }

@@ -22,6 +22,7 @@ import com.tutu.myblbl.core.ui.focus.VideoCardFocusHelper
 import com.tutu.myblbl.core.ui.video.VideoLightCardFactory
 import com.tutu.myblbl.core.ui.video.VideoCardViews
 import com.tutu.myblbl.ui.dialog.VideoCardMenuDialog
+import java.util.concurrent.atomic.AtomicInteger
 
 class VideoAdapter(
     private val displayStyle: DisplayStyle = DisplayStyle.DEFAULT,
@@ -41,9 +42,16 @@ class VideoAdapter(
     var currentPlayingAid: Long = 0
 
     companion object {
-        private const val VIEW_TYPE_DEFAULT = 0x560100
-        private const val VIEW_TYPE_HISTORY = 0x560101
+        private const val VIEW_TYPE_DEFAULT_START = 0x560100
+        private const val VIEW_TYPE_HISTORY_START = 0x570100
+        private val nextDefaultViewType = AtomicInteger(VIEW_TYPE_DEFAULT_START)
+        private val nextHistoryViewType = AtomicInteger(VIEW_TYPE_HISTORY_START)
         private val portraitDetectedBvids = mutableSetOf<String>()
+    }
+
+    private val contentViewType = when (displayStyle) {
+        DisplayStyle.DEFAULT -> nextDefaultViewType.getAndIncrement()
+        DisplayStyle.HISTORY -> nextHistoryViewType.getAndIncrement()
     }
 
     init {
@@ -99,10 +107,7 @@ class VideoAdapter(
     private var onItemClickListener: ((View, VideoModel) -> Unit)? = null
 
     override fun getContentItemViewType(position: Int): Int {
-        return when (displayStyle) {
-            DisplayStyle.DEFAULT -> VIEW_TYPE_DEFAULT
-            DisplayStyle.HISTORY -> VIEW_TYPE_HISTORY
-        }
+        return contentViewType
     }
 
     fun setOnItemClickListener(listener: (View, VideoModel) -> Unit) {
