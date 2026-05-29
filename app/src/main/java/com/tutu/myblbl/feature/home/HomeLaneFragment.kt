@@ -60,7 +60,7 @@ class HomeLaneFragment : BaseListFragment<HomeLaneSection>(), HomeTabPage {
         get() = adapter as? HomeLaneAdapter
 
     override val autoLoad: Boolean = false
-    override val enableSwipeRefresh: Boolean = false
+    override val deferSwipeRefreshUntilFirstDraw: Boolean = true
 
     override fun initArguments() {
         type = arguments?.getInt(ARG_TYPE, TYPE_ANIMATION) ?: TYPE_ANIMATION

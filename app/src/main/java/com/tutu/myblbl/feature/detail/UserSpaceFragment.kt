@@ -24,6 +24,7 @@ import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseAdapter
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.base.BaseListFragment
+import com.tutu.myblbl.core.ui.base.VideoRecyclerViewTuning
 import com.tutu.myblbl.feature.user.FollowUserListFragment
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
@@ -33,6 +34,7 @@ import com.tutu.myblbl.core.ui.focus.tv.OffsetTvFocusableAdapter
 import com.tutu.myblbl.core.ui.focus.tv.TvDataChangeReason
 import com.tutu.myblbl.core.ui.focus.tv.TvListFocusController
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
+import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -76,6 +78,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
     private var lastFocusedVideoPosition = RecyclerView.NO_POSITION
     private var hasRequestedInitialFocus = false
     private var tvFocusController: TvListFocusController? = null
+    private var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout? = null
 
     override fun onResume() {
         super.onResume()
@@ -142,8 +145,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
         }
         binding.recyclerViewVideos.layoutManager = layoutManager
         binding.recyclerViewVideos.adapter = concatAdapter
-        binding.recyclerViewVideos.itemAnimator = null
-        binding.recyclerViewVideos.setRecycledViewPool(BaseListFragment.sharedVideoPool)
+        VideoRecyclerViewTuning.apply(binding.recyclerViewVideos, videoAdapter)
         if (binding.recyclerViewVideos.itemDecorationCount == 0) {
             binding.recyclerViewVideos.addItemDecoration(
                 GridSpacingItemDecoration(
@@ -153,7 +155,6 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
                 )
             )
         }
-        binding.recyclerViewVideos.setHasFixedSize(true)
         binding.recyclerViewVideos.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
@@ -166,6 +167,10 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
             }
         })
         installTvFocusController()
+        swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(
+            recyclerView = binding.recyclerViewVideos,
+            onRefresh = ::refreshUserSpace
+        )
 
         videoAdapter.setOnItemClickListener { _, item ->
             if (item.aid != 0L || item.bvid.isNotBlank()) {
@@ -259,6 +264,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
 
             result.onSuccess { response ->
                 binding.progressBar.visibility = View.GONE
+                swipeRefreshLayout?.isRefreshing = false
                 isLoading = false
 
                 if (response.isSuccess) {
@@ -288,6 +294,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
                 }
             }.onFailure { e ->
                 binding.progressBar.visibility = View.GONE
+                swipeRefreshLayout?.isRefreshing = false
                 isLoading = false
                 rollbackPage()
                 Toast.makeText(requireContext(), "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -339,7 +346,15 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
     private fun refreshUserVideos() {
         currentPage = 1
         hasMore = true
+        lastFocusedVideoPosition = RecyclerView.NO_POSITION
+        tvFocusController?.clearAnchorForUserRefresh()
         loadUserVideos()
+    }
+
+    private fun refreshUserSpace() {
+        loadUserInfo()
+        loadUserStat()
+        refreshUserVideos()
     }
 
     private fun rollbackPage() {
@@ -524,6 +539,7 @@ class UserSpaceFragment : BaseFragment<FragmentUserSpaceBinding>(), com.tutu.myb
     override fun onDestroyView() {
         tvFocusController?.release()
         tvFocusController = null
+        swipeRefreshLayout = null
         super.onDestroyView()
     }
 

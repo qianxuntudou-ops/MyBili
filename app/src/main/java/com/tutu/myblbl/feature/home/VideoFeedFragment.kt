@@ -46,9 +46,7 @@ abstract class VideoFeedFragment : BaseListFragment<VideoModel>(), HomeTabPage, 
 
     override val autoLoad: Boolean = false
     override val initialViewHolderPrewarmPlan: RecyclerViewPoolPrewarmer.Plan = RecyclerViewPoolPrewarmer.Plan.VideoFeed
-    // TV 项目无触摸下拉刷新，下拉刷新由 MainTabReselected/MenuPressed/BackPressed 等键盘事件触发。
-    // 关掉可省 setupSwipeRefresh 里的 view tree 重排（removeView + addView 两次）+ 多一层 measure。
-    override val enableSwipeRefresh: Boolean = false
+    override val deferSwipeRefreshUntilFirstDraw: Boolean = true
     override fun createAdapter(): VideoAdapter {
         return VideoAdapter(
             onItemClick = ::onVideoClick,

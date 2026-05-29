@@ -36,7 +36,7 @@ class ChannelVideoFragment : BaseListFragment<VideoModel>(), com.tutu.myblbl.ui.
 
     override val autoLoad: Boolean = false
     override val enableTvListFocusController: Boolean = true
-    override val enableSwipeRefresh: Boolean = false
+    override val deferSwipeRefreshUntilFirstDraw: Boolean = true
 
     override fun getSpanCount(): Int = 4
 
@@ -113,6 +113,11 @@ class ChannelVideoFragment : BaseListFragment<VideoModel>(), com.tutu.myblbl.ui.
         offset = ""
         showLoading(true)
         loadData(1)
+    }
+
+    override fun refresh() {
+        offset = ""
+        super.refresh()
     }
 
     private fun onVideoClick(video: VideoModel) {

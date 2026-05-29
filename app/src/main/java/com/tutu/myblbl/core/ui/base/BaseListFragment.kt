@@ -3,7 +3,7 @@ package com.tutu.myblbl.core.ui.base
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
+import android.view.ViewTreeObserver
 import android.os.SystemClock
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,6 +20,7 @@ import com.tutu.myblbl.core.ui.focus.tv.TvDataChangeReason
 import com.tutu.myblbl.core.ui.focus.tv.TvFocusStrategy
 import com.tutu.myblbl.core.ui.focus.tv.TvFocusableAdapter
 import com.tutu.myblbl.core.ui.focus.tv.TvListFocusController
+import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
 
 abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>() {
 
@@ -47,11 +48,14 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
     protected val loadMoreThreshold = 12
     protected open val autoLoad: Boolean = true
     protected open val enableSwipeRefresh: Boolean = true
+    protected open val deferSwipeRefreshUntilFirstDraw: Boolean = false
     protected open val enableLoadMoreFocusController: Boolean = false
     protected open val enableTvListFocusController: Boolean = false
     protected open val initialViewHolderPrewarmCount: Int = 0
     protected open val initialViewHolderPrewarmPlan: RecyclerViewPoolPrewarmer.Plan? = null
     private var pendingRecyclerIdleAction: (() -> Unit)? = null
+    private var pendingSwipeRefreshInstallRoot: View? = null
+    private var pendingSwipeRefreshInstallListener: ViewTreeObserver.OnPreDrawListener? = null
     protected var loadMoreFocusController: RecyclerViewLoadMoreFocusController? = null
     protected var tvFocusController: TvListFocusController? = null
     private val restoreObserver = object : RecyclerView.AdapterDataObserver() {
@@ -77,12 +81,12 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
         adapter = createAdapter()
         val t1 = SystemClock.elapsedRealtime()
         recyclerView?.adapter = adapter
-        recyclerView?.itemAnimator = null
-        recyclerView?.setHasFixedSize(true)
-        recyclerView?.setItemViewCacheSize(8)
+        val rvForTuning = recyclerView
+        val adapterForTuning = adapter
+        if (rvForTuning != null && adapterForTuning != null) {
+            VideoRecyclerViewTuning.apply(rvForTuning, adapterForTuning)
+        }
         adapter?.registerAdapterDataObserver(restoreObserver)
-        recyclerView?.setRecycledViewPool(sharedVideoPool)
-        configureSharedPoolFor(adapter)
         layoutManager = createLayoutManager()
         recyclerView?.layoutManager = layoutManager
         val rvForPrewarm = recyclerView
@@ -156,12 +160,6 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
         }
     }
 
-    private fun configureSharedPoolFor(adapter: BaseAdapter<MODEL, *>?) {
-        if (adapter == null) return
-        val viewType = runCatching { adapter.getItemViewType(0) }.getOrNull() ?: return
-        sharedVideoPool.setMaxRecycledViews(viewType, 60)
-    }
-
     override fun initData() {
         if (autoLoad) {
             refresh()
@@ -181,23 +179,51 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
     }
 
     private fun setupSwipeRefresh() {
-        val rv = recyclerView ?: return
-        val parent = rv.parent as? ViewGroup ?: return
-        val index = parent.indexOfChild(rv)
-        parent.removeView(rv)
+        if (deferSwipeRefreshUntilFirstDraw) {
+            scheduleSwipeRefreshAfterFirstDraw()
+        } else {
+            installSwipeRefresh()
+        }
+    }
 
-        val context = rv.context
-        swipeRefreshLayout = SwipeRefreshLayout(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            addView(rv)
-            setOnRefreshListener {
-                refresh()
+    private fun scheduleSwipeRefreshAfterFirstDraw() {
+        val root = view ?: rootView ?: return installSwipeRefresh()
+        if (!root.viewTreeObserver.isAlive) {
+            installSwipeRefresh()
+            return
+        }
+        val listener = object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                removePendingSwipeRefreshInstallListener()
+                root.post {
+                    if (isAdded && view != null) {
+                        installSwipeRefresh()
+                    }
+                }
+                return true
             }
         }
-        parent.addView(swipeRefreshLayout, index)
+        pendingSwipeRefreshInstallRoot = root
+        pendingSwipeRefreshInstallListener = listener
+        root.viewTreeObserver.addOnPreDrawListener(listener)
+    }
+
+    private fun installSwipeRefresh() {
+        if (swipeRefreshLayout != null) return
+        val rv = recyclerView ?: return
+        swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(rv) {
+            refresh()
+        }
+    }
+
+    private fun removePendingSwipeRefreshInstallListener() {
+        val root = pendingSwipeRefreshInstallRoot
+        val listener = pendingSwipeRefreshInstallListener
+        if (root != null && listener != null && root.viewTreeObserver.isAlive) {
+            root.viewTreeObserver.removeOnPreDrawListener(listener)
+        }
+        pendingSwipeRefreshInstallRoot = null
+        pendingSwipeRefreshInstallListener = null
     }
 
     protected fun setRefreshing(refreshing: Boolean) {
@@ -349,6 +375,7 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
         swipeRefreshLayout = null
         recyclerView = null
         pendingRecyclerIdleAction = null
+        removePendingSwipeRefreshInstallListener()
         super.onDestroyView()
     }
 

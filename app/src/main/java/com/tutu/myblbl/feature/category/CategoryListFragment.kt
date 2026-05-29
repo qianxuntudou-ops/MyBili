@@ -38,7 +38,7 @@ class CategoryListFragment : BaseListFragment<VideoModel>(), com.tutu.myblbl.ui.
 
     private val viewModel: CategoryViewModel by viewModel()
     private var categoryId: Int = 0
-    override val enableSwipeRefresh: Boolean = false
+    override val deferSwipeRefreshUntilFirstDraw: Boolean = true
     override val autoLoad: Boolean = false
     override val enableLoadMoreFocusController: Boolean = false
     override val enableTvListFocusController: Boolean = true

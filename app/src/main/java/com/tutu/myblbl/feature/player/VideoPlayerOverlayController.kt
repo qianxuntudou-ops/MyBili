@@ -21,6 +21,7 @@ import com.tutu.myblbl.ui.dialog.OwnerDetailDialog
 import com.tutu.myblbl.ui.dialog.PlayerActionDialog
 import com.tutu.myblbl.ui.dialog.VideoInfoDialog
 import com.tutu.myblbl.feature.detail.UserSpaceFragment
+import com.tutu.myblbl.core.ui.base.VideoRecyclerViewTuning
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.feature.player.view.MyPlayerView
 
@@ -187,7 +188,7 @@ class VideoPlayerOverlayController(
         recyclerViewRelated.layoutManager =
             GridLayoutManager(activity, 1, RecyclerView.HORIZONTAL, false)
         recyclerViewRelated.adapter = relatedAdapter
-        recyclerViewRelated.itemAnimator = null
+        VideoRecyclerViewTuning.apply(recyclerViewRelated, relatedAdapter)
         if (viewRelated.isVisible) {
             focusRelatedItem()
             return

@@ -18,6 +18,7 @@ import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.UserRepository
 import com.tutu.myblbl.ui.activity.PlayerActivity
 import com.tutu.myblbl.ui.adapter.VideoAdapter
+import com.tutu.myblbl.core.ui.base.VideoRecyclerViewTuning
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.common.content.ContentFilter
@@ -79,7 +80,7 @@ class OwnerDetailDialog(
         val spacing = context.resources.getDimensionPixelSize(R.dimen.px10)
         binding.recyclerView.layoutManager = WrapContentGridLayoutManager(context, 3)
         binding.recyclerView.adapter = videoAdapter
-        binding.recyclerView.itemAnimator = null
+        VideoRecyclerViewTuning.apply(binding.recyclerView, videoAdapter)
         binding.recyclerView.setPadding(0, -spacing, 0, binding.recyclerView.paddingBottom)
         if (binding.recyclerView.itemDecorationCount == 0) {
             binding.recyclerView.addItemDecoration(

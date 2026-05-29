@@ -22,6 +22,7 @@ import com.tutu.myblbl.ui.adapter.HistoryVideoAdapter
 import com.tutu.myblbl.ui.adapter.VideoAdapter
 import com.tutu.myblbl.core.ui.base.BaseFragment
 import com.tutu.myblbl.core.ui.base.BaseListFragment
+import com.tutu.myblbl.core.ui.base.VideoRecyclerViewTuning
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.common.content.ContentFilter
 import com.tutu.myblbl.core.common.log.AppLog
@@ -149,8 +150,9 @@ class MeListFragment : BaseFragment<FragmentMeTabListBinding>(), MeTabPage, com.
         val layoutManager = WrapContentGridLayoutManager(requireContext(), 4)
         binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.adapter = historyAdapter ?: videoAdapter
-        binding.recyclerView.setRecycledViewPool(BaseListFragment.sharedVideoPool)
-        binding.recyclerView.setHasFixedSize(true)
+        (historyAdapter ?: videoAdapter)?.let { adapter ->
+            VideoRecyclerViewTuning.apply(binding.recyclerView, adapter)
+        }
         binding.emptyContainer.visibility = View.GONE
         binding.progressBar.visibility = View.GONE
         binding.btnRetry.setOnClickListener {

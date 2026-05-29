@@ -18,6 +18,7 @@ import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.repository.FavoriteRepository
 import com.tutu.myblbl.ui.adapter.FavoriteHistoryAdapter
 import com.tutu.myblbl.core.ui.base.BaseFragment
+import com.tutu.myblbl.core.ui.base.VideoRecyclerViewTuning
 import com.tutu.myblbl.core.ui.layout.WrapContentGridLayoutManager
 import com.tutu.myblbl.core.ui.decoration.GridSpacingItemDecoration
 import com.tutu.myblbl.core.common.content.ContentFilter
@@ -27,6 +28,7 @@ import com.tutu.myblbl.core.ui.focus.tv.GridTvFocusStrategy
 import com.tutu.myblbl.core.ui.focus.tv.TvDataChangeReason
 import com.tutu.myblbl.core.ui.focus.tv.TvListFocusController
 import com.tutu.myblbl.core.navigation.VideoRouteNavigator
+import com.tutu.myblbl.core.ui.refresh.SwipeRefreshHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -64,6 +66,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
     private var pendingRestoreFocus = false
     private var hasRequestedInitialFocus = false
     private var tvFocusController: TvListFocusController? = null
+    private var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout? = null
     private var videosLoadJob: Job? = null
     private var videosRequestSerial = 0
     private var activeVideosRequestId = 0
@@ -118,13 +121,12 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
         )
         binding.recyclerViewVideos.layoutManager = WrapContentGridLayoutManager(requireContext(), 4)
         binding.recyclerViewVideos.adapter = favoriteAdapter
-        binding.recyclerViewVideos.itemAnimator = null
+        VideoRecyclerViewTuning.apply(binding.recyclerViewVideos, favoriteAdapter)
         if (binding.recyclerViewVideos.itemDecorationCount == 0) {
             binding.recyclerViewVideos.addItemDecoration(
                 GridSpacingItemDecoration(4, resources.getDimensionPixelSize(com.tutu.myblbl.R.dimen.px20), true)
             )
         }
-        binding.recyclerViewVideos.setHasFixedSize(true)
         binding.recyclerViewVideos.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
@@ -137,6 +139,10 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
             }
         })
         installTvFocusController()
+        swipeRefreshLayout = SwipeRefreshHelper.wrapRecyclerView(
+            recyclerView = binding.recyclerViewVideos,
+            onRefresh = ::refreshFavoriteVideos
+        )
 
         binding.buttonBack.setOnClickListener {
             parentFragmentManager.popBackStack()
@@ -210,6 +216,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
 
         if (!sessionGateway.isLoggedIn()) {
             hasMore = false
+            swipeRefreshLayout?.isRefreshing = false
             favoriteAdapter.setData(emptyList())
             tvFocusController?.onDataChanged(TvDataChangeReason.REPLACE_PRESERVE_ANCHOR)
             showEmpty(getString(R.string.need_sign_in))
@@ -237,6 +244,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
             }
 
             binding.progressBar.visibility = android.view.View.GONE
+            swipeRefreshLayout?.isRefreshing = false
             finishVideosRequest(requestId)
 
             result.onSuccess { response ->
@@ -327,6 +335,14 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
         }
     }
 
+    private fun refreshFavoriteVideos() {
+        currentPage = 1
+        hasMore = true
+        lastFocusedPosition = RecyclerView.NO_POSITION
+        tvFocusController?.clearAnchorForUserRefresh()
+        loadFavoriteVideos()
+    }
+
     private fun restoreFocus() {
         if (!isAdded) return
         binding.recyclerViewVideos.post {
@@ -378,6 +394,7 @@ class FavoriteDetailFragment : BaseFragment<FragmentFavoriteDetailBinding>() {
     override fun onDestroyView() {
         tvFocusController?.release()
         tvFocusController = null
+        swipeRefreshLayout = null
         super.onDestroyView()
     }
 }

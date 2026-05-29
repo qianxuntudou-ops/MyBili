@@ -19,8 +19,8 @@ import com.tutu.myblbl.model.user.FollowingModel
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.network.session.NetworkSessionGateway
 import com.tutu.myblbl.core.ui.base.BaseFragment
-import com.tutu.myblbl.core.ui.base.BaseListFragment
 import com.tutu.myblbl.core.ui.base.RecyclerViewPoolPrewarmer
+import com.tutu.myblbl.core.ui.base.VideoRecyclerViewTuning
 import android.os.SystemClock
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.log.PagePerfLogger
@@ -147,11 +147,7 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
         )
         binding.recyclerViewRight.layoutManager = WrapContentGridLayoutManager(requireContext(), 3)
         binding.recyclerViewRight.adapter = videoAdapter
-        binding.recyclerViewRight.itemAnimator = null
-        binding.recyclerViewRight.setHasFixedSize(true)
-        binding.recyclerViewRight.setItemViewCacheSize(8)
-        binding.recyclerViewRight.setRecycledViewPool(BaseListFragment.sharedVideoPool)
-        BaseListFragment.sharedVideoPool.setMaxRecycledViews(videoAdapter.getItemViewType(0), 60)
+        VideoRecyclerViewTuning.apply(binding.recyclerViewRight, videoAdapter)
         RecyclerViewPoolPrewarmer.prewarm(
             recyclerView = binding.recyclerViewRight,
             adapter = videoAdapter,
