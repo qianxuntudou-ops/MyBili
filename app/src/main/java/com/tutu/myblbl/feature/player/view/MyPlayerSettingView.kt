@@ -447,7 +447,7 @@ class MyPlayerSettingView @JvmOverloads constructor(
                 onPlayerSettingChange?.onScreenMirrorChange(newValue)
                 val label = if (newValue) context.getString(R.string.on) else context.getString(R.string.off)
                 Toast.makeText(context, "${context.getString(R.string.screen_mirror)}：$label", Toast.LENGTH_SHORT).show()
-                refreshCurrentMenu()
+                refreshCurrentMenuInPlace()
             }
         }
     }
@@ -611,9 +611,7 @@ class MyPlayerSettingView @JvmOverloads constructor(
         }
         val label = if (newValue) context.getString(R.string.on) else context.getString(R.string.off)
         Toast.makeText(context, "$title：$label", Toast.LENGTH_SHORT).show()
-        when {
-            itemId in ITEM_DM_ENABLE..ITEM_DM_SMART_SHIELD -> showDmSettingMenu(animateTransition = true)
-        }
+        refreshCurrentMenuInPlace()
         return true
     }
 
@@ -747,6 +745,50 @@ class MyPlayerSettingView @JvmOverloads constructor(
             }
 
             LEVEL_DM -> showDmOptionSubMenu(adapter.currentMenuKey, animateTransition = false)
+        }
+    }
+
+    private fun refreshCurrentMenuInPlace() {
+        val rows = currentMenuRows() ?: run {
+            refreshCurrentMenu()
+            return
+        }
+        recyclerView.animate().cancel()
+        recyclerView.animate().setListener(null)
+        recyclerView.alpha = 1f
+        clearTransientItemStates()
+        adapter.submitRows(adapter.currentMenuKey, rows)
+    }
+
+    private fun currentMenuRows(): List<PlayerSettingRow>? {
+        return when (menuLevel) {
+            LEVEL_MAIN -> menuBuilder.buildMainMenu(panelState)
+            LEVEL_SUB -> when (adapter.currentMenuKey) {
+                ITEM_VIDEO_QUALITY -> menuBuilder.buildVideoQualityMenu(panelState)
+                ITEM_PLAYBACK_SPEED -> menuBuilder.buildPlaybackSpeedMenu(panelState)
+                ITEM_SUBTITLE -> menuBuilder.buildSubtitleMenu(panelState).takeIf { panelState.subtitles.isNotEmpty() }
+                ITEM_VIDEO_CODEC -> menuBuilder.buildVideoCodecMenu(panelState)
+                ITEM_AFTER_PLAY -> menuBuilder.buildAfterPlayMenu(panelState)
+                ITEM_AUDIO_QUALITY -> menuBuilder.buildAudioQualityMenu(panelState)
+                ITEM_ASPECT_RATIO -> menuBuilder.buildScreenRatioMenu(panelState)
+                ITEM_DM_SETTING -> menuBuilder.buildDmSettingMenu(panelState)
+                ITEM_LIVE_QUALITY -> menuBuilder.buildLiveQualityMenu(panelState)
+                else -> null
+            }
+            LEVEL_DM -> {
+                val menu = menuBuilder.buildDmChoiceMenu(adapter.currentMenuKey, panelState) ?: return null
+                mutableListOf<PlayerSettingRow>(PlayerSettingRow.Header(title = menu.title)).apply {
+                    addAll(menu.values.mapIndexed { index, value ->
+                        PlayerSettingRow.Item(
+                            id = index,
+                            title = value,
+                            checked = index == menu.selectedIndex,
+                            showArrow = false
+                        )
+                    })
+                }
+            }
+            else -> null
         }
     }
 
