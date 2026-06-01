@@ -174,7 +174,7 @@ abstract class BaseListFragment<MODEL> : BaseFragment<FragmentBaseListBinding>()
     override fun onResume() {
         super.onResume()
         if (tvFocusController?.restoreCapturedAnchor() != true) {
-            tvFocusController?.ensureValidFocus("resume")
+            tvFocusController?.ensureValidFocus("resume", allowWhenFocusOutside = true)
         }
     }
 
