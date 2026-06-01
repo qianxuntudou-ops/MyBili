@@ -265,7 +265,10 @@ data class VipLabel(
 
 data class VipAvatarIcon(
     @SerializedName("icon_resource")
-    val iconResource: Map<String, IconResource>? = null
+    val iconResource: Map<String, IconResource>? = null,
+
+    @SerializedName("icon_source")
+    val iconSource: Any? = null
 )
 
 data class IconResource(
