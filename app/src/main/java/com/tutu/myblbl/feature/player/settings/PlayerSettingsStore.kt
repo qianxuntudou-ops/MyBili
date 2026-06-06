@@ -30,7 +30,7 @@ data class PlayerSettings(
     val showDanmakuSwitch: Boolean = false,
     val fastSeekSeconds: Int = 10,
     val resumePlayback: Boolean = true,
-    val sponsorBlockEnabled: Boolean = true,
+    val sponsorBlockEnabled: Boolean = false,
     val sponsorBlockAutoSkip: Boolean = true
 )
 
@@ -178,7 +178,7 @@ object PlayerSettingsStore {
             ),
             sponsorBlockEnabled = parseToggle(
                 readSetting(KEY_SPONSOR_BLOCK_ENABLED),
-                defaultValue = true
+                defaultValue = false
             ),
             sponsorBlockAutoSkip = parseToggle(
                 readSetting(KEY_SPONSOR_BLOCK_AUTO_SKIP),

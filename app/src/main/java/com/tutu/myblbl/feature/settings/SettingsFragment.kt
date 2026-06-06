@@ -202,7 +202,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             SettingModel(getString(R.string.show_bottom_progress_bar), "关"),
             SettingModel(getString(R.string.show_next_previous), "关"),
             SettingModel(getString(R.string.resume_playback), "开"),
-            SettingModel("空降助手", "开")
+            SettingModel("空降助手", "关")
         )
 
         dmSettings = mutableListOf(

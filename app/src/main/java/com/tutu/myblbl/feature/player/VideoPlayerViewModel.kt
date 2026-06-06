@@ -2603,7 +2603,7 @@ class VideoPlayerViewModel(
                 return@launch
             }
             sponsorBlockUseCase.lastError?.let { error ->
-                Toast.makeText(appContext, error, Toast.LENGTH_SHORT).show()
+                AppLog.w(TAG, "sponsor load skipped: $error")
             }
             _sponsorSegments.value = sponsorBlockUseCase.getSegments()
             PlaybackStartupTrace.log(

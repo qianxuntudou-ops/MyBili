@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -16,6 +17,7 @@ object SponsorBlockRepository {
     private const val BASE_URL = "https://bsbsb.top/api"
     private const val TAG = "SponsorBlock"
     private const val CACHE_TTL_MS = 30 * 60 * 1000L
+    private const val CONNECTION_ERROR = "空降助手连接失败，请检查网络"
 
     private val gson = Gson()
 
@@ -26,7 +28,7 @@ object SponsorBlockRepository {
 
     private val cache = ConcurrentHashMap<String, CacheEntry>()
 
-    private data class HashVideoResponse(
+    data class HashVideoResponse(
         val videoID: String = "",
         val segments: List<SponsorSegment> = emptyList()
     )
@@ -41,11 +43,15 @@ object SponsorBlockRepository {
                 .get()
                 .build()
 
-            val response = client.newCall(request).execute()
-            if (response.code == 200) null else "空降助手服务异常 (${response.code})"
-        } catch (e: Exception) {
+            client.newCall(request).execute().use { response ->
+                if (response.code == 200) null else "空降助手服务异常 (${response.code})"
+            }
+        } catch (e: IOException) {
             AppLog.e(TAG, "连通性测试失败: ${e.message}")
-            "空降助手连接失败，请检查网络"
+            CONNECTION_ERROR
+        } catch (e: Exception) {
+            AppLog.e(TAG, "连通性测试异常: ${e.message}", e)
+            "空降助手测试失败"
         }
     }
 
@@ -60,17 +66,18 @@ object SponsorBlockRepository {
                 .get()
                 .build()
 
-            val response = client.newCall(request).execute()
-            if (response.code != 200) return@withContext "测试失败：API 返回 ${response.code}"
+            client.newCall(request).execute().use { response ->
+                if (response.code != 200) return@withContext "测试失败：API 返回 ${response.code}"
 
-            val body = response.body?.string() ?: return@withContext "测试失败：响应为空"
-            val type = object : TypeToken<List<HashVideoResponse>>() {}.type
-            val videos = gson.fromJson<List<HashVideoResponse>>(body, type)
-            val totalSegments = videos.sumOf { it.segments.size }
-            return@withContext if (totalSegments > 0) {
-                "测试通过：解析正常，获取到 $totalSegments 个片段"
-            } else {
-                "测试通过：连接和解析正常（当前无测试数据）"
+                val body = response.body?.string() ?: return@withContext "测试失败：响应为空"
+                val type = object : TypeToken<List<HashVideoResponse>>() {}.type
+                val videos = gson.fromJson<List<HashVideoResponse>>(body, type)
+                val totalSegments = videos.sumOf { it.segments.size }
+                return@withContext if (totalSegments > 0) {
+                    "测试通过：解析正常，获取到 $totalSegments 个片段"
+                } else {
+                    "测试通过：连接和解析正常（当前无测试数据）"
+                }
             }
         } catch (e: Exception) {
             AppLog.e(TAG, "片段拉取测试失败: ${e.message}", e)
@@ -80,8 +87,9 @@ object SponsorBlockRepository {
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(5, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .callTimeout(15, TimeUnit.SECONDS)
             .build()
     }
 
@@ -118,29 +126,30 @@ object SponsorBlockRepository {
                 .get()
                 .build()
 
-            val response = client.newCall(request).execute()
-            when (response.code) {
-                200 -> {
-                    val body = response.body?.string() ?: return@withContext SegmentResult()
-                    val type = object : TypeToken<List<HashVideoResponse>>() {}.type
-                    val videos = gson.fromJson<List<HashVideoResponse>>(body, type)
-                    val allSegments = videos
-                        .find { it.videoID == bvid }
-                        ?.segments
-                        ?: emptyList()
-                    val segments = normalizeSegments(allSegments)
-                    cache[cacheKey] = CacheEntry(segments)
-                    SegmentResult(segments)
-                }
-                404 -> SegmentResult()
-                else -> {
-                    AppLog.w(TAG, "$bvid: API error ${response.code}")
-                    SegmentResult(error = "空降助手服务异常 (${response.code})")
+            client.newCall(request).execute().use { response ->
+                when (response.code) {
+                    200 -> {
+                        val body = response.body?.string() ?: return@withContext SegmentResult()
+                        val type = object : TypeToken<List<HashVideoResponse>>() {}.type
+                        val videos = gson.fromJson<List<HashVideoResponse>>(body, type)
+                        val allSegments = selectSegments(videos, bvid, cid)
+                        val segments = normalizeSegments(allSegments)
+                        cache[cacheKey] = CacheEntry(segments)
+                        SegmentResult(segments)
+                    }
+                    404 -> SegmentResult()
+                    else -> {
+                        AppLog.w(TAG, "$bvid: API error ${response.code}")
+                        SegmentResult(error = "空降助手服务异常 (${response.code})")
+                    }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             AppLog.w(TAG, "$bvid: ${e.message}")
-            SegmentResult(error = "空降助手连接失败，请检查网络")
+            SegmentResult(error = CONNECTION_ERROR)
+        } catch (e: Exception) {
+            AppLog.w(TAG, "$bvid: ${e.message}", e)
+            SegmentResult(error = "空降助手加载失败")
         }
     }
 
@@ -150,15 +159,26 @@ object SponsorBlockRepository {
         return hash.joinToString("") { "%02x".format(it) }.take(prefixLength)
     }
 
+    internal fun selectSegments(
+        videos: List<HashVideoResponse>,
+        bvid: String,
+        cid: Long
+    ): List<SponsorSegment> {
+        return videos
+            .find { it.videoID == bvid }
+            ?.segments
+            ?.filter { segment -> cid <= 0L || segment.cid == cid.toString() }
+            ?: emptyList()
+    }
+
     private fun normalizeSegments(
         segments: List<SponsorSegment>
     ): List<SponsorSegment> {
         return segments
             .filter { it.isSkipType && it.endTimeMs > it.startTimeMs }
-            .groupBy { it.category }
-            .values
-            .mapNotNull { candidates ->
-                candidates.maxWithOrNull(
+            .groupBy { it.UUID.ifBlank { "${it.category}:${it.startTimeMs}:${it.endTimeMs}" } }
+            .mapNotNull { (_, duplicates) ->
+                duplicates.maxWithOrNull(
                     compareBy<SponsorSegment> { it.locked }
                         .thenBy { it.votes }
                 )
