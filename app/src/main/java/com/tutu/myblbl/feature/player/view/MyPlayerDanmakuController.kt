@@ -550,6 +550,7 @@ class MyPlayerDanmakuController(
 
     fun resume() {
         if (isDanmakuStarted && !isDanmakuPaused) {
+            danmakuPlayer?.let { startPreparedPlayerIfNeeded(it) }
             return
         }
         isDanmakuStarted = true
@@ -584,6 +585,23 @@ class MyPlayerDanmakuController(
             }
         }
         startDriftSync()
+    }
+
+    fun resetForPlaybackStart(positionMs: Long) {
+        prepareJob?.cancel()
+        preloadTextureJob?.cancel()
+        prepareGeneration++
+        stop()
+        danmakuTimeline = DanmakuTimeline.EMPTY
+        rawDanmakuData = emptyList()
+        rawDanmakuSignature = 0L
+        rawDanmakuCount = 0
+        preparedDanmakuSignature = 0L
+        preparedDanmakuCount = 0
+        danmakuPositionMs = positionMs.coerceAtLeast(0L)
+        if (danmakuPositionMs > 0L) {
+            danmakuPlayer?.seekTo(danmakuPositionMs)
+        }
     }
 
     fun stop() {
@@ -784,6 +802,7 @@ class MyPlayerDanmakuController(
             step = "danmaku_player_data_applied",
             message = "count=$appliedCount raw=$rawCount"
         )
+        startPreparedPlayerIfNeeded(player)
     }
 
     private fun resolveStartupDataDelayMs(): Long {
@@ -876,6 +895,18 @@ class MyPlayerDanmakuController(
                     bypassDedup = true
                 )
             }
+            startPreparedPlayerIfNeeded(player)
+        }
+    }
+
+    private fun startPreparedPlayerIfNeeded(player: DanmakuPlayer, restartDriftSync: Boolean = true) {
+        if (!isDanmakuStarted || isDanmakuPaused || !hasPreparedData()) {
+            return
+        }
+        ensureTimerFactor(player, currentPlaybackSpeed)
+        player.start(danmakuConfig)
+        if (restartDriftSync) {
+            startDriftSync()
         }
     }
 
@@ -926,6 +957,7 @@ class MyPlayerDanmakuController(
         if (prepareGeneration != generation || window.data.isEmpty()) return
         player.updateData(window.data)
         applyAppendedWindowState(window, signature)
+        startPreparedPlayerIfNeeded(player, restartDriftSync = false)
         lastWindowApplyRealtimeMs = SystemClock.elapsedRealtime()
         AppLog.i(
             TAG,
@@ -1459,6 +1491,7 @@ class MyPlayerDanmakuController(
             stage = stage,
             startIndex = range.startIndex.toLong()
         )
+        logWindowIdStats(stage, rawWindowData, preparedData)
         val coveredUntilMs = when {
             preparedData.isEmpty() -> range.windowEndMs
             range.isCapped -> preparedData.last().position
@@ -1489,6 +1522,7 @@ class MyPlayerDanmakuController(
             stage = stage,
             startIndex = range.startIndex.toLong()
         )
+        logWindowIdStats(stage, rawWindowData, preparedData)
         return PreparedWindow(
             data = preparedData,
             rawCount = rawWindowData.size,
@@ -1555,7 +1589,7 @@ class MyPlayerDanmakuController(
     private fun DmModel.toDanmakuItemData(index: Long, allowVipColorful: Boolean): DanmakuItemData? {
         val renderContent = toRenderableContent() ?: return null
         return DanmakuItemData(
-            danmakuId = id.takeIf { it > 0L } ?: (index + 1L),
+            danmakuId = index + 1L,
             position = progress.toLong().coerceAtLeast(0L),
             content = renderContent,
             mode = mode.toDanmakuMode(),
@@ -1564,6 +1598,29 @@ class MyPlayerDanmakuController(
             score = weight.coerceAtLeast(0),
             renderFlags = resolveRenderFlags(allowVipColorful),
             vipGradientStyle = resolveVipGradientStyle(allowVipColorful)
+        )
+    }
+
+    private fun logWindowIdStats(
+        stage: String,
+        rawWindowData: List<DmModel>,
+        preparedData: List<DanmakuItemData>
+    ) {
+        if (rawWindowData.size < INITIAL_WINDOW_MAX_ITEMS && preparedData.size < INITIAL_WINDOW_MAX_ITEMS) {
+            return
+        }
+        val serviceIds = rawWindowData.asSequence().map { it.id }.filter { it > 0L }.toList()
+        val serviceDuplicateCount = serviceIds.size - serviceIds.toHashSet().size
+        val serviceZeroCount = rawWindowData.count { it.id <= 0L }
+        val runtimeIds = preparedData.map { it.danmakuId }
+        val runtimeDuplicateCount = runtimeIds.size - runtimeIds.toHashSet().size
+        if (serviceDuplicateCount <= 0 && serviceZeroCount <= 0 && runtimeDuplicateCount <= 0) {
+            return
+        }
+        AppLog.i(
+            TAG,
+            "danmaku id stats: stage=$stage raw=${rawWindowData.size} prepared=${preparedData.size} " +
+                "serviceZero=$serviceZeroCount serviceDup=$serviceDuplicateCount runtimeDup=$runtimeDuplicateCount"
         )
     }
 

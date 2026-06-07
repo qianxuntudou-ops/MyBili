@@ -60,6 +60,14 @@ class MyPlayerSpecialDanmakuController(
         syncView()
     }
 
+    fun resetForPlaybackStart(positionMs: Long) {
+        isPlaying = false
+        playbackPositionMs = positionMs.coerceAtLeast(0L)
+        data = emptyList()
+        dataAppliedToView = null
+        syncView()
+    }
+
     fun syncPosition(positionMs: Long, @Suppress("UNUSED_PARAMETER") forceSeek: Boolean = false) {
         playbackPositionMs = positionMs.coerceAtLeast(0L)
         syncView()

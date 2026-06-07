@@ -130,15 +130,20 @@ class DmMaskController(
         currentTimeline = repository.getTimeline(cid)
         maskHostProvider()?.let { it.timeline = currentTimeline }
 
-        state = if (enabled && isPlaying) State.ACTIVE else State.READY
+        state = if (!enabled) {
+            State.IDLE
+        } else if (isPlaying) {
+            State.ACTIVE
+        } else {
+            State.READY
+        }
 
         if (enabled) {
             frameInvalidator.start()
             invalidateMaskHost()
+            // 触发初始预加载
+            maybePreload(currentVideoPtsMs())
         }
-
-        // 触发初始预加载
-        maybePreload(currentVideoPtsMs())
         return true
     }
 
@@ -235,7 +240,7 @@ class DmMaskController(
      * IDLE → false。READY / ACTIVE / SEEKING → true（SEEKING 时用旧遮罩冻结）。
      */
     fun shouldRenderMask(): Boolean {
-        return state != State.IDLE
+        return enabled && state != State.IDLE
     }
 
     /** HostLayout 调用：当前是否处于 SEEKING 冻结状态。 */
@@ -261,7 +266,10 @@ class DmMaskController(
         currentTimeline = null
         lastPreloadedSegIndex = -1
         frameInvalidator.stop()
-        maskHostProvider()?.clearCachedMask()
+        maskHostProvider()?.let { host ->
+            host.timeline = null
+            host.clearCachedMask()
+        }
     }
 
     fun dispose() {

@@ -583,6 +583,7 @@ class MyPlayerView @JvmOverloads constructor(
             }
         })
         syncDanmakuSettings()
+        dmMaskController.setEnabled(settingView?.getDmSmartShield() ?: false)
     }
 
     private fun ensureSeekOverlay(reason: String): SeekOverlayView? {
@@ -694,10 +695,13 @@ class MyPlayerView @JvmOverloads constructor(
         }
     }
 
-    fun prepareForPlaybackTransition() {
+    fun prepareForPlaybackTransition(startPositionMs: Long = 0L) {
         closeShutter()
         handler.removeCallbacks(bufferingIndicatorRunnable)
         bufferingView?.visibility = GONE
+        danmakuController.resetForPlaybackStart(startPositionMs)
+        specialDanmakuController.resetForPlaybackStart(startPositionMs)
+        releaseDmMask()
     }
 
     private fun updateAspectRatio() {

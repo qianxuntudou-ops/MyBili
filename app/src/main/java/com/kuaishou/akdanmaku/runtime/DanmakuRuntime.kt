@@ -76,6 +76,7 @@ internal class DanmakuRuntime(private val context: DanmakuContext) {
   private var filterCacheableGeneration = -1
   private var filterResultCacheable = false
   private var fallbackLimitLogTick = 0
+  private var lastFrameStallLogAtMs = 0L
   private var lastUpdateTimeMs = DanmakuTimelineJumpPolicy.TIME_UNSET
   private var frameReuseGeneration = 0
   private val frameReuseInvalidationCounts = IntArray(REUSE_INVALIDATE_REASON_COUNT)
@@ -243,7 +244,7 @@ internal class DanmakuRuntime(private val context: DanmakuContext) {
     val releaseProfile = releasePendingFrames()
     val releaseMs = SystemClock.elapsedRealtime() - checkpoint
     checkpoint = SystemClock.elapsedRealtime()
-    syncPendingData()
+    val syncedItems = syncPendingData()
     val syncMs = SystemClock.elapsedRealtime() - checkpoint
 
     val config = context.config
@@ -335,6 +336,18 @@ internal class DanmakuRuntime(private val context: DanmakuContext) {
       }
     }
     val frameMs = SystemClock.elapsedRealtime() - checkpoint
+    logFrameStallIfNeeded(
+      now = now,
+      config = config,
+      syncedItems = syncedItems,
+      enqueuedActiveItems = enqueuedActiveItems,
+      promotedItems = promotedItems,
+      scheduledMeasures = scheduledMeasures,
+      builtCommands = newFrame?.commands?.size ?: -1,
+      replacedFrame = replacedFrame,
+      reuseMissReason = reuseMissReason,
+      incrementalProfile = incrementalProfile
+    )
 
     val cost = SystemClock.elapsedRealtime() - startedAt
     if (cost >= RUNTIME_OVERLOAD_MS) {
@@ -491,9 +504,9 @@ internal class DanmakuRuntime(private val context: DanmakuContext) {
     context.cacheManager.release()
   }
 
-  private fun syncPendingData() {
+  private fun syncPendingData(): Int {
     val added = timelineWindow.syncPending(pendingAddItems, liveMode)
-    if (added == 0) return
+    return added
   }
 
   private fun resetForTimelineJumpIfNeeded(now: Long, config: DanmakuConfig): TimelineResetProfile? {
@@ -1161,6 +1174,55 @@ internal class DanmakuRuntime(private val context: DanmakuContext) {
     return true
   }
 
+  private fun logFrameStallIfNeeded(
+    now: Long,
+    config: DanmakuConfig,
+    syncedItems: Int,
+    enqueuedActiveItems: Int,
+    promotedItems: Int,
+    scheduledMeasures: Int,
+    builtCommands: Int,
+    replacedFrame: Boolean,
+    reuseMissReason: String?,
+    incrementalProfile: IncrementalFrameProfile
+  ) {
+    val commandCount = frame?.commands?.size ?: 0
+    if (commandCount > 0) return
+    if (activeStates.isEmpty() && waitingStates.isEmpty() && pendingAddItems.isEmpty()) return
+    val elapsed = SystemClock.elapsedRealtime()
+    if (elapsed - lastFrameStallLogAtMs < FRAME_STALL_LOG_INTERVAL_MS) return
+    lastFrameStallLogAtMs = elapsed
+
+    var uninitialized = 0
+    var measuring = 0
+    var measuredOrAbove = 0
+    var error = 0
+    fun countState(state: ActiveItemState) {
+      when (state.item.state) {
+        ItemState.Uninitialized -> uninitialized++
+        ItemState.Measuring -> measuring++
+        ItemState.Error -> error++
+        else -> measuredOrAbove++
+      }
+    }
+    activeStates.forEach(::countState)
+    waitingStates.forEach(::countState)
+    val displayer = context.displayer
+    Log.w(
+      DanmakuEngine.TAG,
+      "[Runtime] frame stall now=${now}ms active=${activeStates.size} waiting=${waitingStates.size} " +
+        "pending=${pendingAddItems.size} sorted=${sortedItems.size} scan=${timelineWindow.scanIndex} " +
+        "commands=$commandCount built=$builtCommands replaced=${if (replacedFrame) 1 else 0} " +
+        "synced=$syncedItems enqActive=$enqueuedActiveItems promoted=$promotedItems " +
+        "scheduledMeasure=$scheduledMeasures measureQueue=${measureQueue.size} " +
+        "stateU=$uninitialized stateM=$measuring stateReady=$measuredOrAbove stateErr=$error " +
+        "reuseMiss=${reuseMissReason ?: "none"} incr=${if (incrementalProfile.applied) 1 else 0} " +
+        "incrReason=${incrementalProfile.reason} incrItems=${incrementalProfile.items} " +
+        "incrCommands=${incrementalProfile.commands} loadShed=$loadShedLevel " +
+        "visible=${config.visibility} size=${displayer.width}x${displayer.height} screenPart=${config.screenPart}"
+    )
+  }
+
   private fun drawCommand(
     canvas: Canvas,
     frame: RuntimeFrame,
@@ -1747,6 +1809,7 @@ internal class DanmakuRuntime(private val context: DanmakuContext) {
     private const val MERGE_SUFFIX_SAFETY_EM = 0.8f
     private const val MERGE_CANVAS_PADDING = 6f
     private const val FRAME_CACHE_RELEASE_DELAY_MS = 48L
+    private const val FRAME_STALL_LOG_INTERVAL_MS = 1_000L
     private const val MIN_ENQUEUE_PER_FRAME = 4
     private const val ENQUEUE_BUDGET_MS = 2L
     private const val CACHE_PRIORITY_VISIBLE = 0
