@@ -144,7 +144,7 @@
       <div><strong>数据参考</strong>Web 端最适合验证 <code>dm_mask</code> 字段和 <code>.webmask</code> 文件格式。</div>
       <div><strong>行为参考</strong>Android APP 端更适合参考播放器 clock、seek、buffering 和弹幕生命周期。</div>
       <div><strong>渲染语义</strong>Chronos native 证实是 <code>CRONDefaultShading() * mask_sample</code>，不是父 View <code>clipPath</code>。</div>
-      <div><strong>当前重点</strong>MyBLBL 已实现核心解析和合成；剩余要盯缺帧/seek 旧 mask 兜底和弹幕 runtime 闪烁。</div>
+      <div><strong>当前重点</strong>云端已处理弹幕闪烁后，本地重点收敛到遮罩 alpha/path 语义和参考链路证据。</div>
     </div>
   </header>
 
@@ -163,7 +163,7 @@
         <tr><td>播放器 clock</td><td>Android APP / Chronos</td><td>参考通过 <code>onPlayerClockChanged(rate, position, timestamp)</code> 校准内部时钟，再按 rate 连续推进。</td></tr>
         <tr><td>seek / buffering / ready</td><td>Android APP</td><td>这些是 Android 播放器状态语义，Web 环境差异太大。</td></tr>
         <tr><td>渲染合成</td><td>Chronos native</td><td>反汇编证实 shader 读取 <code>cron_mask_texture</code> alpha，再乘弹幕输出。</td></tr>
-        <tr><td>最终实现</td><td>MyBLBL 工程折中</td><td>我们没有 Chronos native surface，只能用 View tree 中的 <code>saveLayer + DST_IN</code> 近似。</td></tr>
+        <tr><td>最终实现</td><td>MyBLBL 工程折中</td><td>我们没有 Chronos native surface，只能用 View tree 中的 <code>saveLayer + DST_IN</code> 保留可显示 path。</td></tr>
       </tbody>
     </table>
 
@@ -266,7 +266,7 @@ frame 2: len=518  pts=67  payload startsWith data:image/svg+xml;base64</code></p
         <tr><td>SHA256</td><td><code>d1c07f6eb9ee82b01e7fea5c0ab6bd679fd4deaa63ad72299c9d8b66ecdf0bb7</code></td></tr>
         <tr><td>导出符号</td><td>只有 <code>JNI_OnLoad</code>，库已 strip。</td></tr>
         <tr><td>动态依赖</td><td><code>libGLESv2.so</code>、<code>libEGL.so</code>、<code>libandroid.so</code>、<code>libjnigraphics.so</code>、<code>liblog.so</code>、<code>libm.so</code>、<code>libc.so</code></td></tr>
-        <tr><td>分析产物</td><td><code class="path">E:\MyTool\MyBLBL\.analysis\chronos</code></td></tr>
+        <tr><td>分析产物</td><td><code class="path">E:\MyTool\MyBLBL\.trae\bili\out\.analysis\chronos</code></td></tr>
       </tbody>
     </table>
 
@@ -284,7 +284,7 @@ frame 2: len=518  pts=67  payload startsWith data:image/svg+xml;base64</code></p
     </ul>
 
     <h3>4.2 定点反汇编结论</h3>
-    <p>通过 <code>.eh_frame</code> 恢复到 24,124 个函数边界，再从关键字符串反查 xref，得到下面几个强结论。</p>
+    <p>通过 <code>.eh_frame</code> 恢复到 24,124 个函数边界，再从关键字符串反查 xref，得到下面几个结论。本节按证据强度排列，避免把弱线索误当成主链路。</p>
 
     <table>
       <thead><tr><th>证据</th><th>反汇编结论</th><th>对 MyBLBL 的意义</th></tr></thead>
@@ -302,7 +302,7 @@ frame 2: len=518  pts=67  payload startsWith data:image/svg+xml;base64</code></p
         <tr>
           <td><code>CRONDefaultShading() * mask_sample</code></td>
           <td>弹幕默认输出乘 mask alpha。</td>
-          <td><code>saveLayer + DST_IN</code> 是 View 体系下最接近的近似。</td>
+          <td><code>saveLayer + DST_IN</code> 是 View 体系下最接近的近似：先画弹幕，再保留 webmask 可显示区。</td>
         </tr>
         <tr>
           <td><code>android/graphics/Path</code> / <code>setClipPath</code></td>
@@ -322,8 +322,73 @@ frame 2: len=518  pts=67  payload startsWith data:image/svg+xml;base64</code></p
       </tbody>
     </table>
 
+    <h3>4.3 根据 <code>.analysis/chronos</code> 精准定位参考代码</h3>
+    <p>这次不再全局扫包，而是从 <code class="path">E:\MyTool\MyBLBL\.trae\bili\out\.analysis\chronos</code> 的产物反推代码入口：</p>
+    <table>
+      <thead><tr><th>线索文件</th><th>命中内容</th><th>反推到的参考代码</th><th>证据强度</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>strings_all.txt</code> / <code>keyword_hits.json</code></td>
+          <td><code>external/bili_chronos+/chronos/cron/core/renderer/render_pass.cc</code>、<code>cron_mask_texture</code>、<code>cron_mask_tex_coord</code></td>
+          <td><code class="path">libchronos.so</code> 的 render pass 管线。</td>
+          <td><span class="tag tag-ok">强</span>：定位到防挡 shader 所在渲染通道。</td>
+        </tr>
+        <tr>
+          <td><code>strings_all.txt</code></td>
+          <td><code>mediump float mask_sample = texture(...).a</code>、<code>cron_output = CRONDefaultShading() * mask_sample;</code></td>
+          <td>Chronos shader 源码片段。</td>
+          <td><span class="tag tag-ok">强</span>：直接证明 alpha=1 保留弹幕，alpha=0 隐藏弹幕。</td>
+        </tr>
+        <tr>
+          <td><code>key_functions_summary.json</code> / <code>xrefs_key_strings.txt</code></td>
+          <td><code>cron_mask_texture</code> xref 位于 <code>0x277d5c</code>、<code>0x27b864</code>；<code>cron_mask_tex_coord</code> 还有 <code>0x20ade0</code>、<code>0x32c758</code> 等函数。</td>
+          <td><code>render_pass.cc</code> 相关纹理/uniform/坐标绑定逻辑。</td>
+          <td><span class="tag tag-ok">强</span>：说明不是普通父 View 裁剪，而是 GPU texture 输入。</td>
+        </tr>
+        <tr>
+          <td><code>xrefs_key_strings.txt</code></td>
+          <td><code>setClipPath</code>、<code>android/graphics/Path</code>、<code>Path$FillType</code></td>
+          <td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\cron\Canvas.java</code>。</td>
+          <td><span class="tag tag-infer">中</span>：证明 Chronos 有 Android Canvas/Path 能力，但不是防挡主渲染证据。</td>
+        </tr>
+        <tr>
+          <td><code>keyword_hits.json</code> / <code>xrefs_key_strings.txt</code></td>
+          <td><code>MASK</code> 命中 <code>external/bili_chronos+/chronos/poros/renderer/parser.cc</code> 附近，xref 函数约 <code>0x37ec20-0x383c04</code>。</td>
+          <td>更像 Chronos/Poros 资源或渲染 parser 的格式标记。</td>
+          <td><span class="tag tag-risk">弱</span>：不能据此认定这里就是 B 站 <code>.webmask</code> 解析器。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>4.4 参考 Java/Smali 入口</h3>
+    <table>
+      <thead><tr><th>入口</th><th>证据</th><th>对齐结论</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\cron\ChronosRenderer.java</code></td>
+          <td>静态加载 <code>System.loadLibrary("chronos")</code>，并把渲染交给 <code>ChronosEngine.nativeUpdateAndDraw()</code>。</td>
+          <td>防挡最终在 Chronos native surface/render pass 中完成。</td>
+        </tr>
+        <tr>
+          <td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\cron\ChronosEngine.java</code></td>
+          <td>暴露 <code>nativeRunPackage</code>、<code>nativeSendMessageAsync/Sync</code>、<code>nativeUpdateAndDraw</code>。</td>
+          <td>主进程通过消息/RPC 驱动 Chronos，不在普通 View 层直接解析绘制防挡。</td>
+        </tr>
+        <tr>
+          <td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\cron\Canvas.java</code></td>
+          <td><code>setClipPath(Path)</code> 只是离屏 Canvas 的通用 clip；同类还支持 <code>DST_IN</code>、<code>DST_OUT</code> 等 Xfermode。</td>
+          <td>不能把 <code>Canvas.clipPath</code> 当成防挡主链路；主链路仍以 shader alpha 为准。</td>
+        </tr>
+        <tr>
+          <td><code class="path">E:\MyTool\bili\out\apktool\smali_classes21\tv\danmaku\biliplayerv2\service\interact\biz\chronos\chronosrpc\remote\RemoteServiceHandler.smali</code></td>
+          <td><code>onPlayerClockChanged(FJMap)</code> 创建 <code>PlaybackStatusChange$Request</code>，写入 <code>playback_rate</code>、<code>current_time</code>、<code>timestamp</code>。</td>
+          <td>参考的时间基准是 position + rate + timestamp 的 clock 校准，而不是每帧临时读一个静态 position。</td>
+        </tr>
+      </tbody>
+    </table>
+
     <div class="note">
-      <strong>native 逆向边界：</strong>目前足够证明 Chronos 的防挡渲染语义是 alpha mask shader 合成；但还不足以完整还原下载、segment 缓存、缺帧兜底等状态机。继续做全库级 Ghidra/IDA 类型恢复成本很高，当前性价比不如先对齐 MyBLBL 已知差异。
+      <strong>native 逆向边界：</strong>目前足够证明 Chronos 的防挡渲染语义是 alpha mask shader 合成，并能定位 clock RPC；但还不足以完整还原下载、segment 缓存、缺帧兜底等状态机。尤其 <code>MASK</code> 字符串是弱证据，不能拿它反推 webmask 解析细节。
     </div>
 
     <h2>5. MyBLBL 当前实现状态</h2>
@@ -441,8 +506,8 @@ frame 2: len=518  pts=67  payload startsWith data:image/svg+xml;base64</code></p
       <li>真实 <code>.webmask</code> 文件由 <code>MASK</code> 文件头、段索引表、gzip 段组成。段内每帧是 <code>uint32 len + uint64 pts + payload</code>。</li>
       <li>播放器通过 <code>rate + position + timestamp</code> 校准内部 clock。后续按 elapsed time 和 playback rate 连续推进。</li>
       <li>按当前 clock PTS 定位 segment 和 frame，使用 floor 语义，不取未来帧。</li>
-      <li>把 SVG path 转成允许弹幕绘制的 alpha mask。人物/主体区域是洞。</li>
-      <li>弹幕内容先正常绘制，再乘 mask alpha。Chronos native 是 shader；MyBLBL 用 <code>saveLayer + DST_IN</code> 近似。</li>
+      <li>把 SVG path 转成弹幕可显示区。实机验证 <code>DST_OUT</code> 会反向显示，因此解析后的 path 应按可显示 alpha 处理。</li>
+      <li>弹幕内容先正常绘制，再按 mask alpha 保留可显示区。Chronos native 是 shader；MyBLBL 用 <code>saveLayer + DST_IN</code> 近似。</li>
       <li>BUFFERING/READY 是 clock/status 校准，不等价于清空弹幕 render queue。</li>
     </ol>
 
@@ -497,7 +562,13 @@ frame 2: len=518  pts=67  payload startsWith data:image/svg+xml;base64</code></p
         <tr><td>参考模型</td><td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bapis\bilibili\community\service\dm\v1\DmViewReply.java</code></td><td><code>mask_</code> 字段和 <code>hasMask()</code>。</td></tr>
         <tr><td>参考 clock</td><td><code class="path">E:\MyTool\bili\out\apktool\smali_classes21\tv\danmaku\biliplayerv2\service\interact\biz\chronos\chronosrpc\remote\RemoteServiceHandler.smali</code></td><td><code>onPlayerClockChanged</code>、<code>current_time</code>、<code>playback_rate</code>。</td></tr>
         <tr><td>参考 native</td><td><code class="path">E:\MyTool\bili\out\apktool\lib\arm64-v8a\libchronos.so</code></td><td>Chronos native 渲染和资源处理。</td></tr>
-        <tr><td>逆向产物</td><td><code class="path">E:\MyTool\MyBLBL\.analysis\chronos</code></td><td>ELF 摘要、字符串、xref、关键函数反汇编。</td></tr>
+        <tr><td>Chronos Java 桥</td><td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\cron\ChronosRenderer.java</code>、<code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\cron\ChronosEngine.java</code></td><td>加载 <code>libchronos.so</code>，把包运行、消息和绘制交给 native。</td></tr>
+        <tr><td>Chronos 包管理</td><td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\common\chronoscommon\ChronosPackageManager.java</code></td><td>按 <code>service_danmaku</code> 获取、下载、缓存并加载动态 Chronos 包。</td></tr>
+        <tr><td>Chronos 下载桥</td><td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\common\chronoscommon\message\UrlRequest$Request.java</code>、<code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\common\chronoscommon\plugins\C21301j.java</code></td><td>Chronos JS 可发起 URL 请求，文件响应落到 <code>download_files/chronos_file_x</code>。</td></tr>
+        <tr><td>Chronos 解压桥</td><td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\common\chronoscommon\message\UnzipFile$Request.java</code>、<code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\common\chronoscommon\plugins\P.java</code></td><td>支持运行时 zip 解压，也支持 AES/CBC/NoPadding 安全包解密。</td></tr>
+        <tr><td>内置 DFM 包</td><td><code class="path">E:\MyTool\MyBLBL\.trae\bili\out\.analysis\cron_package</code></td><td><code>MiniDmPkg</code>，包含 DFM 基础弹幕逻辑和 proto，但未发现 <code>maskUrl</code> 消费。</td></tr>
+        <tr><td>Chronos Canvas 辅证</td><td><code class="path">E:\MyTool\bili\out\jadx\sources\com\bilibili\cron\Canvas.java</code></td><td>证明 Chronos 支持 Path/clip/Xfermode，但不是防挡主链路。</td></tr>
+        <tr><td>逆向产物</td><td><code class="path">E:\MyTool\MyBLBL\.trae\bili\out\.analysis\chronos</code></td><td>ELF 摘要、字符串、xref、关键函数反汇编。</td></tr>
         <tr><td>当前实现</td><td><code class="path">app/src/main/java/com/tutu/myblbl/model/dm/DmMaskInfo.kt</code></td><td>Web <code>dm_mask</code> 字段模型。</td></tr>
         <tr><td>当前实现</td><td><code class="path">app/src/main/java/com/tutu/myblbl/model/dm/DmMaskRepository.kt</code></td><td>webmask Range 下载、段缓存。</td></tr>
         <tr><td>当前实现</td><td><code class="path">app/src/main/java/com/tutu/myblbl/model/dm/WebmaskParser.kt</code></td><td>webmask 文件和 SVG path 解析。</td></tr>
@@ -514,11 +585,121 @@ frame 2: len=518  pts=67  payload startsWith data:image/svg+xml;base64</code></p
       <li>“人物区域整块露出是资源空帧”已废弃。样本 <code>37,090</code> 帧都有 path。</li>
       <li>“主 APK 与 Chronos 共用 clock”表述过度简化。准确说法是主 APK 把 clock 转发给 Chronos。</li>
       <li>“父 View clipPath 等价官方”已废弃。Chronos 证据指向 shader alpha 乘法。</li>
+      <li>“webmask path 必须用 <code>DST_OUT</code> 挖掉”已废弃。实机验证 <code>DST_OUT</code> 会让人物区域显示弹幕、其他区域无弹幕；当前应使用 <code>DST_IN</code> 保留解析后的可显示区。</li>
       <li>“seek 后冻结旧 mask 防闪”不是参考主线。它能掩盖空窗，但会制造旧 PTS 遮罩拖尾。</li>
       <li>“关闭智能防挡仍闪”不应继续归因到 mask path，要查弹幕 runtime。</li>
     </ul>
 
-    <p class="muted">更新时间：2026-06-06。本文基于本地反编译目录、真实 webmask 文件、Chronos native 反汇编结果和当前工作区代码整理；只作为分析报告，不包含代码修改。</p>
+    <h2>11. 2026-06-08 遮罩反向显示的纠正</h2>
+    <div class="warning">
+      <p><strong>本节结论：</strong>最新日志已经证明数据链路是通的：<code>Webmask segment cached</code> 连续出现，Host 也持续输出 <code>mask state=masked masked=true</code>。随后实机反馈证明 <code>DST_OUT</code> 会反向显示：人物区域有弹幕，其他区域无弹幕。因此最终合成方向应回到 <code>DST_IN</code>，只保留解析后的可显示 path。</p>
+    </div>
+
+    <h3>11.1 最新日志证据</h3>
+    <table>
+      <thead><tr><th>日志</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>Webmask segment cached: ... seg=0 frames=300 firstPts=0 lastPts=9977</code></td><td>当前段已解析出有效帧。</td></tr>
+        <tr><td><code>DmMaskHost mask state=masked masked=true pts=4450 framePts=4438 paths=1</code></td><td>Host 已拿到当前帧并进入遮罩合成分支。</td></tr>
+        <tr><td><code>mask state=masked</code> 连续覆盖 4s 到 31s</td><td>不是偶发 no_frame 或 disabled。</td></tr>
+      </tbody>
+    </table>
+
+    <h3>11.2 真实 SVG 与实机校验</h3>
+    <p>重新拉取 <code>37551801208_29_0.webmask</code> 第 0 段第 0 帧，SVG 头部是：</p>
+<pre><code>&lt;svg width="320.000000px" height="180.000000px" viewBox="0 0 320.000000 180.000000"&gt;
+&lt;g transform="translate(0.000000,180.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none"&gt;
+&lt;path d="..."/&gt;
+</code></pre>
+    <p>单看 SVG 的 <code>fill="#000000"</code> 容易误判为“黑色遮挡区应使用 <code>DST_OUT</code>”。但实机结果已经证伪这个假设：<code>DST_OUT</code> 会让人物区域显示弹幕、其他区域无弹幕。也就是说经过当前解析、坐标变换和填充规则后，传入 Host 的 path 应被视为<strong>弹幕可显示区</strong>，Android View 合成应使用 <code>DST_IN</code> 保留该区域。</p>
+
+    <h3>11.3 本次代码修正</h3>
+    <table>
+      <thead><tr><th>文件</th><th>修正</th><th>理由</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code class="path">app/src/main/java/com/tutu/myblbl/feature/player/view/DanmakuMaskHostLayout.kt</code></td>
+          <td>保留 <code>PorterDuff.Mode.DST_IN</code></td>
+          <td>实机验证 <code>DST_OUT</code> 反向；<code>DST_IN</code> 才是当前解析语义下的正确合成方向。</td>
+        </tr>
+        <tr>
+          <td><code class="path">app/src/main/java/com/tutu/myblbl/model/dm/WebmaskParser.kt</code></td>
+          <td><code>Path.FillType.EVEN_ODD</code> → <code>Path.FillType.WINDING</code></td>
+          <td>SVG 默认 fill rule 是 nonzero；真实样本没有声明 evenodd。</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>本次最终只保留 <code>WINDING</code> 修正，撤销 <code>DST_OUT</code> 假设。后续如果还出现错位，应继续查坐标/填充，而不是再把合成方向改成 <code>DST_OUT</code>。</p>
+
+    <h2>12. 2026-06-08 继续深挖：Chronos 包与 mask 消费边界</h2>
+    <div class="warning">
+      <p><strong>当前状态：</strong>不能说“参考整个智能防挡链路已经 100% 清楚”。已经闭环的是主进程 RPC、开关方向、clock 转发、native shader 合成语义；还没有闭环的是动态 DFM Chronos 包内部如何下载/解析 <code>maskUrl</code>，以及它在哪个 JS/native 节点把结果绑定为 <code>cron_mask_texture</code>。</p>
+    </div>
+
+    <h3>12.1 新增已证实点</h3>
+    <table>
+      <thead><tr><th>证据</th><th>位置</th><th>结论</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>ChronosPackageManager.Service.DFM</code></td>
+          <td><code class="path">smali_classes8\com\bilibili\common\chronoscommon\ChronosPackageManager$Service.smali</code></td>
+          <td>DFM 的服务 key 是 <code>service_danmaku</code>。弹幕 Chronos 包不是随便一个通用包，而是按服务 key 获取。</td>
+        </tr>
+        <tr>
+          <td><code>suspendLoadPackage(pkgUrl, md5, sign, service)</code></td>
+          <td><code class="path">ChronosPackageManager.java</code></td>
+          <td>如果外部传入 <code>pkgUrl</code>，优先下载该包；否则通过 MOSS 拉取服务包信息，再下载、校验、缓存。</td>
+        </tr>
+        <tr>
+          <td><code>runPackage(pkg, null, argsMap)</code></td>
+          <td><code class="path">EnhancedChronosFragment$tryRunPackage$1.smali</code></td>
+          <td>包运行时会把 Fragment arguments 转成 Map 传入 Chronos。它不是单纯运行 APK 内置脚本。</td>
+        </tr>
+        <tr>
+          <td><code>URLRequest</code> + 文件 parser</td>
+          <td><code class="path">UrlRequest$Request.java</code>、<code class="path">plugins\C21301j.java</code></td>
+          <td>Chronos 包可以请求远程 URL，文件响应会写到 <code>download_files/chronos_file_x</code>。这解释了为什么静态 APK 包里找不到完整 webmask 消费代码。</td>
+        </tr>
+        <tr>
+          <td><code>UnzipFile</code> + AES 解密</td>
+          <td><code class="path">plugins\P.java</code></td>
+          <td>Chronos 包可以解压或解密资源包。mask/模型/脚本资源可能由动态包运行时拉取。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>12.2 内置 <code>cron_package</code> 的负证据</h3>
+    <p><code class="path">E:\MyTool\MyBLBL\.trae\bili\out\.analysis\cron_package</code> 是 APK 中提取出的 <code>danmaku-flame-master-mini</code>，<code>info.json</code> 显示版本 <code>3.0.0</code>，commit <code>cdf962a9ce3201c8ce027a8c9ae840e61a70678d</code>。</p>
+    <table>
+      <thead><tr><th>搜索项</th><th>结果</th><th>解释</th></tr></thead>
+      <tbody>
+        <tr><td><code>VideoMask / maskUrl / mask_url</code></td><td>只在 proto 定义处出现。</td><td>说明 mini 包知道字段结构，但没有在可见代码里消费它。</td></tr>
+        <tr><td><code>URLRequest / UnzipFile</code></td><td>框架能力存在，但未见与 <code>maskUrl</code> 绑定。</td><td>不能把 mini 包当完整参考防挡实现。</td></tr>
+        <tr><td><code>GetDmView reply</code></td><td>未见对 dataMap <code>reply</code> 的完整业务消费。</td><td>真实消费逻辑更可能在动态 DFM 包，或在 native/插件层。</td></tr>
+      </tbody>
+    </table>
+
+    <h3>12.3 目前严格对齐时不能再猜的点</h3>
+    <ul>
+      <li><code>block_mask</code> 不能按字面理解。参考是 <code>block_mask = !getDanmakuAvoidFigure()</code>，开智能防挡时发给 Chronos 的 <code>block_mask</code> 反而是 <code>false</code>。</li>
+      <li><code>mask_enabled</code> 已被标注废弃，严格对齐时应以 <code>DanmakuFilterChange.Request.blockMask</code> 和 <code>GetDanmakuFilter.Response.blockMask</code> 为主。</li>
+      <li>内置 <code>MiniDmPkg</code> 不能作为完整防挡包复刻依据。它没有显式下载/解析 <code>maskUrl</code> 的证据。</li>
+      <li><code>DST_OUT</code> 已被实机证伪；当前解析后的 path 在 MyBLBL View 合成里应按可显示区域处理，继续使用 <code>DST_IN</code>。</li>
+      <li>官方最终不是父 View 裁剪，而是 <code>cron_output = CRONDefaultShading() * mask_sample</code> 的 alpha 乘法。MyBLBL 的 <code>saveLayer + DST_IN</code> 只是 View 体系下的近似。</li>
+    </ul>
+
+    <h3>12.4 还缺的最后一段证据</h3>
+    <p>要真正说“完全清楚”，还需要拿到或反推出动态 <code>service_danmaku</code> Chronos 包内部实现，也就是：</p>
+    <ol>
+      <li>它如何从 <code>GetDmView</code> 的 <code>reply</code> 附件解出 <code>DmViewReply.mask.maskUrl</code>。</li>
+      <li>它是否通过 <code>URLRequest</code> 拉取 <code>.webmask</code>，是否通过 <code>UnzipFile</code> 处理资源。</li>
+      <li>它如何处理缺帧、seek、buffering、segment 预取和旧帧兜底。</li>
+      <li>它在哪个 Chronos/Poros 节点把 mask 帧转成 alpha texture，并绑定到 <code>cron_mask_texture</code>。</li>
+    </ol>
+    <p>因此，下一轮如果继续逆向，应优先找运行时缓存目录里的 <code>chronos_pkg/service_danmaku</code> 或 MOSS 返回的 DFM 动态包，而不是继续全局扫 APK。APK 静态层已经证明主进程只是 RPC 和包管理桥，真正的防挡消费逻辑不在当前可见 mini 包里。</p>
+
+    <p class="muted">更新时间：2026-06-08。本文基于本地反编译目录、真实 webmask 文件、Chronos native 反汇编结果、Android PorterDuff 官方文档和当前工作区代码整理。</p>
   </section>
 </main>
 </body>
