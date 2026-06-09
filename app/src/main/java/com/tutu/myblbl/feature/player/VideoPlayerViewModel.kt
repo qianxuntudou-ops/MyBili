@@ -111,6 +111,7 @@ class VideoPlayerViewModel(
         private const val FIRST_FRAME_DM_MASK_LOAD_DELAY_MS = 2_500L
         private const val FIRST_DANMAKU_PARTIAL_END_MS = 120_000L
         private const val FIRST_DANMAKU_INITIAL_PARSE_END_MS = 30_000L
+        private const val FIRST_DANMAKU_INITIAL_RANGE_END_MS = FIRST_DANMAKU_INITIAL_PARSE_END_MS
         private const val FIRST_DANMAKU_TAIL_PREFETCH_AHEAD_MS = 10_000L
         private const val FIRST_DANMAKU_FAR_TAIL_MIN_DELAY_MS = 60_000L
         private const val DANMAKU_SEGMENT_DURATION_MS = 360_000L
@@ -3551,8 +3552,8 @@ class VideoPlayerViewModel(
                         segmentIndices = listOf(initialSegment),
                         expectedSegmentCount = if (useInitialPartialSegment) 0 else expectedSegmentCount,
                         rangeStartMs = if (useInitialPartialSegment) 0L else null,
-                        rangeEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_PARTIAL_END_MS else null,
-                        parseEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_PARSE_END_MS else null
+                        rangeEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null,
+                        parseEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
                     )
                 }
             } finally {
@@ -4120,13 +4121,13 @@ class VideoPlayerViewModel(
             step = "danmaku_segment_preload_started",
             message = "cid=$cid segment=$segmentIndex range=${formatDanmakuRange(
                 if (segmentIndex == 1) 0L else null,
-                if (segmentIndex == 1) FIRST_DANMAKU_PARTIAL_END_MS else null
+                if (segmentIndex == 1) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
             )}"
         )
         danmakuSegmentPreloadJob = viewModelScope.launch(Dispatchers.IO) {
             val startedAt = SystemClock.elapsedRealtime()
             val preloadPartialStartMs = if (segmentIndex == 1) 0L else null
-            val preloadPartialEndMs = if (segmentIndex == 1) FIRST_DANMAKU_PARTIAL_END_MS else null
+            val preloadPartialEndMs = if (segmentIndex == 1) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
             val payload = loadDanmakuSegmentPayload(
                 cid = cid,
                 aid = aid,
@@ -4137,7 +4138,7 @@ class VideoPlayerViewModel(
                 ).takeIf { preloadPartialEndMs == null } ?: 0,
                 rangeStartMs = preloadPartialStartMs,
                 rangeEndMs = preloadPartialEndMs,
-                parseEndMs = if (preloadPartialEndMs != null) FIRST_DANMAKU_INITIAL_PARSE_END_MS else null
+                parseEndMs = preloadPartialEndMs
             )
             withContext(Dispatchers.Main) {
                 preloadedDanmakuSegmentCid = cid
