@@ -107,7 +107,7 @@ val viewModelModule = module {
 val eventModule = module {
     single { AppEventHub() }
     single { AppSettingsDataStore(androidContext()) }
-    single { DouyinModeManager(get(), get()) }
+    single { DouyinModeManager(androidContext(), get(), get(), get(named("noCookie")), get()) }
 }
 
 val appModules = listOf(

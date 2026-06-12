@@ -55,6 +55,7 @@ import com.tutu.myblbl.network.response.Base2Response
 import com.tutu.myblbl.network.WbiGenerator
 import com.tutu.myblbl.core.common.log.AppLog
 import com.tutu.myblbl.core.common.settings.AppSettingsDataStore
+import com.tutu.myblbl.feature.player.cache.PlayerMediaCache
 import com.tutu.myblbl.network.cookie.CookieManager
 import com.tutu.myblbl.feature.player.settings.PlayerSettings
 import com.tutu.myblbl.feature.player.settings.PlayerSettingsStore
@@ -140,6 +141,12 @@ class VideoPlayerViewModel(
             }
         }
         private var danmakuViewCacheTtlMs: Long = 300_000L
+        private val douyinDanmakuSegmentCache = object : LinkedHashMap<String, Pair<SpecialDanmakuPayload, Long>>(4, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<SpecialDanmakuPayload, Long>>): Boolean {
+                return size > 4
+            }
+        }
+        private const val DOUYIN_DANMAKU_SEGMENT_CACHE_TTL_MS = 120_000L
 
         // 跨 VM 实例记录最近播放过的 cid，用于同视频重播热路径检测
         private val recentlyPlayedCids = linkedSetOf<Long>()
@@ -167,15 +174,16 @@ class VideoPlayerViewModel(
             val selectionSnapshot: VideoPlayerStreamResolver.SelectionSnapshot,
             val expiresAtMs: Long
         )
-        @Volatile
-        private var lastPlayback: CachedPlayback? = null
-        private const val LAST_PLAYBACK_TTL_MS = 30_000L
+        private val cachedPlaybacks = LinkedHashMap<String, CachedPlayback>(2, 0.75f, true)
+        private const val LAST_PLAYBACK_TTL_MS = 120_000L
+        private const val MAX_CACHED_PLAYBACKS = 2
 
         @Synchronized
         internal fun getCachedPlayback(bvid: String?, cid: Long): CachedPlayback? {
-            val cached = lastPlayback ?: return null
+            trimExpiredCachedPlaybacks()
+            val cached = cachedPlaybacks[cachePlaybackKey(bvid, cid)] ?: return null
             if (System.currentTimeMillis() > cached.expiresAtMs) {
-                lastPlayback = null
+                cachedPlaybacks.remove(cachePlaybackKey(bvid, cid))
                 return null
             }
             if (cached.bvid != bvid || cached.cid != cid) return null
@@ -191,7 +199,8 @@ class VideoPlayerViewModel(
             playInfo: PlayInfoModel,
             selectionSnapshot: VideoPlayerStreamResolver.SelectionSnapshot
         ) {
-            lastPlayback = CachedPlayback(
+            trimExpiredCachedPlaybacks()
+            cachedPlaybacks[cachePlaybackKey(bvid, cid)] = CachedPlayback(
                 bvid = bvid,
                 cid = cid,
                 mediaSource = mediaSource,
@@ -199,15 +208,35 @@ class VideoPlayerViewModel(
                 selectionSnapshot = selectionSnapshot,
                 expiresAtMs = System.currentTimeMillis() + LAST_PLAYBACK_TTL_MS
             )
+            while (cachedPlaybacks.size > MAX_CACHED_PLAYBACKS) {
+                cachedPlaybacks.remove(cachedPlaybacks.entries.first().key)
+            }
         }
 
         @Synchronized
         fun clearCachedPlayback() {
-            lastPlayback = null
+            cachedPlaybacks.clear()
         }
 
         @Synchronized
-        fun hasCachedPlayback(): Boolean = lastPlayback != null
+        fun hasCachedPlayback(): Boolean {
+            trimExpiredCachedPlaybacks()
+            return cachedPlaybacks.isNotEmpty()
+        }
+
+        private fun cachePlaybackKey(bvid: String?, cid: Long): String {
+            return "${bvid.orEmpty()}#$cid"
+        }
+
+        private fun trimExpiredCachedPlaybacks() {
+            val now = System.currentTimeMillis()
+            val iterator = cachedPlaybacks.entries.iterator()
+            while (iterator.hasNext()) {
+                if (iterator.next().value.expiresAtMs <= now) {
+                    iterator.remove()
+                }
+            }
+        }
     }
 
     data class PlayableEpisode(
@@ -225,6 +254,9 @@ class VideoPlayerViewModel(
 
     data class PlaybackRequest(
         val mediaSource: MediaSource,
+        val aid: Long? = null,
+        val bvid: String? = null,
+        val cid: Long = 0L,
         val seekPositionMs: Long,
         val playWhenReady: Boolean,
         val replaceInPlace: Boolean,
@@ -387,9 +419,13 @@ class VideoPlayerViewModel(
                 "Referer" to "https://www.bilibili.com"
             )
         )
-    private val dataSourceFactory = DefaultDataSource.Factory(
+    private val cacheDataSourceFactory = PlayerMediaCache.buildDataSourceFactory(
         appContext,
         upstreamDataSourceFactory
+    )
+    private val dataSourceFactory = DefaultDataSource.Factory(
+        appContext,
+        cacheDataSourceFactory
     )
 
     var useDashPlayback: Boolean = true
@@ -400,8 +436,12 @@ class VideoPlayerViewModel(
         urlNormalizer = ::normalizeUrl
     )
     private val dashMediaSourceFactory = VideoPlayerDashMediaSourceFactory(
-        context = appContext,
-        okHttpClient = playerOkHttpClient
+        dataSourceFactory = cacheDataSourceFactory,
+        urlNormalizer = ::normalizeUrl
+    )
+    private val douyinWarmupManager = DouyinPlaybackWarmupManager(
+        dataSourceFactory = cacheDataSourceFactory,
+        urlNormalizer = ::normalizeUrl
     )
     private var currentDashSession: VideoPlaybackSession? = null
     private val qualityPolicy = VideoPlayerQualityPolicy()
@@ -612,6 +652,7 @@ class VideoPlayerViewModel(
     private var preloadedDanmakuViewCid: Long = 0L
     private var preloadedDanmakuView: DmWebViewReplyProto? = null
     private var danmakuSegmentPreloadJob: Job? = null
+    private var douyinWarmupJob: Job? = null
     private var preloadedDanmakuSegmentCid: Long = 0L
     private var preloadedDanmakuSegmentAid: Long = 0L
     private var preloadedDanmakuSegmentIndex: Int = 0
@@ -1006,7 +1047,8 @@ class VideoPlayerViewModel(
             cid = video.cid,
             seasonId = targetSeasonId ?: 0L,
             epId = targetEpId ?: 0L,
-            preferLastPlayTime = preferLastPlayTime
+            preferLastPlayTime = preferLastPlayTime,
+            playbackIntentId = "douyin:${UUID.randomUUID()}"
         )
     }
 
@@ -1322,32 +1364,39 @@ class VideoPlayerViewModel(
         val currentIdentity = currentPlayRequestIdentity()
 
         if (target == null) {
+            AppLog.i(TAG, "playback_preload_clear reason=null_target")
             clearPreloadedPlayback(cancelJob = true)
             return
         }
         if (!hasReachedFirstFrame && target.source != PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN && target.source != PlaybackPreloadTarget.Source.DOUYIN_MODE) {
+            AppLog.i(TAG, "playback_preload_skip reason=before_first_frame source=${target.source}")
             return
         }
         if (
             target.source != PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN
             && target.source != PlaybackPreloadTarget.Source.DOUYIN_MODE
         ) {
+            AppLog.i(TAG, "playback_preload_skip reason=unsupported_source source=${target.source}")
             return
         }
 
         if (identity == null || identity == currentIdentity) {
+            AppLog.i(TAG, "playback_preload_clear reason=invalid_or_current identity=$identity current=$currentIdentity source=${target.source}")
             clearPreloadedPlayback(cancelJob = true)
             return
         }
         if (identity.cid <= 0L) {
+            AppLog.i(TAG, "playback_preload_clear reason=invalid_cid identity=$identity source=${target.source}")
             clearPreloadedPlayback(cancelJob = true)
             return
         }
         val cachedPreload = preloadedPlayback
         if (cachedPreload?.preparedPlayback?.identity == identity && cachedPreload.source == target.source) {
+            AppLog.i(TAG, "playback_preload_keep identity=$identity source=${target.source}")
             return
         }
         if (preloadingIdentity == identity) {
+            AppLog.i(TAG, "playback_preload_keep_running identity=$identity source=${target.source}")
             return
         }
 
@@ -1355,6 +1404,7 @@ class VideoPlayerViewModel(
         preloadJob?.cancel()
         preloadedPlayback = null
         preloadingIdentity = identity
+        AppLog.i(TAG, "playback_preload_begin identity=$identity current=$currentIdentity source=${target.source}")
         PlaybackStartupTrace.log(
             traceId = currentStartupTraceId,
             startElapsedMs = currentStartupTraceStartElapsedMs,
@@ -1380,14 +1430,24 @@ class VideoPlayerViewModel(
             preloadingIdentity = null
             preloadJob = null
             if (preparedPlayback == null) {
+                AppLog.w(TAG, "playback_preload_failed identity=$identity source=${target.source}")
                 return@launch
             }
             preloadedPlayback = PreloadedPlayback(
                 source = target.source,
                 preparedPlayback = preparedPlayback
             )
-            identity.aid?.takeIf { it > 0L }?.let { aid ->
+            AppLog.i(TAG, "playback_preload_ready identity=$identity source=${target.source}")
+            val preloadAid = identity.aid?.takeIf { it > 0L }
+            preloadAid?.let { aid ->
                 preloadDanmakuView(cid = identity.cid, aid = aid, loadGeneration = videoLoadGeneration)
+            }
+            if (target.source == PlaybackPreloadTarget.Source.DOUYIN_MODE) {
+                warmupDouyinPlayback(
+                    identity = identity,
+                    aid = preloadAid,
+                    preparedPlayback = preparedPlayback
+                )
             }
             PlaybackStartupTrace.log(
                 traceId = currentStartupTraceId,
@@ -1399,6 +1459,81 @@ class VideoPlayerViewModel(
                     "playWhenReady=${preparedPlayback.playWhenReady}"
             )
         }
+    }
+
+    private fun warmupDouyinPlayback(
+        identity: PlayRequestIdentity,
+        aid: Long?,
+        preparedPlayback: PreparedPlayback
+    ) {
+        douyinWarmupJob?.cancel()
+        douyinWarmupJob = viewModelScope.launch(Dispatchers.IO) {
+            val mediaJob = launch {
+                douyinWarmupManager.warmup(
+                    playInfo = preparedPlayback.playInfo,
+                    selection = preparedPlayback.selectionSnapshot
+                )
+            }
+            val danmakuJob = aid
+                ?.takeIf { it > 0L }
+                ?.let {
+                    launch {
+                        warmupDouyinDanmakuSegment(
+                            cid = identity.cid,
+                            aid = it,
+                            segmentIndex = 1
+                        )
+                    }
+            }
+            mediaJob.join()
+            danmakuJob?.join()
+            if (douyinWarmupJob == this.coroutineContext[Job]) {
+                douyinWarmupJob = null
+            }
+        }
+    }
+
+    private suspend fun warmupDouyinDanmakuSegment(cid: Long, aid: Long, segmentIndex: Int) {
+        val cacheKey = douyinDanmakuCacheKey(cid, aid, segmentIndex)
+        synchronized(douyinDanmakuSegmentCache) {
+            val cached = douyinDanmakuSegmentCache[cacheKey]
+            if (cached != null && System.currentTimeMillis() - cached.second < DOUYIN_DANMAKU_SEGMENT_CACHE_TTL_MS) {
+                return
+            }
+        }
+        val payload = loadDanmakuSegmentPayload(
+            cid = cid,
+            aid = aid,
+            segmentIndices = listOf(segmentIndex),
+            expectedSegmentCount = 0,
+            rangeStartMs = 0L,
+            rangeEndMs = FIRST_DANMAKU_INITIAL_RANGE_END_MS,
+            parseEndMs = FIRST_DANMAKU_INITIAL_RANGE_END_MS
+        )
+        synchronized(douyinDanmakuSegmentCache) {
+            douyinDanmakuSegmentCache[cacheKey] = payload to System.currentTimeMillis()
+        }
+    }
+
+    private fun takeDouyinDanmakuSegmentCache(
+        cid: Long,
+        aid: Long,
+        segmentIndex: Int
+    ): SpecialDanmakuPayload? {
+        val cacheKey = douyinDanmakuCacheKey(cid, aid, segmentIndex)
+        return synchronized(douyinDanmakuSegmentCache) {
+            val cached = douyinDanmakuSegmentCache[cacheKey] ?: return@synchronized null
+            if (System.currentTimeMillis() - cached.second >= DOUYIN_DANMAKU_SEGMENT_CACHE_TTL_MS) {
+                douyinDanmakuSegmentCache.remove(cacheKey)
+                null
+            } else {
+                douyinDanmakuSegmentCache.remove(cacheKey)?.first
+            }
+        }
+    }
+
+    private fun douyinDanmakuCacheKey(cid: Long, aid: Long, segmentIndex: Int): String {
+        return "$aid#$cid#$segmentIndex"
     }
 
     fun reportPlaybackHeartbeat(playType: Int = 0) {
@@ -1701,6 +1836,9 @@ class VideoPlayerViewModel(
         applySelectionSnapshot(selectionSnapshot)
         _playbackRequest.value = PlaybackRequest(
             mediaSource = mediaSource,
+            aid = currentAid,
+            bvid = currentBvid,
+            cid = currentCid,
             seekPositionMs = pendingSeekPositionMs,
             playWhenReady = pendingPlayWhenReady,
             replaceInPlace = true,
@@ -1900,7 +2038,8 @@ class VideoPlayerViewModel(
         val isSameVideoReplay = initialIdentity != null &&
             initialIdentity.cid > 0L &&
             isRecentlyPlayed(initialIdentity.cid) &&
-            !initialIdentity.bvid.isNullOrBlank()
+            !initialIdentity.bvid.isNullOrBlank() &&
+            !activePlaybackIntentId.startsWith("douyin:")
 
         if (isSameVideoReplay) {
             // Check PlayInfo cache for interaction flag (set by x/player/v2 on first play)
@@ -1948,6 +2087,9 @@ class VideoPlayerViewModel(
                     val effectiveSeekMs = resumePositionMs ?: 0L
                     _playbackRequest.value = PlaybackRequest(
                         mediaSource = cachedPlayback.mediaSource,
+                        aid = initialIdentity.aid,
+                        bvid = initialIdentity.bvid,
+                        cid = initialIdentity.cid,
                         seekPositionMs = effectiveSeekMs,
                         playWhenReady = true,
                         replaceInPlace = false,
@@ -2449,6 +2591,9 @@ class VideoPlayerViewModel(
 
         _playbackRequest.value = PlaybackRequest(
             mediaSource = preparedPlayback.mediaSource,
+            aid = preparedPlayback.identity.aid,
+            bvid = preparedPlayback.identity.bvid,
+            cid = preparedPlayback.identity.cid,
             seekPositionMs = preparedPlayback.seekToStart,
             playWhenReady = preparedPlayback.playWhenReady,
             replaceInPlace = preparedPlayback.replaceInPlace,
@@ -2893,6 +3038,9 @@ class VideoPlayerViewModel(
             _error.value = null
             _playbackRequest.value = PlaybackRequest(
                 mediaSource = selection.mediaSource,
+                aid = currentAid,
+                bvid = currentBvid,
+                cid = currentCid,
                 seekPositionMs = seekPositionMs,
                 playWhenReady = true,
                 replaceInPlace = true,
@@ -2938,6 +3086,9 @@ class VideoPlayerViewModel(
             _error.value = null
             _playbackRequest.value = PlaybackRequest(
                 mediaSource = mediaSource,
+                aid = currentAid,
+                bvid = currentBvid,
+                cid = currentCid,
                 seekPositionMs = seekPositionMs,
                 playWhenReady = true,
                 replaceInPlace = true,
@@ -3193,9 +3344,17 @@ class VideoPlayerViewModel(
         replaceInPlace: Boolean
     ): PreparedPlayback? {
         if (preferLastPlayTime || replaceInPlace) {
+            AppLog.i(TAG, "playback_preload_skip_consume requested=$identity preferLast=$preferLastPlayTime replace=$replaceInPlace")
             return null
         }
         val preloaded = preloadedPlayback ?: run {
+            PlaybackStartupTrace.log(
+                traceId = currentStartupTraceId,
+                startElapsedMs = currentStartupTraceStartElapsedMs,
+                step = "playback_preload_absent",
+                message = "requested=$identity preferLast=$preferLastPlayTime replace=$replaceInPlace"
+            )
+            AppLog.i(TAG, "playback_preload_absent requested=$identity preferLast=$preferLastPlayTime replace=$replaceInPlace")
             return null
         }
         if (preloaded.preparedPlayback.identity != identity) {
@@ -3205,6 +3364,7 @@ class VideoPlayerViewModel(
                 step = "playback_preload_miss",
                 message = "requested=$identity preloaded=${preloaded.preparedPlayback.identity} source=${preloaded.source}"
             )
+            AppLog.i(TAG, "playback_preload_miss requested=$identity preloaded=${preloaded.preparedPlayback.identity} source=${preloaded.source}")
             return null
         }
         val preloadedQualityId = preloaded.preparedPlayback.selectionSnapshot.selectedQualityId
@@ -3223,6 +3383,10 @@ class VideoPlayerViewModel(
                     "cap=$safeQualityId reason=software_decoder_safe"
             )
             preloadedPlayback = null
+            AppLog.i(
+                TAG,
+                "playback_preload_discarded requested=$identity source=${preloaded.source} quality=$preloadedQualityId cap=$safeQualityId"
+            )
             return null
         }
         preloadedPlayback = null
@@ -3245,6 +3409,12 @@ class VideoPlayerViewModel(
                 "quality=${preloaded.preparedPlayback.selectionSnapshot.selectedQualityId} " +
                 "codec=${preloaded.preparedPlayback.selectionSnapshot.selectedCodec}"
         )
+        AppLog.i(
+            TAG,
+            "playback_preload_consumed requested=$identity source=${preloaded.source} playWhenReady=$effectivePlayWhenReady " +
+                "quality=${preloaded.preparedPlayback.selectionSnapshot.selectedQualityId} " +
+                "codec=${preloaded.preparedPlayback.selectionSnapshot.selectedCodec}"
+        )
         return preloaded.preparedPlayback.copy(
             playWhenReady = effectivePlayWhenReady,
             replaceInPlace = false
@@ -3252,6 +3422,13 @@ class VideoPlayerViewModel(
     }
 
     private fun clearPreloadedPlayback(cancelJob: Boolean) {
+        if (preloadedPlayback != null || preloadingIdentity != null || preloadJob != null || douyinWarmupJob != null) {
+            AppLog.i(
+                TAG,
+                "playback_preload_clear cancelJob=$cancelJob preloaded=${preloadedPlayback?.preparedPlayback?.identity} " +
+                    "preloading=$preloadingIdentity hasJob=${preloadJob != null} hasWarmup=${douyinWarmupJob != null}"
+            )
+        }
         preloadedPlayback = null
         if (cancelJob) {
             preloadJob?.cancel()
@@ -3259,6 +3436,8 @@ class VideoPlayerViewModel(
             preloadingIdentity = null
             danmakuSegmentPreloadJob?.cancel()
             danmakuSegmentPreloadJob = null
+            douyinWarmupJob?.cancel()
+            douyinWarmupJob = null
             danmakuViewPreloadJob?.cancel()
             danmakuViewPreloadJob = null
             preloadedDanmakuViewCid = 0L
@@ -3275,10 +3454,19 @@ class VideoPlayerViewModel(
         cancelJob: Boolean
     ) {
         if (identity != null && preloadedPlayback?.preparedPlayback?.identity == identity) {
+            AppLog.i(TAG, "playback_preload_preserve_preloaded identity=$identity")
             return
         }
         if (identity != null && preloadingIdentity == identity) {
+            AppLog.i(TAG, "playback_preload_preserve_running identity=$identity")
             return
+        }
+        if (preloadedPlayback != null || preloadingIdentity != null) {
+            AppLog.i(
+                TAG,
+                "playback_preload_clear_different target=$identity preloaded=${preloadedPlayback?.preparedPlayback?.identity} " +
+                    "preloading=$preloadingIdentity cancelJob=$cancelJob"
+            )
         }
         clearPreloadedPlayback(cancelJob = cancelJob)
     }
@@ -3553,15 +3741,26 @@ class VideoPlayerViewModel(
                     )
                     preloaded
                 } else {
-                    loadDanmakuSegmentPayload(
-                        cid = cid,
-                        aid = aid,
-                        segmentIndices = listOf(initialSegment),
-                        expectedSegmentCount = if (useInitialPartialSegment) 0 else expectedSegmentCount,
-                        rangeStartMs = if (useInitialPartialSegment) 0L else null,
-                        rangeEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null,
-                        parseEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
-                    )
+                    val douyinCached = takeDouyinDanmakuSegmentCache(cid, aid, initialSegment)
+                    if (douyinCached != null && useInitialPartialSegment) {
+                        PlaybackStartupTrace.log(
+                            traceId = currentStartupTraceId,
+                            startElapsedMs = currentStartupTraceStartElapsedMs,
+                            step = "danmaku_segment_preload_hit",
+                            message = "cid=$cid segment=$initialSegment source=douyin_cache regular=${douyinCached.regularItems.size} special=${douyinCached.specialItems.size}"
+                        )
+                        douyinCached
+                    } else {
+                        loadDanmakuSegmentPayload(
+                            cid = cid,
+                            aid = aid,
+                            segmentIndices = listOf(initialSegment),
+                            expectedSegmentCount = if (useInitialPartialSegment) 0 else expectedSegmentCount,
+                            rangeStartMs = if (useInitialPartialSegment) 0L else null,
+                            rangeEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null,
+                            parseEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
+                        )
+                    }
                 }
             } finally {
                 danmakuLoadingSegments.remove(initialSegment)

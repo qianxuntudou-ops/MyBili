@@ -4,22 +4,16 @@ import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.DataSourceException
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.TransferListener
-import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
-import java.io.IOException
 
 @OptIn(UnstableApi::class)
 class VideoPlayerDashMediaSourceFactory(
-    private val context: android.content.Context,
-    private val okHttpClient: okhttp3.OkHttpClient
+    private val dataSourceFactory: DataSource.Factory,
+    private val urlNormalizer: (String) -> String
 ) {
 
     companion object {
@@ -39,8 +33,6 @@ class VideoPlayerDashMediaSourceFactory(
     }
 
     fun createMediaSource(route: DashRoute): MediaSource {
-        val startTime = System.currentTimeMillis()
-
         val videoSource = createProgressiveSource(
             urls = route.videoUrls,
             mimeType = route.videoRepresentation.mimeType
@@ -60,9 +52,6 @@ class VideoPlayerDashMediaSourceFactory(
         } else {
             videoSource
         }
-
-        val elapsed = System.currentTimeMillis() - startTime
-
         return mediaSource
     }
 
@@ -81,77 +70,17 @@ class VideoPlayerDashMediaSourceFactory(
 
     private fun createCandidateAwareFactory(urls: List<String>): DataSource.Factory {
         val candidates = urls
+            .map(urlNormalizer)
             .filter { it.isNotBlank() }
             .distinct()
         if (candidates.size <= 1) {
-            return buildHttpDataSourceFactory(candidates.firstOrNull())
+            return dataSourceFactory
         }
-        val upstreamFactory = buildHttpDataSourceFactory(candidates.first())
         return VideoPlayerCdnFailoverDataSourceFactory(
-            upstreamFactory = upstreamFactory,
+            upstreamFactory = dataSourceFactory,
             state = VideoPlayerCdnFailoverState(
                 candidates = candidates.map(Uri::parse)
             )
         )
-    }
-
-    private fun buildHttpDataSourceFactory(defaultUrl: String?): DataSource.Factory {
-        val upstreamFactory = OkHttpDataSource.Factory(okHttpClient)
-            .setUserAgent(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                    "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-            )
-            .setDefaultRequestProperties(
-                mapOf(
-                    "Origin" to "https://www.bilibili.com",
-                    "Referer" to "https://www.bilibili.com"
-                )
-            )
-        return LoggingDataSourceFactory(upstreamFactory)
-    }
-
-    private class LoggingDataSourceFactory(
-        private val upstreamFactory: DataSource.Factory
-    ) : DataSource.Factory {
-        override fun createDataSource(): DataSource {
-            return LoggingDataSource(upstreamFactory.createDataSource())
-        }
-    }
-
-    private class LoggingDataSource(
-        private val upstream: DataSource
-    ) : DataSource {
-
-        override fun addTransferListener(transferListener: TransferListener) {
-            upstream.addTransferListener(transferListener)
-        }
-
-        override fun open(dataSpec: DataSpec): Long {
-            val pos = dataSpec.position
-            val len = dataSpec.length
-            val uri = dataSpec.uri
-            val host = uri?.host.orEmpty()
-            val path = uri?.path.orEmpty().takeLast(40)
-            val openStartMs = System.currentTimeMillis()
-            return try {
-                val remaining = upstream.open(dataSpec)
-                val actualUri = upstream.uri
-                val cdnConnectMs = System.currentTimeMillis() - openStartMs
-                CdnLatencyProfile.recordTtfb(dataSpec.uri.toString(), cdnConnectMs)
-                remaining
-            } catch (e: IOException) {
-                throw e
-            }
-        }
-
-        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-            return upstream.read(buffer, offset, length)
-        }
-
-        override fun getUri(): Uri? = upstream.uri
-
-        override fun close() {
-            upstream.close()
-        }
     }
 }

@@ -14,6 +14,7 @@ import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import com.tutu.myblbl.core.common.log.AppLog
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 
 @UnstableApi
 object PlayerMediaCache {
@@ -23,9 +24,12 @@ object PlayerMediaCache {
     private const val MAX_CACHE_BYTES = 512L * 1024L * 1024L
     private const val CACHE_FRAGMENT_SIZE_BYTES = 2L * 1024L * 1024L
     private const val RESOURCE_PATH_MARKER = "/v1/resource/"
+    private const val CACHE_HIT_LOG_INTERVAL_MS = 2_000L
 
     @Volatile
     private var simpleCache: SimpleCache? = null
+
+    private val lastCacheHitLogMs = AtomicLong(0L)
 
     private val cacheKeyFactory = CacheKeyFactory { dataSpec ->
         dataSpec.key ?: buildStableCacheKey(dataSpec.uri)
@@ -33,6 +37,11 @@ object PlayerMediaCache {
 
     private val cacheEventListener = object : CacheDataSource.EventListener {
         override fun onCachedBytesRead(cacheSizeBytes: Long, cachedBytesRead: Long) {
+            val now = System.currentTimeMillis()
+            val last = lastCacheHitLogMs.get()
+            if (now - last >= CACHE_HIT_LOG_INTERVAL_MS && lastCacheHitLogMs.compareAndSet(last, now)) {
+                AppLog.i(TAG, "cache_hit bytes=$cachedBytesRead cacheSize=$cacheSizeBytes")
+            }
         }
 
         override fun onCacheIgnored(reason: Int) {

@@ -60,11 +60,10 @@ import com.tutu.myblbl.feature.player.interaction.InteractionOverlayView
 import com.tutu.myblbl.feature.player.PlaybackPreloadTarget
 import com.tutu.myblbl.feature.player.douyin.DouyinModeManager
 import com.tutu.myblbl.feature.player.view.DouyinModeKeyListener
+import com.tutu.myblbl.feature.player.view.DouyinModePreview
 import com.tutu.myblbl.feature.player.view.MyPlayerView
 import com.tutu.myblbl.feature.player.view.OnPlayerSettingChange
 import com.tutu.myblbl.feature.player.view.OnVideoSettingChangeListener
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.ImageView
 import com.tutu.myblbl.model.video.VideoModel
 import com.tutu.myblbl.model.video.detail.VideoDetailModel
 import com.tutu.myblbl.model.video.quality.AudioQuality
@@ -272,8 +271,11 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
 
     // 抖音模式
     private var douyinSourceAid: Long = 0L
+    private var douyinSourceKey: String = ""
     private var douyinInitializing: Boolean = false
     private var douyinTransitionRunning: Boolean = false
+    private var douyinInternalNavigationKey: String = ""
+    private var douyinPendingNextAfterInit: Boolean = false
 
     private val gaiaVgateLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -705,16 +707,24 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
     }
 
     private fun setupAdapters() {
+        sessionCoordinator.setContentGate(
+            isVideoAllowed = { video -> !isVideoBlockedByMinorProtection(video) },
+            isEpisodeAllowed = { episode -> !isEpisodeBlockedByMinorProtection(episode) }
+        )
         relatedAdapter = VideoAdapter(
             itemWidthPx = (resources.displayMetrics.widthPixels / 5).coerceAtLeast(1)
         )
         relatedAdapter.setOnItemClickListener { _, item ->
-            playerView.hideController()
-            hideContentPanel()
-            hideNextPreview()
-            sessionCoordinator.replacePlayQueue(buildPlayQueue(relatedAdapter.getItemsSnapshot(), item))
-            sessionCoordinator.updateCurrentVideo(item)
-            viewModel.playRelatedVideo(item)
+            if (isVideoBlockedByMinorProtection(item)) {
+                toast("青少年模式已拦截该视频")
+            } else {
+                playerView.hideController()
+                hideContentPanel()
+                hideNextPreview()
+                sessionCoordinator.replacePlayQueue(buildPlayQueue(relatedAdapter.getItemsSnapshot(), item))
+                sessionCoordinator.updateCurrentVideo(item)
+                viewModel.playRelatedVideo(item)
+            }
         }
     }
 
@@ -742,12 +752,23 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
             dimBackground = binding.dimBackground,
             recyclerViewRelated = recyclerViewRelated,
             textMoreTitle = textMoreTitle,
-            onPlayEpisode = { index -> playerView.hideController(); viewModel.playEpisode(index) },
+            onPlayEpisode = { index ->
+                if (!sessionCoordinator.canPlayEpisode(index)) {
+                    toast("青少年模式已拦截该视频")
+                } else {
+                    playerView.hideController()
+                    viewModel.playEpisode(index)
+                }
+            },
             onPlayRelatedVideo = { video, playQueue ->
-                playerView.hideController()
-                sessionCoordinator.replacePlayQueue(playQueue)
-                sessionCoordinator.updateCurrentVideo(video)
-                viewModel.playRelatedVideo(video)
+                if (isVideoBlockedByMinorProtection(video)) {
+                    toast("青少年模式已拦截该视频")
+                } else {
+                    playerView.hideController()
+                    sessionCoordinator.replacePlayQueue(playQueue)
+                    sessionCoordinator.updateCurrentVideo(video)
+                    viewModel.playRelatedVideo(video)
+                }
             },
             onOpenFragmentFromHost = { _, _ -> },
             onHideNextPreview = { autoPlayController.hideNextPreview() },
@@ -818,11 +839,19 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         playerView.douyinModeKeyListener = object : DouyinModeKeyListener {
             override fun isDouyinModeActive(): Boolean {
                 val currentVideo = sessionCoordinator.getCurrentVideo()
-                val enabled = douyinModeManager.isEnabled()
                 return douyinModeManager.isApplicable(currentVideo)
             }
             override fun onDouyinNavigateNext(): Boolean = handleDouyinNext()
             override fun onDouyinNavigatePrevious(): Boolean = handleDouyinPrevious()
+            override fun peekDouyinNext(): DouyinModePreview? {
+                return douyinModeManager.peekNext()?.toDouyinPreview()
+                    ?: if (!douyinModeManager.hasList()) {
+                        DouyinModePreview(title = "加载推荐中...", coverUrl = "")
+                    } else {
+                        null
+                    }
+            }
+            override fun peekDouyinPrevious(): DouyinModePreview? = douyinModeManager.peekPrevious()?.toDouyinPreview()
         }
         playerView.onResumeProgressCancelled = { cancelResume() }
         playerView.seekPreviewUpdateListener = object : MyPlayerView.SeekPreviewUpdateListener {
@@ -1027,8 +1056,10 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                 } finally {
                     suppressPlaybackEnvironmentSync = false
                 }
+                playerView.awaitDouyinPageTransitionFirstFrame()
                 playerView.syncDanmakuPosition(playbackRequest.seekPositionMs, forceSeek = true)
                 syncPlaybackEnvironment()
+                scheduleDouyinPreloadAfterPlaybackRequest(playbackRequest)
             }
         }
 
@@ -1058,6 +1089,7 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
                 latestVideoInfo = info
                 sessionCoordinator.updateVideoInfo(info)
                 resetDouyinModeIfNeeded()
+                ensureDouyinQueueStarted()
                 schedulePreloadAndHeaderRefresh()
                 updatePrimaryActionVisibility()
                 checkTagsAndExitIfNeeded(info)
@@ -1392,6 +1424,32 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         schedulePreloadAndHeaderRefresh()
         relatedAdapter.setData(related)
         playerView.showHideRelatedButton(related.isNotEmpty())
+    }
+
+    private fun isVideoBlockedByMinorProtection(video: VideoModel): Boolean {
+        return ContentFilter.isVideoBlocked(
+            context = this,
+            typeName = video.typeName,
+            title = video.title,
+            teenageMode = video.teenageMode,
+            desc = video.desc,
+            authorName = video.authorName,
+            aid = video.aid,
+            bvid = video.bvid,
+            coverUrl = video.coverUrl,
+            typeId = video.typeId
+        )
+    }
+
+    private fun isEpisodeBlockedByMinorProtection(episode: VideoPlayerViewModel.PlayableEpisode): Boolean {
+        return ContentFilter.isVideoBlocked(
+            context = this,
+            typeName = "",
+            title = episode.title,
+            aid = episode.aid,
+            bvid = episode.bvid,
+            coverUrl = episode.cover
+        )
     }
 
     private fun checkTagsAndExitIfNeeded(info: VideoDetailModel?) {
@@ -1800,22 +1858,19 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         if (!douyinModeManager.isApplicable(currentVideo)) return false
 
         if (!douyinModeManager.hasList() && !douyinInitializing) {
-            douyinInitializing = true
-            lifecycleScope.launch {
-                douyinModeManager.initialize(currentVideo)
-                douyinInitializing = false
-                if (!douyinModeManager.hasList()) {
-                    toast("该视频无推荐")
-                } else {
-                    playDouyinVideo(douyinModeManager.next(), direction = 1)
-                }
-            }
+            douyinPendingNextAfterInit = true
+            startDouyinQueueInitialization(currentVideo)
             return true
         }
-        if (douyinInitializing) return true
+        if (douyinInitializing) {
+            douyinPendingNextAfterInit = true
+            return true
+        }
 
         val next = douyinModeManager.next()
         if (next == null) {
+            playerView.cancelDouyinPageTransition()
+            playerView.showDouyinBoundaryBounce(1)
             toast("该视频无推荐")
             return true
         }
@@ -1827,89 +1882,75 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         val currentVideo = sessionCoordinator.getCurrentVideo() ?: return false
         if (!douyinModeManager.isApplicable(currentVideo)) return false
 
-        if (!douyinModeManager.hasList()) return true
+        if (!douyinModeManager.hasList()) {
+            playerView.cancelDouyinPageTransition()
+            playerView.showDouyinBoundaryBounce(-1)
+            return true
+        }
         val prev = douyinModeManager.previous()
         if (prev != null) {
             playDouyinVideo(prev, direction = -1)
+        } else {
+            playerView.cancelDouyinPageTransition()
+            playerView.showDouyinBoundaryBounce(-1)
         }
         return true
     }
 
     private fun playDouyinVideo(video: VideoModel?, direction: Int = 0) {
         if (video == null) return
+        if (isVideoBlockedByMinorProtection(video)) {
+            toast("青少年模式已拦截该视频")
+            return
+        }
         playerView.hideController()
+        douyinInternalNavigationKey = video.douyinIdentityKey()
+        sessionCoordinator.updateCurrentVideo(video)
+        renderDouyinTargetHeader(video)
 
-        if (direction != 0 && !douyinTransitionRunning) {
-            startDouyinTransition(direction) {
-                viewModel.playRelatedVideo(video, preferLastPlayTime = false)
+        val playTarget = {
+            viewModel.playRelatedVideo(video, preferLastPlayTime = false)
+        }
+
+        if (direction != 0 && playerView.consumeDouyinGestureTransition()) {
+            playTarget()
+        } else if (direction != 0 && !douyinTransitionRunning) {
+            douyinTransitionRunning = true
+            val transitionStarted = playerView.startDouyinPageTransition(
+                direction,
+                targetPreview = video.toDouyinPreview()
+            ) {
+                playTarget()
+                douyinTransitionRunning = false
+            }
+            if (!transitionStarted) {
+                playTarget()
+                douyinTransitionRunning = false
             }
         } else {
-            viewModel.playRelatedVideo(video, preferLastPlayTime = false)
+            playTarget()
         }
 
         lifecycleScope.launch {
             douyinModeManager.appendMore()
-            preloadNextDouyinVideo()
         }
     }
 
-    /**
-     * 抖音模式切换动画 —— 黑色遮罩竖向滑动
-     * @param direction 1=向上滑出（下键下一个），-1=向下滑出（上键上一个）
-     * @param onAnimationReady 遮罩覆盖屏幕后的回调（开始加载新视频）
-     *
-     * 原理：黑色遮罩从一侧滑入覆盖全屏 → 切换视频 → 等新视频首帧渲染 → 遮罩滑出。
-     * 不使用 PixelCopy 截帧，避免异步延迟和兼容性问题。
-     */
-    private fun startDouyinTransition(direction: Int, onAnimationReady: () -> Unit) {
-        if (douyinTransitionRunning) return
-        douyinTransitionRunning = true
-
-        val overlay: ImageView = binding.imageDouyinTransition ?: run {
-            douyinTransitionRunning = false
-            onAnimationReady()
-            return
+    private fun scheduleDouyinPreloadAfterPlaybackRequest(playbackRequest: VideoPlayerViewModel.PlaybackRequest) {
+        if (!douyinModeManager.hasList()) return
+        val currentVideo = sessionCoordinator.getCurrentVideo() ?: return
+        if (!douyinModeManager.isApplicable(currentVideo)) return
+        val requestMatchesCurrent = when {
+            playbackRequest.cid > 0L && currentVideo.cid > 0L -> playbackRequest.cid == currentVideo.cid
+            playbackRequest.aid != null && currentVideo.aid > 0L -> playbackRequest.aid == currentVideo.aid
+            !playbackRequest.bvid.isNullOrBlank() && currentVideo.bvid.isNotBlank() -> playbackRequest.bvid == currentVideo.bvid
+            else -> false
         }
-
-        val screenHeight = overlay.height.toFloat()
-        // 遮罩起始位置：下键时从屏幕下方开始，上键时从屏幕上方开始
-        val startY = if (direction > 0) screenHeight else -screenHeight
-
-        overlay.setImageResource(0)
-        overlay.setBackgroundColor(0xFF000000.toInt())
-        overlay.translationY = startY
-        overlay.visibility = View.VISIBLE
-
-        // 第一阶段：遮罩滑入覆盖全屏
-        overlay.animate()
-            .translationY(0f)
-            .setDuration(150)
-            .setInterpolator(AccelerateDecelerateInterpolator())
-            .withEndAction {
-                var overlayDismissed = false
-
-                fun dismissOverlay() {
-                    if (overlayDismissed) return
-                    overlayDismissed = true
-                    val exitY = if (direction > 0) -screenHeight else screenHeight
-                    overlay.animate()
-                        .translationY(exitY)
-                        .setDuration(150)
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .withEndAction {
-                            overlay.visibility = View.GONE
-                            douyinTransitionRunning = false
-                        }
-                        .start()
-                }
-
-                // 先注册首帧监听，再切换视频，避免竞态
-                playerView.observeNextFirstFrame { dismissOverlay() }
-                onAnimationReady()
-                // 兜底：3 秒后强制滑出，防止视频加载失败时遮罩卡住
-                overlay.postDelayed({ dismissOverlay() }, 3000)
-            }
-            .start()
+        if (!requestMatchesCurrent) return
+        lifecycleScope.launch {
+            douyinModeManager.appendMore()
+            preloadNextDouyinVideo()
+        }
     }
 
     private fun preloadNextDouyinVideo() {
@@ -1928,12 +1969,82 @@ class PlayerActivity : BaseActivity<FragmentVideoPlayerBinding>() {
         )
     }
 
+    private fun renderDouyinTargetHeader(video: VideoModel) {
+        playerView.setTitle(video.title)
+        playerView.setSubTitle(video.authorName.takeIf { it.isNotBlank() }.orEmpty())
+    }
+
     private fun resetDouyinModeIfNeeded() {
-        val currentAid = sessionCoordinator.getCurrentVideo()?.aid ?: 0L
-        if (currentAid != douyinSourceAid && currentAid > 0L) {
+        val currentVideo = sessionCoordinator.getCurrentVideo()
+        val currentAid = currentVideo?.aid ?: 0L
+        val currentKey = currentVideo?.douyinIdentityKey().orEmpty()
+        if (currentKey.isNotBlank() && currentKey == douyinInternalNavigationKey) {
             douyinSourceAid = currentAid
+            douyinSourceKey = currentKey
+            douyinInternalNavigationKey = ""
+            return
+        }
+        if (currentKey.isNotBlank() && currentKey != douyinSourceKey) {
+            AppLog.i(TAG, "DouyinQueue reset_external current=${currentVideo?.douyinDebugId().orEmpty()} sourceKey=$douyinSourceKey internalKey=$douyinInternalNavigationKey")
+            douyinSourceAid = currentAid
+            douyinSourceKey = currentKey
             douyinModeManager.reset()
             douyinInitializing = false
+            douyinInternalNavigationKey = ""
+            douyinPendingNextAfterInit = false
+        }
+    }
+
+    private fun ensureDouyinQueueStarted() {
+        val currentVideo = sessionCoordinator.getCurrentVideo() ?: return
+        if (!douyinModeManager.isApplicable(currentVideo)) {
+            if (douyinModeManager.hasList()) {
+                AppLog.i(TAG, "DouyinQueue ensure_reset_unplayable current=${currentVideo.douyinDebugId()}")
+                douyinModeManager.reset()
+            }
+            douyinInitializing = false
+            return
+        }
+        if (douyinModeManager.hasList() || douyinInitializing) return
+
+        startDouyinQueueInitialization(currentVideo)
+    }
+
+    private fun startDouyinQueueInitialization(currentVideo: VideoModel) {
+        if (douyinInitializing) return
+        douyinInitializing = true
+        lifecycleScope.launch {
+            douyinModeManager.initialize(currentVideo)
+            douyinInitializing = false
+            val latestVideo = sessionCoordinator.getCurrentVideo()
+            if (!currentVideo.isSameDouyinVideo(latestVideo)) {
+                AppLog.i(TAG, "DouyinQueue ensure_stale initialized=${currentVideo.douyinDebugId()} latest=${latestVideo?.douyinDebugId().orEmpty()}")
+                douyinPendingNextAfterInit = false
+                return@launch
+            }
+            if (!douyinModeManager.hasList()) {
+                if (douyinPendingNextAfterInit) {
+                    playerView.cancelDouyinPageTransition()
+                    playerView.showDouyinBoundaryBounce(1)
+                    toast("该视频无推荐")
+                }
+                douyinPendingNextAfterInit = false
+                return@launch
+            }
+
+            if (douyinPendingNextAfterInit) {
+                douyinPendingNextAfterInit = false
+                val next = douyinModeManager.next()
+                if (next == null) {
+                    playerView.cancelDouyinPageTransition()
+                    playerView.showDouyinBoundaryBounce(1)
+                    toast("该视频无推荐")
+                } else {
+                    playDouyinVideo(next, direction = 1)
+                }
+            } else {
+                preloadNextDouyinVideo()
+            }
         }
     }
 
@@ -1946,6 +2057,34 @@ private fun Int.nameOfPlaybackState(): String = when (this) {
     Player.STATE_READY -> "READY"
     Player.STATE_ENDED -> "ENDED"
     else -> toString()
+}
+
+private fun VideoModel.toDouyinPreview(): DouyinModePreview {
+    return DouyinModePreview(
+        title = title,
+        coverUrl = effectiveCoverUrl
+    )
+}
+
+private fun VideoModel.douyinDebugId(): String {
+    return "aid=$aid,bvid=$bvid,title=${title.take(18)}"
+}
+
+private fun VideoModel.douyinIdentityKey(): String {
+    val epKey = playbackEpId.takeIf { it > 0L }?.let { "ep:$it" }
+    val bvidKey = bvid.takeIf { it.isNotBlank() }?.let { "bvid:$it" }
+    val aidKey = aid.takeIf { it > 0L }?.let { "aid:$it" }
+    val cidKey = cid.takeIf { it > 0L }?.let { "cid:$it" }
+    return listOfNotNull(epKey, bvidKey, aidKey, cidKey).joinToString("|")
+}
+
+private fun VideoModel.isSameDouyinVideo(other: VideoModel?): Boolean {
+    if (other == null) return false
+    return when {
+        aid > 0L && other.aid > 0L -> aid == other.aid
+        bvid.isNotBlank() && other.bvid.isNotBlank() -> bvid == other.bvid
+        else -> false
+    }
 }
 
 private fun String.isSoftwareVideoDecoderName(): Boolean {

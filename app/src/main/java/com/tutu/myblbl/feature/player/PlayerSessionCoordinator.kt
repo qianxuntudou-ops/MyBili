@@ -28,6 +28,20 @@ class PlayerSessionCoordinator {
     private var episodes: List<VideoPlayerViewModel.PlayableEpisode> = emptyList()
     private var selectedEpisodeIndex: Int = 0
     private var relatedVideos: List<VideoModel> = emptyList()
+    private var isVideoAllowed: (VideoModel) -> Boolean = { true }
+    private var isEpisodeAllowed: (VideoPlayerViewModel.PlayableEpisode) -> Boolean = { true }
+
+    fun setContentGate(
+        isVideoAllowed: (VideoModel) -> Boolean,
+        isEpisodeAllowed: (VideoPlayerViewModel.PlayableEpisode) -> Boolean
+    ) {
+        this.isVideoAllowed = isVideoAllowed
+        this.isEpisodeAllowed = isEpisodeAllowed
+        launchVideo = launchVideo?.takeIf(::isAllowedVideo)
+        currentVideo = currentVideo?.takeIf(::isAllowedVideo)
+        relatedVideos = relatedVideos.filter(::isAllowedVideo)
+        replacePlayQueue(launchQueue.toList())
+    }
 
     fun consumeLaunchContext(arguments: Bundle?): PlayerLaunchContext? {
         val resolved = resolveLaunchContext(arguments) ?: return null
@@ -61,7 +75,7 @@ class PlayerSessionCoordinator {
     }
 
     fun updateCurrentVideo(video: VideoModel?) {
-        currentVideo = video
+        currentVideo = video?.takeIf(::isAllowedVideo)
     }
 
     fun updateEpisodes(value: List<VideoPlayerViewModel.PlayableEpisode>) {
@@ -73,12 +87,12 @@ class PlayerSessionCoordinator {
     }
 
     fun updateRelatedVideos(value: List<VideoModel>) {
-        relatedVideos = value
+        relatedVideos = value.filter(::isAllowedVideo)
     }
 
     fun replacePlayQueue(playQueue: List<VideoModel>) {
         launchQueue.clear()
-        launchQueue.addAll(playQueue.filter(::isPlayableVideo))
+        launchQueue.addAll(playQueue.filter(::isAllowedVideo))
     }
 
     fun getLaunchVideo(): VideoModel? = launchVideo
@@ -90,6 +104,11 @@ class PlayerSessionCoordinator {
     fun getSelectedEpisodeIndex(): Int = selectedEpisodeIndex
 
     fun getSelectedEpisode(): VideoPlayerViewModel.PlayableEpisode? = episodes.getOrNull(selectedEpisodeIndex)
+
+    fun canPlayEpisode(index: Int): Boolean {
+        val episode = episodes.getOrNull(index) ?: return false
+        return isAllowedEpisode(episode)
+    }
 
     fun buildContinuationPlan(
         afterPlayMode: AfterPlayMode,
@@ -127,7 +146,7 @@ class PlayerSessionCoordinator {
             }
             AfterPlayMode.PLAY_QUEUE -> {
                 trimQueueAgainstCurrent(getCurrentVideo())
-                val queuedVideo = launchQueue.pollFirst()
+                val queuedVideo = pollNextAllowedQueuedVideo()
                 val target = queuedVideo?.toPreloadTarget(PlaybackPreloadTarget.Source.AUTOPLAY_COUNTDOWN)
                 if (queuedVideo != null && target != null) {
                     ContinuationPlan.PlayIntent(
@@ -146,7 +165,7 @@ class PlayerSessionCoordinator {
             }
             AfterPlayMode.NEXT_EPISODE -> {
                 // 严格按“播放合集中的下一个”执行；没有下一集时不再兜底播队列或推荐。
-                if (hasNextEpisode && nextEpisode != null) {
+                if (hasNextEpisode && nextEpisode != null && isAllowedEpisode(nextEpisode)) {
                     ContinuationPlan.PlayIntent(
                         ContinuationPlaybackIntent(
                             mode = afterPlayMode,
@@ -174,8 +193,16 @@ class PlayerSessionCoordinator {
     private fun nextRelatedVideo(): VideoModel? {
         val current = getCurrentVideo()
         return relatedVideos.firstOrNull { candidate ->
-            current == null || !isSameVideo(candidate, current)
+            isAllowedVideo(candidate) && (current == null || !isSameVideo(candidate, current))
         }
+    }
+
+    private fun pollNextAllowedQueuedVideo(): VideoModel? {
+        while (launchQueue.isNotEmpty()) {
+            val video = launchQueue.pollFirst()
+            if (isAllowedVideo(video)) return video
+        }
+        return null
     }
 
     private fun trimQueueAgainstCurrent(current: VideoModel?) {
@@ -187,6 +214,14 @@ class PlayerSessionCoordinator {
 
     private fun isPlayableVideo(video: VideoModel): Boolean {
         return video.hasPlaybackIdentity
+    }
+
+    private fun isAllowedVideo(video: VideoModel): Boolean {
+        return isPlayableVideo(video) && isVideoAllowed(video)
+    }
+
+    private fun isAllowedEpisode(episode: VideoPlayerViewModel.PlayableEpisode): Boolean {
+        return isEpisodeAllowed(episode)
     }
 
     private fun isSameVideo(left: VideoModel, right: VideoModel): Boolean {

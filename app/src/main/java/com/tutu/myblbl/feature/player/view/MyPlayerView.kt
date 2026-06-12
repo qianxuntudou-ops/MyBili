@@ -13,6 +13,7 @@ import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.Choreographer
 import android.view.GestureDetector
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -26,7 +27,10 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.view.ViewStub
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import androidx.annotation.OptIn
+import androidx.appcompat.widget.AppCompatTextView
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
@@ -64,6 +68,18 @@ interface DouyinModeKeyListener {
     fun isDouyinModeActive(): Boolean
     fun onDouyinNavigateNext(): Boolean
     fun onDouyinNavigatePrevious(): Boolean
+    fun peekDouyinNext(): DouyinModePreview?
+    fun peekDouyinPrevious(): DouyinModePreview?
+}
+
+data class DouyinModePreview(
+    val title: String,
+    val coverUrl: String
+)
+
+private enum class DouyinSwipeDirection(val value: Int) {
+    Next(1),
+    Previous(-1)
 }
 
 @OptIn(UnstableApi::class)
@@ -155,6 +171,19 @@ class MyPlayerView @JvmOverloads constructor(
     private var pendingDmMaskRequest: DmMaskRequest? = null
 
     private var touchInterceptListener: ((MotionEvent) -> Boolean)? = null
+    private var douyinPreviewLayer: FrameLayout? = null
+    private var douyinPreviewImage: ImageView? = null
+    private var douyinPreviewTitle: AppCompatTextView? = null
+    private var isDouyinDragging = false
+    private var douyinDragDirection: DouyinSwipeDirection? = null
+    private var douyinDragHasTarget = false
+    private var douyinTransitionRunning = false
+    private var douyinGestureCommittedTransition = false
+    private var douyinTouchStartedInInteractiveArea = false
+    private var douyinPendingTargetOffset = 0f
+    private var douyinFirstFrameWaitRegistered = false
+    private val douyinCommitThresholdRatio = 0.22f
+    private val douyinAnimationDurationMs = 220L
 
     private val controllerComponentListener = object : MyPlayerControlView.VisibilityListener {
         override fun onVisibilityChange(visibility: Int) {
@@ -418,6 +447,7 @@ class MyPlayerView @JvmOverloads constructor(
 
         bufferingView?.visibility = GONE
         errorMessageView?.visibility = GONE
+        setupDouyinPreviewLayer()
 
         AppLog.i("PlayerViewPerf", "setupController deferred")
         val settingStartMs = SystemClock.elapsedRealtime()
@@ -443,6 +473,45 @@ class MyPlayerView @JvmOverloads constructor(
             videoSurfaceView = surfaceView
             frame.addView(surfaceView, 0)
         }
+    }
+
+    private fun setupDouyinPreviewLayer() {
+        if (douyinPreviewLayer != null) return
+        val layer = FrameLayout(context).apply {
+            visibility = GONE
+            alpha = 0f
+            setBackgroundColor(Color.BLACK)
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        }
+        val image = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        }
+        val dim = View(context).apply {
+            setBackgroundColor(0x66000000)
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        }
+        val title = AppCompatTextView(context).apply {
+            setTextColor(Color.WHITE)
+            textSize = 22f
+            maxLines = 2
+            includeFontPadding = false
+            setShadowLayer(6f, 0f, 2f, Color.BLACK)
+            val horizontal = resources.getDimensionPixelSize(R.dimen.px50)
+            val bottom = resources.getDimensionPixelSize(R.dimen.px120)
+            setPadding(horizontal, 0, horizontal, 0)
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.BOTTOM
+                bottomMargin = bottom
+            }
+        }
+        layer.addView(image)
+        layer.addView(dim)
+        layer.addView(title)
+        addView(layer)
+        douyinPreviewLayer = layer
+        douyinPreviewImage = image
+        douyinPreviewTitle = title
     }
 
     private fun ensureController(reason: String): MyPlayerControlView? {
@@ -1103,12 +1172,7 @@ class MyPlayerView @JvmOverloads constructor(
             }
             if (!controllerVisible) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    // 抖音模式激活时，上下键完全消费，不呼出控制器
-                    if (douyinModeKeyListener?.isDouyinModeActive() == true) {
-                        when (event.keyCode) {
-                            KeyEvent.KEYCODE_DPAD_DOWN -> douyinModeKeyListener?.onDouyinNavigateNext()
-                            KeyEvent.KEYCODE_DPAD_UP -> douyinModeKeyListener?.onDouyinNavigatePrevious()
-                        }
+                    if (handleDouyinNavigationKey(event)) {
                         return true
                     }
                     if (!gestureListener.handleKeyDown(event) && !gestureListener.isDoubleTapping) {
@@ -1440,14 +1504,342 @@ class MyPlayerView @JvmOverloads constructor(
 
     // ==================== End timebar seek ====================
 
+    private fun handleDouyinSwipeTouch(event: MotionEvent): Boolean {
+        val listener = douyinModeKeyListener ?: return false
+        if (!listener.isDouyinModeActive()) return false
+        if (isSettingViewShowing() || douyinTransitionRunning || isSwipeSeeking) {
+            return false
+        }
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downTouchX = event.x
+                downTouchY = event.y
+                douyinTouchStartedInInteractiveArea =
+                    controller?.isTouchWithinInteractiveArea(event.x, event.y) == true
+                return false
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (douyinTouchStartedInInteractiveArea) return false
+                val deltaX = event.x - downTouchX
+                val deltaY = event.y - downTouchY
+                if (!isDouyinDragging) {
+                    val verticalDrag = kotlin.math.abs(deltaY) > touchSlop &&
+                        kotlin.math.abs(deltaY) > kotlin.math.abs(deltaX) * 1.25f
+                    if (!verticalDrag) return false
+
+                    val direction = if (deltaY < 0f) DouyinSwipeDirection.Next else DouyinSwipeDirection.Previous
+                    beginDouyinDrag(direction)
+                }
+                updateDouyinDrag(deltaY)
+                return true
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (!isDouyinDragging) return false
+                val deltaY = event.y - downTouchY
+                val shouldCommit = douyinDragHasTarget &&
+                    kotlin.math.abs(deltaY) >= height.coerceAtLeast(1) * douyinCommitThresholdRatio
+                val direction = douyinDragDirection
+                if (shouldCommit && direction != null) {
+                    finishDouyinSwipe(direction)
+                } else {
+                    cancelDouyinSwipe()
+                }
+                return true
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                if (!isDouyinDragging) return false
+                cancelDouyinSwipe()
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun handleDouyinNavigationKey(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) return false
+        if (settingView?.isShowing() == true || seekSession?.isActive() == true || timebarSeekActive || tapCommitRunnable != null) {
+            return false
+        }
+        if (douyinModeKeyListener?.isDouyinModeActive() != true) return false
+        return when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KEYCODE_SYSTEM_NAVIGATION_DOWN_COMPAT -> {
+                hideController()
+                douyinModeKeyListener?.onDouyinNavigateNext()
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_UP,
+            KEYCODE_SYSTEM_NAVIGATION_UP_COMPAT -> {
+                hideController()
+                douyinModeKeyListener?.onDouyinNavigatePrevious()
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun beginDouyinDrag(direction: DouyinSwipeDirection) {
+        val preview = douyinPreview(direction)
+        isDouyinDragging = true
+        douyinDragDirection = direction
+        douyinDragHasTarget = preview != null
+        parent?.requestDisallowInterceptTouchEvent(true)
+        hideController()
+        prepareDouyinPreview(direction, preview)
+    }
+
+    private fun douyinPreview(direction: DouyinSwipeDirection): DouyinModePreview? {
+        val listener = douyinModeKeyListener ?: return null
+        return when (direction) {
+            DouyinSwipeDirection.Next -> listener.peekDouyinNext()
+            DouyinSwipeDirection.Previous -> listener.peekDouyinPrevious()
+        }
+    }
+
+    private fun prepareDouyinPreview(direction: DouyinSwipeDirection, preview: DouyinModePreview?) {
+        val layer = douyinPreviewLayer ?: return
+        layer.animate().cancel()
+        contentFrame?.animate()?.cancel()
+        dmkMaskHost?.animate()?.cancel()
+        val h = height.coerceAtLeast(1).toFloat()
+        douyinPendingTargetOffset = if (direction == DouyinSwipeDirection.Next) h else -h
+        douyinPreviewTitle?.text = preview?.title.orEmpty()
+        if (preview?.coverUrl?.isNotBlank() == true) {
+            douyinPreviewImage?.let { ImageLoader.loadVideoCover(it, preview.coverUrl) }
+        } else {
+            douyinPreviewImage?.setImageResource(R.drawable.default_video)
+        }
+        layer.translationY = douyinPendingTargetOffset
+        layer.alpha = if (preview == null) 0f else 1f
+        layer.visibility = if (preview == null) GONE else VISIBLE
+        restoreOverlayZOrder()
+    }
+
+    private fun updateDouyinDrag(deltaY: Float) {
+        val direction = douyinDragDirection ?: return
+        val h = height.coerceAtLeast(1).toFloat()
+        val signedDelta = when (direction) {
+            DouyinSwipeDirection.Next -> deltaY.coerceAtMost(0f)
+            DouyinSwipeDirection.Previous -> deltaY.coerceAtLeast(0f)
+        }
+        val dragOffset = if (douyinDragHasTarget) {
+            signedDelta.coerceIn(-h, h)
+        } else {
+            (signedDelta * 0.18f).coerceIn(-h * 0.16f, h * 0.16f)
+        }
+        applyDouyinContentTranslation(dragOffset)
+        douyinPreviewLayer?.let { layer ->
+            layer.translationY = douyinPendingTargetOffset + dragOffset
+            layer.alpha = if (douyinDragHasTarget) 1f else 0f
+        }
+    }
+
+    private fun finishDouyinSwipe(direction: DouyinSwipeDirection) {
+        isDouyinDragging = false
+        douyinTransitionRunning = true
+        val h = height.coerceAtLeast(1).toFloat()
+        val exitOffset = if (direction == DouyinSwipeDirection.Next) -h else h
+        animateDouyinLayers(
+            contentOffset = exitOffset,
+            previewOffset = 0f,
+            durationMs = douyinAnimationDurationMs
+        ) {
+            douyinGestureCommittedTransition = true
+            val handled = when (direction) {
+                DouyinSwipeDirection.Next -> douyinModeKeyListener?.onDouyinNavigateNext() == true
+                DouyinSwipeDirection.Previous -> douyinModeKeyListener?.onDouyinNavigatePrevious() == true
+            }
+            if (!handled) {
+                resetDouyinVisualState()
+                douyinTransitionRunning = false
+                return@animateDouyinLayers
+            }
+            postDelayed({
+                if (douyinTransitionRunning) {
+                    resetDouyinVisualState()
+                    douyinTransitionRunning = false
+                }
+            }, 3000)
+        }
+    }
+
+    private fun cancelDouyinSwipe() {
+        isDouyinDragging = false
+        animateDouyinLayers(
+            contentOffset = 0f,
+            previewOffset = douyinPendingTargetOffset,
+            durationMs = 180L,
+            useOvershoot = true
+        ) {
+            resetDouyinVisualState()
+        }
+    }
+
+    fun startDouyinPageTransition(
+        directionValue: Int,
+        targetPreview: DouyinModePreview? = null,
+        onReady: () -> Unit
+    ): Boolean {
+        if (douyinGestureCommittedTransition) {
+            douyinGestureCommittedTransition = false
+            onReady()
+            return true
+        }
+        if (douyinTransitionRunning || isDouyinDragging) return false
+        val direction = if (directionValue >= 0) DouyinSwipeDirection.Next else DouyinSwipeDirection.Previous
+        douyinTransitionRunning = true
+        prepareDouyinPreview(direction, targetPreview ?: douyinPreview(direction))
+        val h = height.coerceAtLeast(1).toFloat()
+        val exitOffset = if (direction == DouyinSwipeDirection.Next) -h else h
+        animateDouyinLayers(
+            contentOffset = exitOffset,
+            previewOffset = 0f,
+            durationMs = douyinAnimationDurationMs
+        ) {
+            onReady()
+            postDelayed({
+                if (douyinTransitionRunning) {
+                    resetDouyinVisualState()
+                    douyinTransitionRunning = false
+                }
+            }, 3000)
+        }
+        return true
+    }
+
+    fun consumeDouyinGestureTransition(): Boolean {
+        if (!douyinGestureCommittedTransition) return false
+        douyinGestureCommittedTransition = false
+        return true
+    }
+
+    fun awaitDouyinPageTransitionFirstFrame() {
+        if (!douyinTransitionRunning || douyinFirstFrameWaitRegistered) return
+        douyinFirstFrameWaitRegistered = true
+        observeNextFirstFrame {
+            resetDouyinVisualState()
+            douyinTransitionRunning = false
+        }
+    }
+
+    fun cancelDouyinPageTransition() {
+        douyinGestureCommittedTransition = false
+        douyinTransitionRunning = false
+        isDouyinDragging = false
+        resetDouyinVisualState()
+    }
+
+    fun showDouyinBoundaryBounce(directionValue: Int) {
+        if (douyinTransitionRunning || isDouyinDragging) return
+        val direction = if (directionValue >= 0) DouyinSwipeDirection.Next else DouyinSwipeDirection.Previous
+        val h = height.coerceAtLeast(1).toFloat()
+        val bounceOffset = h * 0.08f * if (direction == DouyinSwipeDirection.Next) -1f else 1f
+        applyDouyinContentTranslation(bounceOffset)
+        contentFrame?.animate()
+            ?.translationY(0f)
+            ?.setDuration(180L)
+            ?.setInterpolator(OvershootInterpolator(0.7f))
+            ?.start()
+        dmkMaskHost?.animate()
+            ?.translationY(0f)
+            ?.setDuration(180L)
+            ?.setInterpolator(OvershootInterpolator(0.7f))
+            ?.start()
+    }
+
+    private fun animateDouyinLayers(
+        contentOffset: Float,
+        previewOffset: Float,
+        durationMs: Long,
+        useOvershoot: Boolean = false,
+        onEnd: () -> Unit
+    ) {
+        val interpolator = if (useOvershoot) OvershootInterpolator(0.7f) else DecelerateInterpolator()
+        var remaining = 2
+        fun markEnd() {
+            remaining--
+            if (remaining <= 0) onEnd()
+        }
+        val contentAnimator = contentFrame?.animate()
+        val maskAnimator = dmkMaskHost?.animate()
+        if (contentAnimator == null && maskAnimator == null) {
+            remaining--
+        } else {
+            contentAnimator?.translationY(contentOffset)
+                ?.setDuration(durationMs)
+                ?.setInterpolator(interpolator)
+                ?.withEndAction { markEnd() }
+                ?.start()
+            maskAnimator?.translationY(contentOffset)
+                ?.setDuration(durationMs)
+                ?.setInterpolator(interpolator)
+                ?.start()
+            if (contentAnimator == null) markEnd()
+        }
+        val layer = douyinPreviewLayer
+        if (layer == null) {
+            markEnd()
+        } else {
+            layer.animate()
+                .translationY(previewOffset)
+                .alpha(1f)
+                .setDuration(durationMs)
+                .setInterpolator(interpolator)
+                .withEndAction { markEnd() }
+                .start()
+        }
+    }
+
+    private fun applyDouyinContentTranslation(offset: Float) {
+        contentFrame?.translationY = offset
+        dmkMaskHost?.translationY = offset
+    }
+
+    private fun resetDouyinVisualState() {
+        parent?.requestDisallowInterceptTouchEvent(false)
+        douyinPreviewLayer?.animate()?.cancel()
+        contentFrame?.animate()?.cancel()
+        dmkMaskHost?.animate()?.cancel()
+        applyDouyinContentTranslation(0f)
+        douyinPreviewLayer?.visibility = GONE
+        douyinPreviewLayer?.alpha = 0f
+        douyinPreviewLayer?.translationY = 0f
+        douyinDragDirection = null
+        douyinDragHasTarget = false
+        douyinTouchStartedInInteractiveArea = false
+        douyinPendingTargetOffset = 0f
+        douyinFirstFrameWaitRegistered = false
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        touchInterceptListener?.let { if (it(event)) return true }
+        if (isDouyinDragging && handleDouyinSwipeTouch(event)) {
+            return true
+        }
+        if (handleDouyinSwipeTouch(event)) {
+            return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        touchInterceptListener?.let { if (it(event)) return true }
+        if (isDouyinDragging && handleDouyinSwipeTouch(event)) {
+            return true
+        }
         if (isSwipeSeeking && handleSwipeSeekTouch(event)) {
             return true
         }
         if (controller?.isTouchWithinInteractiveArea(event.x, event.y) == true) {
             return false
+        }
+        if (handleDouyinSwipeTouch(event)) {
+            return true
         }
         if (handleSwipeSeekTouch(event)) {
             return true
@@ -1706,6 +2098,7 @@ class MyPlayerView @JvmOverloads constructor(
         dmkMaskHost?.bringToFront()
         findViewById<View>(R.id.interaction_view)?.bringToFront()
         pauseIndicatorView?.bringToFront()
+        douyinPreviewLayer?.bringToFront()
         controllerLayer?.bringToFront()
         seekOverlayView?.bringToFront()
         settingView?.bringToFront()
@@ -1713,9 +2106,10 @@ class MyPlayerView @JvmOverloads constructor(
             dmkMaskHost?.translationZ = 1f
             findViewById<View>(R.id.interaction_view)?.translationZ = 2f
             pauseIndicatorView?.translationZ = 3f
-            controllerLayer?.translationZ = 4f
-            seekOverlayView?.translationZ = 5f
-            settingView?.translationZ = 6f
+            douyinPreviewLayer?.translationZ = 4f
+            controllerLayer?.translationZ = 5f
+            seekOverlayView?.translationZ = 6f
+            settingView?.translationZ = 7f
         }
     }
 
