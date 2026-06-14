@@ -657,6 +657,9 @@ class VideoPlayerViewModel(
     private val danmakuPublishPendingSegments = linkedSetOf<Int>()
     private val publishedRegularDanmakuKeys = HashSet<String>()
     private val publishedSpecialDanmakuKeys = HashSet<String>()
+    // 弹幕发布专用单线程后台 dispatcher：保证多次发布的计算/emit 顺序（replace 先于 append），
+    // 同时把去重、排序、identityKey 预算移出主线程（P1：init 发布 3000 条曾主线程耗时 37ms）。
+    private val danmakuPublishDispatcher = Dispatchers.Default.limitedParallelism(1)
     private var currentDanmakuSegmentIndex: Int = -1
     private var danmakuTotalSegments: Int = 0
     private var currentDanmakuFilterContext: DanmakuFilterContext = DanmakuFilterContext.EMPTY
@@ -4240,57 +4243,63 @@ class VideoPlayerViewModel(
 
     private fun publishDanmaku(items: List<DmModel>, replace: Boolean) {
         val startedAtMs = SystemClock.elapsedRealtime()
-        val normalizedItems = items.distinctRegularDanmaku()
-        if (replace && normalizedItems.isNotEmpty() && firstDanmakuTraceLoggedId != currentStartupTraceId) {
-            firstDanmakuTraceLoggedId = currentStartupTraceId
-            PlaybackStartupTrace.log(
-                traceId = currentStartupTraceId,
-                startElapsedMs = currentStartupTraceStartElapsedMs,
-                step = "first_danmaku_published",
-                message = "count=${normalizedItems.size} cid=$currentCid"
-            )
-        }
-        val emittedItems = if (replace) {
-            publishedRegularDanmakuKeys.clear()
-            normalizedItems.forEach { publishedRegularDanmakuKeys.add(it.danmakuIdentityKey()) }
-            normalizedItems
-        } else {
-            normalizedItems.filter { publishedRegularDanmakuKeys.add(it.danmakuIdentityKey()) }
-        }
-        if (!replace && emittedItems.size != normalizedItems.size) {
-            PlaybackStartupTrace.log(
-                traceId = currentStartupTraceId,
-                startElapsedMs = currentStartupTraceStartElapsedMs,
-                step = "danmaku_publish_dedup",
-                message = "input=${normalizedItems.size} emitted=${emittedItems.size} dropped=${normalizedItems.size - emittedItems.size}"
-            )
-        }
-        _danmaku.value = if (replace) {
-            if (normalizedItems.isEmpty()) emptyList() else DANMAKU_AVAILABLE_MARKER
-        } else {
-            if (_danmaku.value.orEmpty().isNotEmpty() || emittedItems.isNotEmpty()) {
-                DANMAKU_AVAILABLE_MARKER
-            } else {
-                emptyList()
+        viewModelScope.launch(danmakuPublishDispatcher) {
+            // 后台单线程：去重 + 排序 + 预算 identityKey（P1 主线程开销大头，3000 条曾耗时 37ms）。
+            val normalizedItems = items.distinctRegularDanmaku()
+            val normalizedKeys = normalizedItems.map { it.danmakuIdentityKey() }
+            withContext(Dispatchers.Main.immediate) {
+                if (replace && normalizedItems.isNotEmpty() && firstDanmakuTraceLoggedId != currentStartupTraceId) {
+                    firstDanmakuTraceLoggedId = currentStartupTraceId
+                    PlaybackStartupTrace.log(
+                        traceId = currentStartupTraceId,
+                        startElapsedMs = currentStartupTraceStartElapsedMs,
+                        step = "first_danmaku_published",
+                        message = "count=${normalizedItems.size} cid=$currentCid"
+                    )
+                }
+                val emittedItems = if (replace) {
+                    publishedRegularDanmakuKeys.clear()
+                    publishedRegularDanmakuKeys.addAll(normalizedKeys)
+                    normalizedItems
+                } else {
+                    normalizedItems.filterIndexed { i, _ -> publishedRegularDanmakuKeys.add(normalizedKeys[i]) }
+                }
+                if (!replace && emittedItems.size != normalizedItems.size) {
+                    PlaybackStartupTrace.log(
+                        traceId = currentStartupTraceId,
+                        startElapsedMs = currentStartupTraceStartElapsedMs,
+                        step = "danmaku_publish_dedup",
+                        message = "input=${normalizedItems.size} emitted=${emittedItems.size} dropped=${normalizedItems.size - emittedItems.size}"
+                    )
+                }
+                _danmaku.value = if (replace) {
+                    if (normalizedItems.isEmpty()) emptyList() else DANMAKU_AVAILABLE_MARKER
+                } else {
+                    if (_danmaku.value.orEmpty().isNotEmpty() || emittedItems.isNotEmpty()) {
+                        DANMAKU_AVAILABLE_MARKER
+                    } else {
+                        emptyList()
+                    }
+                }
+                logDanmakuPublishPerf(
+                    type = "regular",
+                    replace = replace,
+                    inputCount = items.size,
+                    normalizedCount = normalizedItems.size,
+                    emittedCount = emittedItems.size,
+                    totalPublishedKeys = publishedRegularDanmakuKeys.size,
+                    startedAtMs = startedAtMs
+                )
+                if (!replace && emittedItems.isEmpty()) {
+                    return@withContext
+                }
+                _danmakuUpdates.tryEmit(DanmakuUpdate(
+                    items = emittedItems,
+                    replace = replace,
+                    filterContext = currentDanmakuFilterContext
+                ))
             }
         }
-        logDanmakuPublishPerf(
-            type = "regular",
-            replace = replace,
-            inputCount = items.size,
-            normalizedCount = normalizedItems.size,
-            emittedCount = emittedItems.size,
-            totalPublishedKeys = publishedRegularDanmakuKeys.size,
-            startedAtMs = startedAtMs
-        )
-        if (!replace && emittedItems.isEmpty()) {
-            return
-        }
-        _danmakuUpdates.tryEmit(DanmakuUpdate(
-            items = emittedItems,
-            replace = replace,
-            filterContext = currentDanmakuFilterContext
-        ))
     }
 
     private fun publishSpecialDanmaku(items: List<SpecialDanmakuModel>, replace: Boolean) {
