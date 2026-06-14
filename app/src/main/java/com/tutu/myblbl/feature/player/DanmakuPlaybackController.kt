@@ -262,7 +262,6 @@ internal class DanmakuPlaybackController(
             // 2. 计算初始段（根据 seekPosition，使用协程启动前的快照）
             val initialSegment = resolveDanmakuSegmentIndex(seekPositionMs)
                 .takeIf { it > 0 } ?: eagerInitialSegment
-            val useInitialPartialSegment = initialSegment == 1 && seekPositionMs < FIRST_DANMAKU_PARTIAL_END_MS
             currentDanmakuSegmentIndex = initialSegment
             PlaybackStartupTrace.log(
                 traceId = context.startupTraceId,
@@ -271,7 +270,7 @@ internal class DanmakuPlaybackController(
                 message = "cid=$cid seekMs=$seekPositionMs segment=$initialSegment total=$segmentCount"
             )
 
-            // 3. 当前段先发布；特殊弹幕和下一段后台补，避免首段弹幕被额外请求拖慢。
+            // 3. 加载整段弹幕（与 B 站一致：一个 segment 一次请求，6 分钟数据一次拿全）
             danmakuLoadingSegments.add(initialSegment)
             val currentPayload = try {
                 val preloaded = if (initialSegment == eagerInitialSegment) {
@@ -293,7 +292,7 @@ internal class DanmakuPlaybackController(
                     preloaded
                 } else {
                     val douyinCached = takeDouyinDanmakuSegmentCache(cid, aid, initialSegment)
-                    if (douyinCached != null && useInitialPartialSegment) {
+                    if (douyinCached != null) {
                         PlaybackStartupTrace.log(
                             traceId = context.startupTraceId,
                             startElapsedMs = context.startupTraceStartElapsedMs,
@@ -306,10 +305,7 @@ internal class DanmakuPlaybackController(
                             cid = cid,
                             aid = aid,
                             segmentIndices = listOf(initialSegment),
-                            expectedSegmentCount = if (useInitialPartialSegment) 0 else expectedSegmentCount,
-                            rangeStartMs = if (useInitialPartialSegment) 0L else null,
-                            rangeEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null,
-                            parseEndMs = if (useInitialPartialSegment) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
+                            expectedSegmentCount = expectedSegmentCount
                         )
                     }
                 }
@@ -330,14 +326,8 @@ internal class DanmakuPlaybackController(
             }
             // 缓存当前段
             danmakuSegmentPayloads[initialSegment] = currentPayload
-            if (!useInitialPartialSegment) {
-                danmakuLoadedSegments.add(initialSegment)
-            }
-            danmakuSegmentCoveredUntilMs[initialSegment] = if (useInitialPartialSegment) {
-                FIRST_DANMAKU_INITIAL_RANGE_END_MS
-            } else {
-                initialSegment.toLong() * DANMAKU_SEGMENT_DURATION_MS
-            }
+            danmakuLoadedSegments.add(initialSegment)
+            danmakuSegmentCoveredUntilMs[initialSegment] = initialSegment.toLong() * DANMAKU_SEGMENT_DURATION_MS
             danmakuPublishedSegments.clear()
             danmakuPublishedSegments.add(initialSegment)
             publishDanmaku(currentPayload.regularItems, replace = true)
@@ -348,39 +338,6 @@ internal class DanmakuPlaybackController(
                 danmakuView = danmakuView
             )
             trimDistantDanmakuSegments()
-
-            if (useInitialPartialSegment) {
-                launch(Dispatchers.IO) {
-                    loadAndPublishInitialTailRange(
-                        cid = cid,
-                        aid = aid,
-                        segmentIndex = initialSegment,
-                        loadGeneration = loadGeneration,
-                        basePayload = currentPayload,
-                        delayMs = resolveInitialTailLoadDelayMs(
-                            boundaryMs = FIRST_DANMAKU_INITIAL_PARSE_END_MS,
-                            minDelayMs = 0L
-                        ),
-                        rangeStartMs = FIRST_DANMAKU_INITIAL_PARSE_END_MS,
-                        rangeEndMs = FIRST_DANMAKU_PARTIAL_END_MS
-                    )
-                }
-                launch(Dispatchers.IO) {
-                    loadAndPublishInitialTailRange(
-                        cid = cid,
-                        aid = aid,
-                        segmentIndex = initialSegment,
-                        loadGeneration = loadGeneration,
-                        basePayload = currentPayload,
-                        delayMs = resolveInitialTailLoadDelayMs(
-                            boundaryMs = FIRST_DANMAKU_PARTIAL_END_MS,
-                            minDelayMs = FIRST_DANMAKU_FAR_TAIL_MIN_DELAY_MS
-                        ),
-                        rangeStartMs = FIRST_DANMAKU_PARTIAL_END_MS,
-                        rangeEndMs = DANMAKU_SEGMENT_DURATION_MS
-                    )
-                }
-            }
 
             launch(Dispatchers.IO) {
                 val specialPayload = loadSpecialDanmakuPayload(danmakuView?.specialDanmakuUrls.orEmpty())
@@ -469,15 +426,10 @@ internal class DanmakuPlaybackController(
             traceId = context.startupTraceId,
             startElapsedMs = context.startupTraceStartElapsedMs,
             step = "danmaku_segment_preload_started",
-            message = "cid=$cid segment=$segmentIndex range=${formatDanmakuRange(
-                if (segmentIndex == 1) 0L else null,
-                if (segmentIndex == 1) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
-            )}"
+            message = "cid=$cid segment=$segmentIndex"
         )
         danmakuSegmentPreloadJob = scope.launch(Dispatchers.IO) {
             val startedAt = SystemClock.elapsedRealtime()
-            val preloadPartialStartMs = if (segmentIndex == 1) 0L else null
-            val preloadPartialEndMs = if (segmentIndex == 1) FIRST_DANMAKU_INITIAL_RANGE_END_MS else null
             val payload = loadDanmakuSegmentPayload(
                 cid = cid,
                 aid = aid,
@@ -485,10 +437,7 @@ internal class DanmakuPlaybackController(
                 expectedSegmentCount = resolveExpectedDanmakuSegmentCount(
                     totalCount = preloadedDanmakuView?.totalCount ?: danmakuViewCache[cid]?.first?.totalCount ?: 0L,
                     totalSegments = preloadedDanmakuView?.totalSegments ?: danmakuViewCache[cid]?.first?.totalSegments ?: 0
-                ).takeIf { preloadPartialEndMs == null } ?: 0,
-                rangeStartMs = preloadPartialStartMs,
-                rangeEndMs = preloadPartialEndMs,
-                parseEndMs = preloadPartialEndMs
+                )
             )
             withContext(Dispatchers.Main) {
                 preloadedDanmakuSegmentCid = cid
@@ -588,10 +537,7 @@ internal class DanmakuPlaybackController(
             cid = cid,
             aid = aid,
             segmentIndices = listOf(segmentIndex),
-            expectedSegmentCount = 0,
-            rangeStartMs = 0L,
-            rangeEndMs = FIRST_DANMAKU_INITIAL_RANGE_END_MS,
-            parseEndMs = FIRST_DANMAKU_INITIAL_RANGE_END_MS
+            expectedSegmentCount = 0
         )
         synchronized(douyinDanmakuSegmentCache) {
             douyinDanmakuSegmentCache[cacheKey] = payload to System.currentTimeMillis()
